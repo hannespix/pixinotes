@@ -5,6 +5,7 @@ import type { FrameNode } from '../../types';
 import { frameMembers } from '../../lib/arrange';
 import { zahlWort } from '../../lib/sprache';
 import { rahmenReiseStarten } from '../../lib/rahmenReise';
+import { overlayOffen } from '../../lib/overlay';
 
 /**
  * Frame (M149/M150): benannter Rahmen-Bereich à la Miro. Liegt hinter allen
@@ -39,6 +40,9 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
       if (e.key !== 'F2' || e.altKey || e.ctrlKey || e.metaKey) return;
       const t = e.target as HTMLElement | null;
       if (t?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+      // M521: Liegt ein Fenster darüber (Einstellungen, Hilfe, Suche), gehört die Taste ihm — sonst ging dahinter das
+      // Namensfeld auf und zog den Fokus aus dem Fenster
+      if (overlayOffen()) return;
       e.preventDefault();
       setDraft(data.name); setEditing(true);
     };

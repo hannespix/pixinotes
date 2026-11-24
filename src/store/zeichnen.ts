@@ -12,6 +12,26 @@ import { zeitNachPatch } from './karten';
 /** Radier-Geste: erster Treffer erzeugt den History-Eintrag, Rest der Geste nicht */
 let eraseSnapPending = false;
 
+/**
+ * M521: Welche Punkte eines Strichs trifft der Radierer? Geprüft wird die gezeichnete LINIE, nicht nur ihre
+ * Stützpunkte: Eine begradigte Linie hat zwei Punkte, ein eingerastetes Rechteck fünf — dazwischen lag vorher nichts,
+ * was der Radierer treffen konnte (er wirkte nur an den Enden bzw. Ecken). Liegt die Strecke zwischen zwei Punkten im
+ * Radius, gelten beide als getroffen.
+ */
+function radiert(rel: [number, number][], ox: number, oy: number, x: number, y: number, radius: number): boolean[] {
+  const drin = rel.map((p) => Math.hypot(p[0] + ox - x, p[1] + oy - y) < radius);
+  for (let i = 0; i + 1 < rel.length; i += 1) {
+    if (drin[i] && drin[i + 1]) continue;
+    const ax = rel[i][0] + ox; const ay = rel[i][1] + oy;
+    const dx = rel[i + 1][0] + ox - ax; const dy = rel[i + 1][1] + oy - ay;
+    const l2 = dx * dx + dy * dy;
+    if (l2 <= radius * radius) continue;          // dichter als der Radius: Die Punkte selbst genügen
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / l2));
+    if (Math.hypot(x - (ax + t * dx), y - (ay + t * dy)) < radius) { drin[i] = true; drin[i + 1] = true; }
+  }
+  return drin;
+}
+
 /** M480: Teil des Board-Speichers – Zeichnen */
 export function zeichnenScheibe(set: Setzen, get: Holen, patchActive: AufsOffene) {
   return {
@@ -111,7 +131,7 @@ export function zeichnenScheibe(set: Setzen, get: Holen, patchActive: AufsOffene
         const o = offsetOf(s);
         if (!o) { neu.push(s); continue; }
         const rel = strichRelativ(s); // M335: Seitenstriche umgerechnet, verdeckte leer
-        const drin = rel.map((p) => Math.hypot(p[0] + o[0] - x, p[1] + o[1] - y) < radius);
+        const drin = radiert(rel, o[0], o[1], x, y, radius);
         if (!drin.some(Boolean)) { neu.push(s); continue; }
         geaendert = true;
         // Eingerastete Formen (wenige Punkte) verschwinden ganz — ein halbes Rechteck will niemand
@@ -146,7 +166,7 @@ export function zeichnenScheibe(set: Setzen, get: Holen, patchActive: AufsOffene
       };
       const near = (s: Stroke) => {
         const o = offsetOf(s);
-        return !!o && strichRelativ(s).some((p) => Math.hypot(p[0] + o[0] - x, p[1] + o[1] - y) < radius);
+        return !!o && radiert(strichRelativ(s), o[0], o[1], x, y, radius).some(Boolean);
       };
       if (!(board.drawings ?? []).some(near)) return;
       // pro Radier-Geste genau EIN History-Eintrag (beim ersten Treffer)

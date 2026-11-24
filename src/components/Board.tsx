@@ -910,6 +910,9 @@ export function Board() {
         return;
       }
       if (e.key.toLowerCase() !== 'n' || e.metaKey || e.ctrlKey || e.altKey) return;
+      // M521: Im Karten-Fokus liegt die Bildmitte unter der offenen Karte — die neue Notiz entstand dahinter, unsichtbar,
+      // und nahm den Schreib-Cursor mit
+      if (st.focusCard) return;
       addNode(makeNote(screenToFlowPosition({ x: window.innerWidth / 2 - 130, y: window.innerHeight / 2 - 40 })));
     };
     window.addEventListener('keydown', onKey);
@@ -1686,6 +1689,9 @@ export function Board() {
       // Offene Overlays (Suche, Einstellungen, Aufgaben, Hilfe, Präsentation) nicht unterlaufen
       const st = useBoard.getState();
       if (st.searchOpen || st.settingsOpen || st.tasksOpen || st.helpOpen || st.presenting) return;
+      // M521: … und jedes andere Fenster (Teilen, Versionen, Vorlagen, Ticket): Lag der Fokus dort auf einem Knopf,
+      // entstand hinter dem Fenster eine Notiz bzw. ein Bild
+      if (overlayOffen()) return;
 
       const dt = e.clipboardData;
       if (!dt) return;
@@ -1799,10 +1805,11 @@ export function Board() {
         onNodesChange={onNodesChangeFang}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        onBeforeDelete={async ({ nodes: delNodes }) => {
+        onBeforeDelete={async ({ nodes: delNodes, edges: delEdges }) => {
           // Entf-Taste: durch removeNodes leiten, damit Undo auch die Kanten kennt (M1)
           if (delNodes.length === 0) return true;
-          removeNodes(delNodes.map((n) => n.id));
+          // M521: … samt der mitgewählten Verbindungen — vorher blieb eine gewählte Verbindung zwischen anderen Karten stehen
+          removeNodes(delNodes.map((n) => n.id), delEdges.map((k) => k.id));
           return false;
         }}
         onNodeDragStart={onNodeDragStart}

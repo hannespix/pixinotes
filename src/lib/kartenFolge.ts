@@ -146,10 +146,22 @@ export function kartenFolge(karten: AppNode[], edges: Edge[]): AppNode[] {
   const zeige = (ids: string[]) => { for (const id of ids) if (!gezeigt.has(id)) { gezeigt.add(id); aus.push(vonId.get(id)!); } };
   /** Eine Karte zeigen – mit allem, was an ihr hängt */
   const mitGruppe = (id: string) => zeige(ordne(gruppen[gruppeVon.get(id)!]));
-  // leere Rahmen: vor der ersten Karte, die unter ihrer Oberkante beginnt
+  // Leere Rahmen stehen in der Lesefolge: vor der ersten Karte, die nach ihnen kommt.
+  // M521: Vorher zählte allein die Höhe („vor der ersten Karte, die unter ihrer Oberkante beginnt") – ein leerer
+  // Rahmen stand damit vor ALLEM in seiner Zeile, auch vor dem, was links von ihm liegt: In einer Reihe von Rahmen kam
+  // der leere zuerst, Rahmen-Reise und Vortrag begannen in der Mitte. Jetzt gilt die Zeile wie in `leseFolge`: Ein
+  // Rahmen steht mit seinem Kopf (Titel und oberer Teil) in einer Zeile; verglichen wird mit der Karte bzw. – liegt
+  // sie in einem Rahmen – mit dessen Kopf, denn dort beginnt ihr Abschnitt.
+  const RAHMEN_KOPF = 120;
+  const kasten = (k: AppNode) => { const m = mass(k); const h = k.type === 'frame' ? Math.min(m.h, RAHMEN_KOPF) : m.h; return { x: k.position.x, oben: k.position.y, unten: k.position.y + h, h }; };
+  const liegtVor = (f: AppNode, n: AppNode) => {
+    const a = kasten(f); const b = kasten(vonId.get(rahmenVon.get(n.id) ?? '') ?? n);
+    const eineZeile = Math.min(a.unten, b.unten) - Math.max(a.oben, b.oben) >= 0.5 * Math.min(a.h, b.h);
+    return eineZeile ? a.x <= b.x : a.oben <= b.oben;
+  };
   const leer = rahmen.filter((f) => ![...rahmenVon.values()].includes(f.id)).sort((a, b) => (a.position.y - b.position.y) || (a.position.x - b.position.x));
   for (const n of teil) {
-    while (leer.length && leer[0].position.y <= n.position.y) zeige([leer.shift()!.id]);
+    for (const f of leer) if (!gezeigt.has(f.id) && liegtVor(f, n)) zeige([f.id]);
     if (gezeigt.has(n.id)) continue;
     const f = rahmenVon.get(n.id);
     if (!f) { mitGruppe(n.id); continue; }
