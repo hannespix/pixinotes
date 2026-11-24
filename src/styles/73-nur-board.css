@@ -7,7 +7,7 @@
    Maßen — die gemessene Kopfhöhe bleibt, nichts rechnet nach). Was zeigt, dass andere da sind und wohin jemand zeigt,
    bleibt: Zeiger der Gäste, Laser, Reaktionen. Die Bedienung in den Karten (M421) steht in 99-bedienung-im-fokus.css. */
 html[data-nur-board] :is(
-    .app > .topbar, .app > .tabs, .app > .dock, .app > .legal-corner, .app > .lese-band,
+    .app > .topbar, .app > .tabs, .app > .dock, .app > .legal-corner, .dauerbaender > .lese-band,   /* M511: im Stapel */
     .backlinks, .live-leiste, .zeig-band, .gruppen-timer, .punkte-leiste, .sprach-hinweis, .draw-palette,
     .sel-toolbar, .sel-toolbar-dock, .sel-menu-fixed, .sel-toolbar-anker,
     .pn-minimap, .fokus-spur, .empty-board-hint, .app > .toast:not(.wichtig)

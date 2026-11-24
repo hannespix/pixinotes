@@ -1,9 +1,9 @@
 /* ---------- M364: Gruppenarbeit — wer ist dabei, wer bearbeitet welche Karte ---------- */
 .live-leiste {
-  position: fixed; top: calc(58px + var(--safe-top) + var(--app-rand)); right: calc(14px + var(--app-rand));
+  position: fixed; top: calc(58px + var(--safe-top) + var(--app-rand)); right: calc(14px + var(--app-rand) + var(--safe-right));
   display: flex; align-items: center; gap: 4px;
   background: var(--surface-card); border: 1px solid var(--border); border-radius: 999px;
-  box-shadow: var(--pop-shadow); padding: 4px 10px 4px 4px; z-index: 55;
+  box-shadow: var(--pop-shadow); padding: 4px 10px 4px 4px; z-index: var(--ebene-live);
   font-size: 12px; color: var(--muted); white-space: nowrap;
 }
 .live-chip {
@@ -19,7 +19,7 @@
 .live-zahl { margin-left: 6px; }
 .focus-mode .live-leiste { display: none; }
 @media (max-width: 520px) {
-  .live-leiste { top: calc(54px + var(--safe-top) + var(--app-rand)); right: calc(8px + var(--app-rand)); }
+  .live-leiste { top: calc(54px + var(--safe-top) + var(--app-rand)); right: calc(8px + var(--app-rand) + var(--safe-right)); }
   .live-zahl { display: none; }
   .live-leiste { padding-right: 4px; }
 }
@@ -192,6 +192,24 @@ html[data-alles-zeigen] .punkte-leiste { display: none !important; }
 .reakt-wahl button:hover, .reakt-wahl button:focus-visible { background: var(--surface-3); transform: scale(1.18); outline: none; }
 .reakt-wahl button:active { transform: scale(.92); }
 .presenter-head .reakt-wahl { right: 0; }
+/* M511: Mit dem Finger ist jedes Reaktions-Ziel 44 px groß. Der Knopf in der Leiste bleibt sichtbar ein kleiner Kreis
+   (durchsichtiger Rand um die Fläche), die Leiste wird so hoch wie Kopfzeile und Reiter. */
+@media (pointer: coarse) {
+  .live-leiste { padding-top: 0; padding-bottom: 0; }
+  .live-mehr { min-height: 44px; }
+  .live-zeig.reakt-knopf {
+    width: 44px; height: 44px; margin-left: 0; border: 7px solid transparent; background-clip: padding-box;
+    box-shadow: inset 0 0 0 1px var(--border-soft); -webkit-tap-highlight-color: transparent;
+  }
+  .live-zeig.reakt-knopf:hover, .live-zeig.reakt-knopf:focus-visible, .live-zeig.reakt-knopf.an {
+    border-color: transparent; box-shadow: inset 0 0 0 2px var(--accent); outline: none;
+  }
+  .reakt-wahl { gap: 0; padding: 3px; flex-wrap: wrap; justify-content: center; width: max-content; max-width: calc(calc(100vw / var(--pn-anz, 1)) - 16px - var(--safe-left) - var(--safe-right)); }
+  .reakt-wahl button { width: 44px; height: 44px; font-size: 22px; }
+}
+@media (pointer: coarse) and (max-width: 379px) {
+  .reakt-wahl { display: grid; grid-template-columns: repeat(4, 44px); }
+}
 /* Die laufende Uhr — oben in der Mitte, bei allen */
 .gruppen-timer {
   position: fixed; top: calc(58px + var(--safe-top) + var(--app-rand)); left: 50%; transform: translateX(-50%); z-index: 96;
@@ -289,6 +307,43 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
   font-family: inherit; font-size: 12px; font-weight: 700; padding: 5px 11px; border-radius: 999px; white-space: nowrap;
 }
 .zeig-band button.leise { background: var(--surface); color: var(--ink); border: 1px solid var(--border-soft); }
+
+/* ---------- M511: Dauerbänder in einem Stapel (App.tsx, Dauerbaender.tsx) ----------
+   Am Desktop gibt es den Stapel nicht (display: contents): „Nur lesen", „… führt vor", der Timer und „anderes Fenster"
+   stehen wie bisher an ihrer Stelle. Am Telefon lagen sie quer über Kopfzeile und Live-Leiste — „Nur lesen" deckte
+   den Reaktions-Knopf ganz zu. Dort werden sie zu einer Spalte unter dem Kopf, eine Ebene unter der Bedienung
+   (--ebene-dauerband); die Auswahl der Reaktionen klappt darüber auf. */
+.dauerbaender { display: contents; }
+.band-klapp { display: none; }
+@media (max-width: 640px), (max-height: 500px) and (pointer: coarse) {
+  .app:not(.focus-mode) .dauerbaender:not(.im-vortrag) {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    position: fixed; left: var(--app-rand); top: calc(max(var(--head-space), var(--kopf-oben, 0px)) + 4px);
+    width: calc(calc(100vw / var(--pn-anz, 1)) - 2 * var(--app-rand)); padding: 0 calc(8px + var(--safe-right)) 0 calc(8px + var(--safe-left)); box-sizing: border-box;
+    z-index: var(--ebene-dauerband); pointer-events: none;
+  }
+  .app:not(.focus-mode) .dauerbaender:not(.im-vortrag) > * {
+    position: relative; top: auto; right: auto; bottom: auto; left: auto; transform: none; z-index: auto;
+    max-width: 100%; pointer-events: auto;
+  }
+  /* „Nur lesen" schrumpft nach ein paar Sekunden auf sein Kurzwort; antippen zeigt es wieder ganz */
+  .lese-band { min-height: 40px; }
+  .lese-band .band-klapp {
+    flex: none; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; margin: -4px -2px -4px -6px;
+    border: none; border-radius: 50%; background: none; color: var(--muted); padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .lese-band .band-klapp:hover, .lese-band .band-klapp:focus-visible { color: var(--ink); background: var(--surface-3); filter: none; }
+  .lese-band.kurz { cursor: pointer; gap: 6px; -webkit-tap-highlight-color: transparent; }
+  .lese-band.kurz .band-mehr, .lese-band.kurz [data-taste="lese-kopie"] { display: none; }
+}
+@media (pointer: coarse) and (max-width: 640px), (max-height: 500px) and (pointer: coarse) {
+  .lese-band { min-height: 44px; }
+  .lese-band .band-klapp { width: 40px; height: 40px; }
+}
+/* Querformat: wenig Höhe, viel Breite — die Bänder nebeneinander statt übereinander (sonst reicht die Spalte bis ans Dock) */
+@media (max-height: 500px) and (pointer: coarse) {
+  .app:not(.focus-mode) .dauerbaender:not(.im-vortrag) { flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+}
 
 /* M368: Hinweis für anderssprachige Nutzer — der Browser kann die Oberfläche übersetzen */
 .sprach-hinweis {

@@ -61,6 +61,7 @@ function useLiveTeam(): boolean {
 const LiveZeigerVoll = lazy(() => import('./Mauszeiger').then((m) => ({ default: m.LiveZeiger })));
 const VorfuehrenVoll = lazy(() => import('./Vorfuehren').then((m) => ({ default: m.Vorfuehren })));
 const GruppenraumVoll = lazy(() => import('./Gruppenraum').then((m) => ({ default: m.GruppenraumSchicht })));
+const GruppenTimerVoll = lazy(() => import('./Gruppenraum').then((m) => ({ default: m.GruppenTimer })));
 /** Gehört in ein <ViewportPortal> des Boards (M375) */
 export function LiveZeigerSpaet() {
   return useLiveTeam() ? <Suspense fallback={null}><LiveZeigerVoll /></Suspense> : null;
@@ -69,9 +70,13 @@ export function LiveZeigerSpaet() {
 export function VorfuehrenSpaet() {
   return useLiveTeam() ? <Suspense fallback={null}><VorfuehrenVoll /></Suspense> : null;
 }
-/** M376 — aufsteigende Reaktionen und die gemeinsame Uhr */
+/** M376 — aufsteigende Reaktionen */
 export function GruppenraumSpaet() {
   return useLiveTeam() ? <Suspense fallback={null}><GruppenraumVoll /></Suspense> : null;
+}
+/** M376/M511 — die gemeinsame Uhr; steht im Stapel der Dauerbänder (App.tsx) */
+export function GruppenTimerSpaet() {
+  return useLiveTeam() ? <Suspense fallback={null}><GruppenTimerVoll /></Suspense> : null;
 }
 
 function Sperre({ id, t }: { id: string; t: Teilnehmer }) {
