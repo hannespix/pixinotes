@@ -108,8 +108,10 @@ Chromium: `/opt/pw-browsers/chromium` (sonst `PW_CHROMIUM=…`).
   das **Warum** und nennen den Meilenstein (`// M421: …`).
 - Keine Emojis in der Oberfläche (Prüfreihe m397, `werkzeug/ohne-emoji.mjs`);
   Symbole aus `components/Icons.tsx`.
-- Neue Bedien-Elemente in Karten in die drei Listen des Blocks „Bedienung nur
-  im Fokus" in `src/styles/99-bedienung-im-fokus.css` eintragen (M421).
+- Neue Bedien-Elemente in Karten in **alle fünf** Listen des Blocks „Bedienung
+  nur im Fokus" in `src/styles/99-bedienung-im-fokus.css` eintragen (M421;
+  Übergang, Zeiger ruht, Zeiger mit Verzug, Finger, `data-nur-board` aus M510).
+  Prüfreihe m475 B2 meldet eine fehlende Liste.
 - CSS: neue Regeln in die Teildatei ihres Bereichs unter `src/styles/` (an den
   thematisch passenden Abschnitt, nicht ans Dateiende), nie in `src/index.css`
   (dort nur @import, Prüfreihe m475). Neue Teildatei = freie Nummer zwischen den
