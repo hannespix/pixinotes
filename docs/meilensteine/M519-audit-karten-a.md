@@ -69,6 +69,13 @@ PDF-Vorschau, Aufklappen und Fokus mit Seitenzahl; Bild-Lupe und Esc im Fokus; L
   beachtet die Frist ebenfalls. Die Ursache liegt nicht in der Tipp-Erkennung des Boards – der erste Tipp öffnet
   richtig; die frisch geöffnete Ansicht nahm den zweiten an.
 
+- **Start-JS**: Der Hauptzweig lag 77 Bytes unter der Grenze der Start-Reihen (2 065 000 B, m459/m467/m483/m502);
+  die Korrekturen oben brachten 3,2 KB dazu. Dafür kommen Bild-Lupe (`BildLupe.tsx` samt `lib/lupe.ts`) und die
+  Text-Chips der Bilder (`BildTextChips.tsx` samt `lib/bildTextAufgabe.ts`) jetzt erst bei Bedarf:
+  `src/components/nodes/bildSpaet.tsx` (nachgeladen, `bildTeileVorladen()` holt sie vier Sekunden nach dem ersten
+  Bild auf einem Board im Hintergrund – für den ersten Klick und für offline). Start-JS danach 2 062 173 B
+  (2,8 KB unter der Grenze, 2,7 KB weniger als vorher).
+
 ## Grenzen / offen
 - KA10–KA13 siehe Tabelle.
 - KA1 heilt Karten **beim Hereinkommen**. Ein schon gespeicherter kaputter Stand (entstanden vor dieser Korrektur)
