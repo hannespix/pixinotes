@@ -40160,7 +40160,7 @@ function vergleich(l) {
   const rv = einzel(rechts);
   const a = zuZahl(lv);
   const b = zuZahl(rv);
-  const [x, y] = a !== null && b !== null ? [a, b] : [String(lv ?? ""), String(rv ?? "")];
+  const [x, y] = a !== null && b !== null ? [a, b] : [String(lv ?? "").toLowerCase(), String(rv ?? "").toLowerCase()];
   switch (op) {
     case "=":
       return x === y;

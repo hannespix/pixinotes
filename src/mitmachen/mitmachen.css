@@ -82,6 +82,13 @@ body {
 .mit-marke-eigen { color: var(--accent-strong); font-weight: 650; }
 .mit-punkte { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
 .mit-stimmen { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+/* M520: Beim Abstimmen stehen − Zahl ＋ rechts NEBEN dem Text. Vorher brach die Zeile am Telefon um — die Knöpfe
+   standen unter dem Text, jede Idee war anderthalbmal so hoch und auf einen Schirm passten vier statt sechs. */
+.mit-idee-zeile.wahl { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; row-gap: 2px; align-items: center; }
+.mit-idee-zeile.wahl > .mit-text, .mit-idee-zeile.wahl > .mit-meta { grid-column: 1; }
+.mit-idee-zeile.wahl > .mit-meta:empty { display: none; }
+.mit-idee-zeile.wahl > .mit-stimmen { grid-column: 2; grid-row: 1; margin-left: 0; }
+.mit-idee-zeile.wahl > .mit-meta:not(:empty) ~ .mit-stimmen { grid-row: 1 / span 2; }
 .mit-meine { min-width: 1.5em; text-align: center; font-size: 18px; font-variant-numeric: tabular-nums; }
 .mit-platz {
   flex: none; min-width: 2.2em; height: 2.2em; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px;

@@ -323,7 +323,8 @@ function zeichnen(): void {
     if (eigen) meta.push(el('span', { class: 'mit-marke-eigen' }, T.deine));
     else if (b.n?.length) meta.push(el('span', { class: 'mit-von' }, b.n.join(', ')));
     if (b.p !== undefined && b.p > 0 && st.s !== 'sammeln') meta.push(el('span', { class: 'mit-punkte', 'data-taste': 'mit-punkte' }, T.punkte(b.p)));
-    const r = el('div', { class: `mit-idee-zeile${eigen ? ' eigen' : ''}`, 'data-taste': 'mit-zeile', 'data-id': b.id },
+    // M520: beim Abstimmen als Raster — Text links, − Zahl ＋ rechts daneben (Klasse `wahl`, siehe mitmachen.css)
+    const r = el('div', { class: `mit-idee-zeile${eigen ? ' eigen' : ''}${st.s === 'abstimmen' ? ' wahl' : ''}`, 'data-taste': 'mit-zeile', 'data-id': b.id },
       ergebnis && (b.p ?? 0) > 0 ? el('b', { class: `mit-platz p${Math.min(platz.get(b.id)!, 4)}`, 'data-taste': 'mit-platz' }, T.platz(platz.get(b.id)!)) : null,
       el('span', { class: 'mit-text' }, text),
       el('span', { class: 'mit-meta' }, ...meta));
