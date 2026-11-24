@@ -114,6 +114,9 @@
      --safe-top fängt die Statusleisten-Kerbe ab (viewport-fit=cover). */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* M511: seitliche Kerbe im Querformat — die Live-Leiste mit den Reaktionen rückt aus ihr heraus */
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
   /**
    * M248/M249: Der Abstand der App zur Fensterkante.
    *
@@ -129,6 +132,15 @@
    */
   --app-rand: 0px;
   --head-space: calc(110px + var(--safe-top) + var(--app-rand));
+  /*
+   * M511: Ebenen am oberen Rand — Bedienung liegt immer über Dauermeldungen.
+   * Am Telefon lag das Band „Nur lesen" (60) über der Live-Leiste (55) und damit über dem
+   * Reaktions-Knopf. Darum eine Reihenfolge statt einzelner Zahlen je Datei:
+   * Dauerbänder (Nur lesen, Vorführen, Timer, anderes Fenster) < Reiter/Dock (50) < Live-Leiste < Kopfzeile (56).
+   * Am Desktop sitzen die Bänder mittig neben der Live-Leiste und behalten ihre bisherigen Ebenen.
+   */
+  --ebene-dauerband: 49;
+  --ebene-live: 55;
   /*
    * M464: Eigene Mauszeiger — nur hier (und für Inline-Styles über lib/zeiger.ts).
    * Unter Windows ist das System-Fadenkreuz („Präzisionsauswahl") ein dünnes, invertierendes
