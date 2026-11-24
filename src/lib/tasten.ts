@@ -48,6 +48,8 @@ export const KUERZEL: Kuerzel[] = [
 
   // ── Ansichten ───────────────────────────────────────────────────────────
   { id: 'ueberblick', taste: 'Alt+U', was: 'Navigation links ein- und ausblenden', gruppe: 'Ansichten' },
+  // M510 — ausgeführt in components/Tastatur.tsx; Esc beendet (lib/nurBoard.tsx)
+  { id: 'nurBoard', taste: 'Alt+B', was: 'Oberfläche ausblenden – nur das Board; Esc holt sie zurück', gruppe: 'Ansichten' },
   { id: 'netz', taste: 'Alt+G', was: 'Netz-Ansicht – und zurück zum Board', gruppe: 'Ansichten' },
   { id: 'navigator', taste: 'Alt+W', was: 'Navigation: im Baum suchen (am Telefon: Baum öffnen)', gruppe: 'Ansichten' },
   { id: 'praesentation', taste: 'Alt+P', was: 'Präsentation starten', gruppe: 'Ansichten' },

@@ -4,6 +4,7 @@ import { passt } from '../lib/tasten';
 import { usePfeilTasten } from './pfeilTasten';
 import { overlayOffen } from '../lib/overlay';
 import { useKontextSperre } from './Kontextmenue';
+import { nurBoardUmschalten } from '../lib/nurBoard';
 
 /**
  * M251: Die globalen Tastenkürzel an einer Stelle.
@@ -75,6 +76,8 @@ export function Tastatur() {
        */
       const fenster = overlayOffen();
       const amBoard = st.view === 'board' && !st.tasksOpen && !fenster;
+      // M510: Oberfläche ausblenden — nur am Board; mit offenem Fenster gehört die Taste dem Fenster
+      if (passt(e, 'nurBoard')) { if (!amBoard || st.focusCard) return; return tun(() => nurBoardUmschalten()); }
       if (passt(e, 'praesentation')) { if (!st.presenting && fenster) return; return tun(() => st.setPresenting(!st.presenting)); }
 
       // Board wechseln — innerhalb des Projekts, in dem das aktive Board liegt

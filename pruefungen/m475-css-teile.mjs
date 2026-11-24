@@ -58,9 +58,10 @@ const listen = [...fokusCss.matchAll(/:(?:where|is)\(\s*\n([\s\S]*?)\n\s*\)\s*\{
 pruefe('B2 die drei Listen (Übergang, Zeiger, Finger) stehen dort und sind gleich', listen.length >= 3 && listen.every((l) => l === listen[0]) && /kanban-add/.test(listen[0]), listen.length);
 const gebaut = readdirSync(path.join(DIST, 'assets')).filter((d) => /^index-.*\.css$/.test(d));
 let letzte = [];
-if (gebaut.length === 1) letzte = regeln(readFileSync(path.join(DIST, 'assets', gebaut[0]), 'utf8')).slice(-4);
+// M510: dahinter die vierte Liste – „Oberfläche ausblenden" (html[data-nur-board])
+if (gebaut.length === 1) letzte = regeln(readFileSync(path.join(DIST, 'assets', gebaut[0]), 'utf8')).slice(-5);
 pruefe('B3 im gebauten Stylesheet sind die Regeln aus 99-… die letzten',
-  letzte.length === 4 && /^@keyframes pn-bedienung-ein/.test(letzte[0]) && /^@media\(hover:none\)/.test(letzte[3]), letzte.map((r) => r.slice(0, 40)));
+  letzte.length === 5 && /^@keyframes pn-bedienung-ein/.test(letzte[0]) && /^@media\(hover:none\)/.test(letzte[3]) && /^html\[data-nur-board\]/.test(letzte[4]), letzte.map((r) => r.slice(0, 40)));
 
 console.log('\n════ C: Verhalten im Browser ════');
 const app = http.createServer((q, r) => {

@@ -30,6 +30,7 @@ import { sicherungEinspielenOeffnen } from '../lib/sicherungTakt';
 import { INetz } from './Icons';
 import { KartenSymbol } from './KartenSymbol';
 import { EINGANG_ID, eingangOeffnen, marke, ohneEingang } from '../lib/eingang';
+import { nurBoardSetzen } from '../lib/nurBoard';
 interface Hit {
   boardId: string;
   boardName: string;
@@ -95,6 +96,9 @@ function buildCommands(): Command[] {
       run: () => { st().setView('board'); setTimeout(() => window.dispatchEvent(new CustomEvent('pixinotes:board-briefing')), 120); } },
     { label: '▶ Präsentieren', hint: 'Karten als Folien zeigen', alias: 'presenter folien vortrag',
       run: () => st().setPresenting(true) },
+    // M510: nur das Board zeigen – Leisten, Menüs, Rahmen und Anfasser weg (Alt+B, Esc holt sie zurück)
+    { label: 'Oberfläche ausblenden', hint: 'Nur das Board zeigen – zum Teilen des Bildschirms; Esc holt sie zurück', alias: 'nur board ui ausblenden menüs leisten verstecken bildschirm teilen übertragen sharing screen clean sauber vollbild zen',
+      run: () => { st().setView('board'); st().setFocusCard(null); nurBoardSetzen(true); } },
     // M408: das Archiv per Suche ein- und ausblenden
     { label: st().showArchived ? 'Archiv ausblenden' : 'Archiv einblenden', hint: 'Archivierte Karten und Boards zeigen oder verbergen', alias: 'archiv archiviert archive wiederfinden verschwunden weg restore',
       run: () => st().setShowArchived(!st().showArchived) },
