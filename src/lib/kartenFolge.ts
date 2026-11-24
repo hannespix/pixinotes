@@ -172,3 +172,22 @@ export function folgeNachbar(folge: AppNode[], edges: Edge[], id: string, vor: b
   const perPfeil = edges.some((e) => { const r = richtung(e); return !!r && (vor ? r.von === id && r.nach === karte.id : r.von === karte.id && r.nach === id); });
   return { karte, perPfeil };
 }
+
+/**
+ * M503: An welcher Folie beginnt eine Präsentation, die „ab dieser Karte" gewünscht ist? `folge` ist die volle
+ * Kartenfolge, `folien` der Teil, der gezeigt wird (leere statische Karten fallen weg). Ist die Karte selbst keine
+ * Folie, geht es an der nächsten Folie hinter ihr weiter (sonst an der letzten davor) – nicht wieder bei Folie 1,
+ * wie bisher, wenn die gewählte Karte aus der Folienliste fiel. Ein Rahmen ist selbst eine (Abschnitts-)Folie.
+ * −1 = keine Startkarte (von vorn).
+ */
+export function folieAb(folge: AppNode[], folien: AppNode[], id: string | null): number {
+  if (!id) return -1;
+  const direkt = folien.findIndex((n) => n.id === id);
+  if (direkt >= 0) return direkt;
+  const j = folge.findIndex((n) => n.id === id);
+  if (j < 0) return -1;
+  const platz = new Map(folien.map((n, i) => [n.id, i]));
+  for (let k = j; k < folge.length; k += 1) { const i = platz.get(folge[k].id); if (i !== undefined) return i; }
+  for (let k = j - 1; k >= 0; k -= 1) { const i = platz.get(folge[k].id); if (i !== undefined) return i; }
+  return -1;
+}

@@ -12,7 +12,7 @@ const aiCommand: typeof import('../lib/kiAnweisung').aiCommand = (...a) => impor
 import { kiBeispiel, kiBlaettern } from '../lib/kiVerlauf';
 import { KACHEL_TYPEN, STICKY_COLORS, type AppNode } from '../types';
 import { FARB_NAMEN } from '../lib/notiz';
-import { IArchive, IArchiveRestore, IArrange, IBookmark, IDownload, IComment, ICompact, ICrop, IDuplicate, IFit, IFrame, IFlowH, IFlowV, IGlobe, IGridLayout, IImage, IMore, IMoveTo, IPalette, IPen, IPerson, IShare, ITag, ITrash, IType, IUndo, IWand, IX, IMaximize } from './Icons';
+import { IArchive, IArchiveRestore, IArrange, IBookmark, IDownload, IComment, ICompact, ICrop, IDuplicate, IFit, IFrame, IFlowH, IFlowV, IGlobe, IGridLayout, IImage, IMore, IMoveTo, IPalette, IPen, IPerson, IPlay, IShare, ITag, ITrash, IType, IUndo, IWand, IX, IMaximize } from './Icons';
 import { wurzelZoom } from '../lib/anzeige';
 // M267: Schrift-Stapel, Stufen und Beschriftungen kommen aus lib/typo.ts —
 // dieselbe Quelle wie für den markierten Text. Vorher lag hier eine zweite,
@@ -876,6 +876,17 @@ export function SelectionToolbar() {
                   </button>
                 )}
                 <div className="sel-attr-title">Weitergeben</div>
+                {/* M503: „Präsentieren" bei einer Karte heißt: ab GENAU dieser Karte – auch per Rechtsklick (Vorführen = Weitergeben) */}
+                {single && (
+                  <button
+                    data-taste="auswahl-praesentieren"
+                    onClick={() => { setMenu(null); useBoard.getState().setPresenting(true, single.id); }}
+                    title="Ab dieser Karte präsentieren – Vollbild, Folienfolge aus den Verbindungen"
+                    aria-label="Ab dieser Karte präsentieren"
+                  >
+                    <IPlay size={14} /> Ab hier präsentieren
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setMenu(null);

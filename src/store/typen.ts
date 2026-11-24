@@ -307,7 +307,8 @@ export interface BoardState {
   textRueckgaengig: (id: string, blocks: unknown[]) => void;
   /** M390: Notizen ohne Fristen-Anker bekommen ihn nachgetragen (einmal beim Start) */
   fristAnkerNachtragen: () => void;
-  setPresenting: (on: boolean) => void;
+  /** M503: `ab` = Startkarte (null = ausdrücklich von vorn); ohne `ab` startet die Präsentation bei Fokus bzw. Auswahl */
+  setPresenting: (on: boolean, ab?: string | null) => void;
   setTool: (tool: Tool) => void;
   updateAi: (patch: Partial<AiSettings>) => void;
   /** Strich übernehmen; sessionIds = Striche derselben Zeichensitzung

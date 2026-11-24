@@ -60,7 +60,7 @@ export function PortalCard({ id, data, selected }: NodeProps<PortalNode>) {
             <button
               className="portal-open nodrag"
               title="Ziel-Board direkt präsentieren"
-              onClick={() => { openBoard(target.id); setPresenting(true); }}
+              onClick={() => { openBoard(target.id); setPresenting(true, null); }}
             >
               <IPlay size={12} />
             </button>
