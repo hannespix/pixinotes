@@ -298,8 +298,9 @@ function zeichnen(): void {
 
   const verdeckt = st.s === 'sammeln' && !!st.r.verdeckt;
   let blasen = st.b;
+  let fremd = 0;
   if (verdeckt) {
-    const fremd = blasen.filter((b) => !istEigen(b)).length;
+    fremd = blasen.filter((b) => !istEigen(b)).length;
     blasen = blasen.filter(istEigen);
     if (fremd) inhalt.append(el('p', { class: 'mit-klein', 'data-taste': 'mit-verdeckt' }, T.andere(fremd)));
   }
@@ -307,7 +308,7 @@ function zeichnen(): void {
   const imStand = new Set(st.b.flatMap((b) => b.i));
   const unterwegs = z.offen.filter((o) => o.w.a === 'idee' && o.w.id && !imStand.has(o.w.id));
   const liste = el('div', { class: 'mit-liste', 'data-taste': 'mit-liste' });
-  if (!blasen.length && !unterwegs.length) liste.append(el('p', { class: 'mit-klein' }, T.keineIdeen));
+  if (!blasen.length && !unterwegs.length && !fremd) liste.append(el('p', { class: 'mit-klein' }, T.keineIdeen));
   for (const o of unterwegs) liste.append(el('div', { class: 'mit-idee-zeile wartet', 'data-taste': 'mit-zeile' }, el('span', { class: 'mit-text' }, o.w.x ?? ''), el('span', { class: 'mit-klein' }, T.wartet)));
   const ergebnis = st.s === 'ergebnis';
   if (ergebnis) blasen = [...blasen].sort((a, b) => (b.p ?? 0) - (a.p ?? 0) || b.m - a.m || a.x.localeCompare(b.x));

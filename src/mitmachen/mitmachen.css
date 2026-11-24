@@ -35,7 +35,7 @@ body {
 .mit-meldung[hidden] { display: none; }
 
 /* Ablauf: vier Schritte, der jetzige hervorgehoben */
-.mit-schritte { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; font-size: 13px; }
+.mit-schritte { list-style: none; margin: 4px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; font-size: 13px; }
 .mit-schritte li {
   display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px; border-radius: var(--r);
   color: var(--muted); border: 1px solid var(--border-soft); background: var(--surface); text-align: center;

@@ -37,6 +37,7 @@
 }
 .bub-mit-stand:disabled { cursor: default; }
 .bub-mitmachen { display: inline-flex; align-items: center; justify-content: center; }
+.bub.tropfen .bub-mitmachen.an { color: var(--accent-strong); }
 @media (max-width: 720px) { .bub-mitte { flex-direction: column; } .bub-mit-buehne { width: auto; flex-direction: row; } .bub-mit-buehne .qr-code { width: 40%; } }
 .bub-blase {
   position: absolute; left: 0; top: 0; width: 80px; height: 80px; border-radius: 50%; box-sizing: border-box;

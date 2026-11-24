@@ -188,12 +188,12 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   const mitmachen = async () => {
     if (!leiten) return;
     if (mitHier) { setQrOffen(true); return; }
-    if (!supabaseKonfiguriert()) { showToast('Mitmachen per QR braucht den Live-Server von PixiNotes – er ist in dieser Fassung nicht eingerichtet (⚙ → Daten → Konto).', false, 8000); return; }
+    if (!supabaseKonfiguriert()) { showToast('Mitmachen per QR braucht den Live-Server (Einstellungen → Daten → Konto) – hier ist keiner eingerichtet.', false, 8000); return; }
     if (mitAn && !window.confirm('Die Mitmach-Runde dieser Karte läuft auf einem anderen Gerät. Hier neu starten? Der bisherige Code gilt dann nicht mehr.')) return;
     try {
       await mitmachenOeffnen(boardId, id, (m) => updateRoh(id, { mitmachen: m }));
       setQrOffen(true);
-    } catch { showToast('Mitmachen ließ sich nicht starten – der Browser kann hier keine Schlüssel erzeugen (sichere Verbindung nötig).', false, 7000); }
+    } catch { showToast('Mitmachen ging nicht los – der Browser erzeugt hier keine Schlüssel (sichere Verbindung nötig).', false, 7000); }
   };
   const mitBuehne = (an: boolean) => { if (mit && leiten) updateRoh(id, { mitmachen: { ...mit, buehne: an || undefined } }); };
   const mitBeenden = () => {
@@ -982,6 +982,11 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
         <span className="bub-zahl" data-taste="bub-zahl">{zahlWort(blasen.length, 'Idee', 'Ideen')}{personen > 1 ? ` · ${personen} Personen` : ''}</span>
         <button className={`bub-ansicht nodrag${liste ? ' an' : ''}`} onClick={() => { setListe((l) => !l); setWahl(null); setGWahl(null); setFallen(null); }} aria-pressed={liste}
           title={liste ? 'Zurück zu den Blasen' : 'Als Liste zeigen – nach Gruppen und Punkten geordnet'} data-taste="bub-ansicht">{liste ? <IBubbles size={15} /> : '☰'}</button>
+        {/* M513: nur diese Karte teilen — oben neben der Ansicht (die Leiste unten ist schon voll) */}
+        {leiten && (
+          <button className={`bub-ansicht bub-mitmachen nodrag${mitAn ? ' an' : ''}`} onClick={() => void mitmachen()} aria-label="Mitmachen per QR"
+            title="Mitmachen per QR – nur diese Karte teilen: Teilnehmende reichen Ideen ein und stimmen ab, ohne das ganze Board" data-taste="bub-mitmachen"><IQr size={14} /></button>
+        )}
       </div>
       {/* M378: Wo steht die Runde? Für alle sichtbar; wer leitet, schaltet weiter */}
       <div className="bub-schritte nodrag" role="group" aria-label="Ablauf" data-taste="bub-schritte">
@@ -1213,10 +1218,6 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
         {leiten && phase === 'aus' && <button className="bub-knopf" onClick={() => phaseSetzen('offen')} disabled={blasen.length < 2} title={`Punkte-Abstimmung: jede Person vergibt ${zahlWort(d.abstimmung.punkte, 'Punkt', 'Punkte')}`} data-taste="bub-abstimmen">Abstimmen</button>}
         {leiten && phase === 'offen' && <button className="bub-knopf an" onClick={() => phaseSetzen('fertig')} data-taste="bub-auswerten">✓ Auswerten</button>}
         {leiten && phase === 'fertig' && <button className="bub-knopf" onClick={() => phaseSetzen('offen')} title="Abstimmung wieder öffnen" data-taste="bub-weiter">↺ Weiter abstimmen</button>}
-        {leiten && (
-          <button className={`bub-knopf bub-mitmachen${mitAn ? ' an' : ''}`} onClick={() => void mitmachen()} aria-label="Mitmachen per QR"
-            title="Mitmachen per QR – nur diese Karte teilen: Teilnehmende reichen Ideen ein und stimmen ab, ohne das ganze Board" data-taste="bub-mitmachen"><IQr size={15} /></button>
-        )}
         {leiten && (
           <div className="bub-mehr">
             <button className="bub-knopf" onClick={() => setMenue((m) => !m)} aria-label="Weitere Funktionen" title="Weitere Funktionen" data-taste="bub-mehr">⋯</button>
