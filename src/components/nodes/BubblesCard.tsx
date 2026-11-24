@@ -159,7 +159,8 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
     rang.forEach((b, i) => m.set(b.id, i > 0 && rang[i - 1].punkte === b.punkte ? m.get(rang[i - 1].id)! : i + 1));
     return m;
   }, [rang]);
-  const punkteText = (n: number) => `${n} ${n === 1 ? 'Punkt' : 'Punkte'}`;
+  // M520: über zahlWort (M461) — die englische Oberfläche zeigte im Ergebnis sonst weiter „2 Punkte"
+  const punkteText = (n: number) => zahlWort(n, 'Punkt', 'Punkte');
 
   const [eingabe, setEingabe] = useState('');
   const [wahl, setWahl] = useState<string | null>(null);
@@ -179,7 +180,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   const startHier = useRef(new Map<string, { x: number; y: number }>());
   const gewaehlt = wahl ? blasen.find((b) => b.id === wahl) ?? null : null;
   // M513: Mitmachen per QR — nur diese Karte teilen (Teilnehmer-Seite mitmachen.html, Gastgeber: lib/mitmachenHost.ts)
-  const mit = mitmachenVon(roh);
+  const mit = mitmachenVon(roh, id);   // M520: nur die Runde DIESER Karte (eine Kopie trägt das Feld ihres Originals)
   const mitAn = !!mit?.an;
   const mitHier = mitAn && hierGastgeber(mit!.token, id);
   const mitStand = useMitmachenStand(mitAn ? mit!.token : undefined);
