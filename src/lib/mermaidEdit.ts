@@ -617,3 +617,71 @@ export function addSeqNote(code: string, msgIdx: number | null): string {
   lines.splice(m ? m.line + 1 : lines.length, 0, line);
   return lines.join('\n');
 }
+
+// ---------------------------------------------------------------------------
+// Flussdiagramm
+/**
+ * M519: Einen Schritt aus einem Flussdiagramm entfernen — nur ihn und seine Verbindungen.
+ *
+ * Vorher fiel jede Zeile weg, in der die Kennung des Schritts vorkam. In `A[Start] --> B{Prüfen}` steht aber auch
+ * die Beschriftung von A: „Prüfen" entfernen löschte „Start" mit — im Vorlagen-Diagramm (jede Zeile nennt B) blieb
+ * vom ganzen Diagramm nur die Kopfzeile. Und eine Kennung, die als Wort in der BESCHRIFTUNG eines anderen Schritts
+ * steht (`D[Zurück an A]`), riss dessen Zeile mit.
+ *
+ * Jetzt wird jede Zeile an ihren Pfeilen zerlegt: Der Schritt fällt heraus, was links und rechts von ihm stand, bleibt
+ * als eigene Zeile — eine Kette, solange sie noch zwei Schritte verbindet, ein einzelner Schritt, wenn er dort seine
+ * Beschriftung trägt (`A[Start]`). Beschriftungen (in Klammern, Strichen, Anführungszeichen) zählen nicht als Schritt.
+ */
+export function removeFlowNode(code: string, nid: string): string {
+  const esc = nid.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const WORT = '[\\p{L}\\p{N}_]';
+  const alsWort = new RegExp(`(?<!${WORT})${esc}(?!${WORT})`, 'u');
+  const amAnfang = new RegExp(`^${esc}(?!${WORT})`, 'u');
+  /** Text in Anführungszeichen, Klammern und zwischen Strichen mit gleich vielen Platzhaltern füllen (Lagen bleiben) */
+  const maske = (l: string) => {
+    const fuellen = (m: string, rand: number) => m.slice(0, rand) + '\u0000'.repeat(Math.max(0, m.length - 2 * rand)) + m.slice(m.length - rand);
+    return l
+      .replace(/"[^"]*"/g, (m) => fuellen(m, 1))
+      .replace(/\(\([^)]*\)\)|\[\[[^\]]*\]\]|\{\{[^}]*\}\}/g, (m) => fuellen(m, 2))
+      .replace(/\[[^\]]*\]|\{[^}]*\}|\([^)]*\)|\|[^|]*\|/g, (m) => fuellen(m, 1));
+  };
+  // Pfeil samt Beschriftung: `-->`, `---`, `-.->`, `==>`, `--o`, `<-->`, `-- Text -->`, dahinter wahlweise `|Text|`
+  // eslint-disable-next-line no-control-regex
+  const PFEIL = /\s*(?:--(?![->ox])[^|>\n]*?-->|==(?![=>])[^|>\n]*?==>|<?(?:-{2,}|={2,}|-\.+-)(?:>|[ox](?=\s))?)(?:\s*\|\u0000*\|)?\s*/gu;
+  // die eigene Zeile des Schritts ohne Verbindung: `B{Prüfen}`, `style B …`, `class B …`, `click B …`
+  const eigene = new RegExp(`^\\s*(?:(?:style|class|click)\\s+)?${esc}(?!${WORT})`, 'u');
+  const out: string[] = [];
+  code.split('\n').forEach((zeile, i) => {
+    if (i === 0) { out.push(zeile); return; }
+    const m = maske(zeile);
+    if (!alsWort.test(m)) { out.push(zeile); return; }          // kommt nur in einer Beschriftung vor (oder gar nicht)
+    const einzug = /^\s*/.exec(zeile)?.[0] ?? '';
+    // an den Pfeilen zerlegen — Lagen aus der Maske, Text aus der Zeile
+    const teile: string[] = []; const pfeile: string[] = [];
+    let ab = 0;
+    for (const p of m.matchAll(PFEIL)) {
+      teile.push(zeile.slice(ab, p.index)); pfeile.push(zeile.slice(p.index, p.index + p[0].length));
+      ab = p.index + p[0].length;
+    }
+    teile.push(zeile.slice(ab));
+    if (pfeile.length === 0) {
+      if (!eigene.test(m)) out.push(zeile);
+      return;
+    }
+    // den Schritt aus jedem Teil nehmen (auch aus `A & B`); ein leerer Teil trennt die Kette
+    const rest = teile.map((t) => t.replace(/;\s*$/, '').split('&').map((s) => s.trim()).filter((s) => s && !amAnfang.test(s)).join(' & '));
+    let lauf: string[] = []; let laufPfeile: string[] = [];
+    const ablegen = () => {
+      if (lauf.length >= 2) out.push(einzug + lauf.map((t, k) => (k < laufPfeile.length ? t + laufPfeile[k] : t)).join(''));
+      else if (lauf.length === 1 && /[[({]/.test(lauf[0])) out.push(einzug + lauf[0]);   // einzelner Schritt mit Beschriftung
+      lauf = []; laufPfeile = [];
+    };
+    rest.forEach((t, k) => {
+      if (!t) { ablegen(); return; }
+      if (lauf.length) laufPfeile.push(` ${pfeile[k - 1].trim()} `);
+      lauf.push(t);
+    });
+    ablegen();
+  });
+  return out.join('\n');
+}

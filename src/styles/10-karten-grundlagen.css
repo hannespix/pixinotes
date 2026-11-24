@@ -202,9 +202,10 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   font-size: 12px; cursor: pointer; padding: 0; font-family: inherit;
 }
 
+/* M519: Farbe als Token — das feste Grün hatte im Dunkeln auf der Mail-Karte 2,9:1 */
 .ent-tel {
-  color: #0a7d40; font-weight: 600; text-decoration: none;
-  border-bottom: 1.5px dotted #0a7d40; white-space: nowrap;
+  color: var(--tel-gruen); font-weight: 600; text-decoration: none;
+  border-bottom: 1.5px dotted var(--tel-gruen); white-space: nowrap;
 }
 .ent-tel:hover { background: rgba(10, 125, 64, 0.1); border-radius: var(--r-xs); }
 .ent-link { color: var(--accent-strong); word-break: break-all; }

@@ -30,6 +30,9 @@ import { FOKUS_ANSICHTEN, FOKUS_ZOOM_EREIGNIS, FOKUS_ANSICHT_EREIGNIS, fokusAnsi
 
 /** Kurzer, sprechender Name der Karte für die Kopfzeile */
 function cardTitle(node: AppNode): string {
+  // M519: Der Text einer Diagramm-Karte beginnt mit dem Etikett „Diagramm:" (für KI und Export) — als Titel stand
+  // es mit hängendem Doppelpunkt in der Kopfzeile und in „Nächste Karte: Diagramm:"
+  if (node.type === 'mermaid') return TYPE_LABEL.mermaid;
   const first = nodeToText(node).trim().split('\n').map((l) => l.trim()).find(Boolean);
   if (first) return first.replace(/^#+\s*/, '').slice(0, 60);
   return TYPE_LABEL[node.type ?? ''] ?? 'Karte';

@@ -7,6 +7,7 @@
 // der Board-Inhalt.
 import type { AppNode, KontaktData, KontaktTelefon } from '../types';
 import { zeitSaeubern } from './kartenZeit';
+import { kartenDatenGerade } from './kartenDaten';
 import type { BoardDoc } from '../store';
 import { lookVonAussen } from './boardLook';
 // M509: Look eines geteilten Boards — nur bekannte Werte
@@ -175,7 +176,8 @@ export function karteGueltig(n: unknown): n is AppNode {
  * M453: Zeitpunkte (angelegt/geaendert) müssen glaubhafte Zahlen sein und dürfen nicht in der Zukunft liegen.
  */
 export function karteEntschaerfen<T extends AppNode>(n0: T): T {
-  const n = zeitSaeubern(n0);
+  // M519: auch der Inhalt muss die Gestalt seiner Kartenart haben (lib/kartenDaten.ts) — sonst Absturz der ganzen App
+  const n = kartenDatenGerade(zeitSaeubern(n0));
   const d = n.data as Record<string, unknown>;
   if (n.type === 'htmlapp' && d.url !== undefined && !fremdeWebAdresse(d.url)) {
     const { url: _u, live: _l, ...rest } = d;
