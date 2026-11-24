@@ -128,6 +128,8 @@ export const IMore = make(<><circle cx="12" cy="5" r="1.6" fill="currentColor" s
 /** M498: Griff zum Umsortieren (Checklisten-Punkte im Ticket) */
 export const IGriff = make(<>{[9, 15].flatMap((x) => [6, 12, 18].map((y) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.5" fill="currentColor" stroke="none" />))}</>);
 export const IAppWindow = make(<><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 8.5h18" /><path d="M6 6.3h.01" /><path d="M8.6 6.3h.01" /><path d="m10 13 2.2 2.2L10 17.4" /><path d="M13.5 17.4h3.5" /></>);
+/** M516: Als App installieren — Bildschirm mit Pfeil nach unten (wie das Symbol in der Adressleiste) */
+export const IInstallieren = make(<><rect x="3" y="4" width="18" height="13" rx="2" /><path d="M8 21h8" /><path d="M12 17v4" /><path d="M12 7.5v6" /><path d="m9.5 11 2.5 2.5 2.5-2.5" /></>);
 export const IMaximize = make(<><path d="M15 3h6v6" /><path d="M9 21H3v-6" /><path d="M21 3l-7 7" /><path d="M3 21l7-7" /></>);
 export const IMinimize = make(<><path d="M4 14h6v6" /><path d="M20 10h-6V4" /><path d="M14 10l7-7" /><path d="M3 21l7-7" /></>);
 export const IReload = make(<><path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" /></>);
