@@ -942,15 +942,20 @@ export function Board() {
       const b = selectActiveBoard(useBoard.getState());
       const jetzt = b.nodes.find((n) => n.id === node.id);
       // M485: Karten mit Verbindung — deren Kanten folgen der sichtbaren (gehobenen, ausweichenden) Lage
-      if (jetzt) zieh.current = m.zugStarten(wurzel, jetzt, b.nodes, getViewport().zoom || 1, new Set(b.edges.flatMap((e) => [e.source, e.target])));
+      // M504: der Einmal-Hinweis aufs Stapeln kommt als kurzer Toast
+      if (jetzt) zieh.current = m.zugStarten(wurzel, jetzt, b.nodes, getViewport().zoom || 1, new Set(b.edges.flatMap((e) => [e.source, e.target])), (t) => useBoard.getState().showToast(t, false, 7000));
     };
     if (zg.current) { starten(zg.current); return; }
     // Allererster Zug (Finger: kein Überfahren vorher) — die Datei kommt noch; dann setzt das Gefühl mitten im Zug ein
     void zgLaden().then((m) => { if (zugSchritt.current && !zieh.current) starten(m); });
   }, [getViewport, zgLaden]);
-  const ziehSchritt = useCallback((node: Node) => {
-    zieh.current?.schritt(node.position.x, node.position.y, getViewport().zoom || 1, fangAktiv());
-  }, [getViewport]);
+  const ziehSchritt = useCallback((node: Node, e?: MouseEvent | TouchEvent) => {
+    const z = zieh.current;
+    if (!z) return;
+    // M504: Alt/⌥ = frei übereinander (niemand weicht aus); der Zeiger zeigt auf das Stapel-Ziel
+    const p = e && ('touches' in e ? e.touches[0] ?? e.changedTouches[0] : e);
+    z.schritt(node.position.x, node.position.y, getViewport().zoom || 1, fangAktiv(), e && { alt: e.altKey, finger: 'touches' in e, zeiger: p ? screenToFlowPosition({ x: p.clientX, y: p.clientY }) : undefined });
+  }, [getViewport, screenToFlowPosition]);
   /** Loslassen: Karte senkt sich federnd, was noch ausweicht, bleibt dort (selber Rückgängig-Schritt wie der Zug) */
   const ziehEnde = useCallback((abbrechen = false) => {
     const z = zieh.current;
@@ -958,7 +963,8 @@ export function Board() {
     if (!z) return;
     const lagen = z.ende(abbrechen);
     if (lagen.length === 0) return;
-    mutedHistory(() => useBoard.getState().setNodePositions(lagen));
+    // M504: auf einen Stapel gelegt — die Karten liegen obenauf (in der Reihenfolge des Stapels); selber Rückgängig-Schritt
+    mutedHistory(() => { const st = useBoard.getState(); for (const id of z.gestapelt) st.touchNode(id); st.setNodePositions(lagen); });
     z.aufloesen(lagen);
   }, []);
   // Board gewechselt oder Fläche weg mitten im Zug: nichts hängen lassen
@@ -984,8 +990,13 @@ export function Board() {
   const rfStore = useStoreApi();
   const rasterSelbst = useRef(false);
   useEffect(() => {
-    const taste = (e: KeyboardEvent) => { strgRef.current = e.ctrlKey || e.metaKey; };
-    const weg = () => { strgRef.current = false; };
+    const taste = (e: KeyboardEvent) => {
+      strgRef.current = e.ctrlKey || e.metaKey;
+      // M504: Alt/⌥ während des Zugs — niemand weicht aus, frei übereinander legen (auch ohne die Maus zu bewegen).
+      // preventDefault: unter Windows holte das Loslassen von Alt sonst das Browser-Menü
+      if (e.key === 'Alt' && zieh.current && !overlayOffen()) { e.preventDefault(); zieh.current.frei(e.type === 'keydown'); }
+    };
+    const weg = () => { strgRef.current = false; zieh.current?.frei(false); };
     window.addEventListener('keydown', taste, true); window.addEventListener('keyup', taste, true); window.addEventListener('blur', weg);
     return () => { window.removeEventListener('keydown', taste, true); window.removeEventListener('keyup', taste, true); window.removeEventListener('blur', weg); };
   }, []);
@@ -1515,7 +1526,7 @@ export function Board() {
     return () => window.removeEventListener('pointerdown', onDown, true);
   }, []);
 
-  const onNodeDrag = useCallback((_: unknown, node: Node) => {
+  const onNodeDrag = useCallback((ev: MouseEvent | TouchEvent, node: Node) => {
     {
       const fd = frameDrag.current;
       if (fd && fd.id === node.id) {
@@ -1533,7 +1544,7 @@ export function Board() {
       }
     }
     if (node.type === 'frame') return; // Rahmen heben und neigen sich nicht
-    ziehSchritt(node);
+    ziehSchritt(node, ev);
   }, [ziehSchritt]);
 
   const onNodeDragStop = useCallback(
