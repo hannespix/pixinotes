@@ -5,7 +5,8 @@ import { lesefolge } from './boardTasten';
 import { useMemo, useState } from 'react';
 import { selectActiveBoard, useBoard } from '../store';
 import { useEscSchliesst } from '../lib/useEscSchliesst';
-import { nodesToHtml, nodesToText, sicherKuerzen } from '../lib/serialize';
+import { nodesToText } from '../lib/serialize';
+import { nodesToHtml, sicherKuerzen } from '../lib/serializeFormate';
 import { cardsShareUrl, cardsToBoardDoc, cardsToPdf, printCards, whatsappNachricht } from '../lib/shareCards';
 import { ICopy, IDownload, IFolder, IMail, IX, IComment, IDrucker } from './Icons';
 
