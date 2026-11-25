@@ -1028,14 +1028,38 @@ let ohneBoardAendern = false;
 /** Größere Patches reisen als ganzes Board (der Server nimmt bis 6 Mio. Zeichen) */
 const PATCH_MAX_ZEICHEN = 4_000_000;
 interface AendernAntwort { version: number; vor: number; umgebung: number | null; umgebung_vor: number | null }
-/** `null`: auf diesem Weg nicht möglich (Funktion fehlt, abgelehnt) → das ganze Board schreiben */
-async function boardAendern(besitzer: string, boardId: string, p: Patch, savedAt?: string): Promise<AendernAntwort | null> {
-  const res = await anfrage(`${restUrl()}/rpc/board_aendern`, { method: 'POST', headers: JSON_KOPF, body: JSON.stringify({ p_besitzer: besitzer, p_board_id: boardId, p_patch: p, p_saved_at: savedAt ?? null }) });
+/**
+ * M529: Vorbedingung beim kartenweisen Schreiben. Mit der Migration 20261125100000 nimmt board_aendern
+ * `p_wenn_umgebung` (Version der Umgebung des Besitzers, die das Gerät kennt) bzw. `p_wenn_version` (Version der
+ * Board-Zeile, für Gäste mit Konto) und schreibt NICHTS, wenn inzwischen ein anderer geschrieben hat („vorbedingung").
+ * Das Gerät liest dann neu, führt Feld für Feld zusammen und schreibt erneut — vorher ersetzte die später eintreffende
+ * ganze Karte die eines anderen Geräts (M524, „Grenzen"). Ohne Migration antwortet der Server mit 404 (Funktion mit
+ * diesen Parametern unbekannt): dann ohne Vorbedingung wie bisher, und vor dem Schreiben bleibt der Mini-Abruf.
+ * 'ja' erst, wenn der Server bestätigt, geprüft zu haben (`geprueft`) — ein Server, der die Parameter nur hinnähme,
+ * gilt als 'nein'.
+ */
+let vorbedingung: 'unbekannt' | 'ja' | 'nein' = 'unbekannt';
+/** `null`: auf diesem Weg nicht möglich (Funktion fehlt, abgelehnt) → das ganze Board schreiben. Wirft
+ *  VorbedingungFehler, wenn der Server wegen einer fremden Änderung nichts geschrieben hat. */
+async function boardAendern(besitzer: string, boardId: string, p: Patch, savedAt?: string, wenn?: { umgebung?: string | null; version?: string | null }): Promise<AendernAntwort | null> {
+  const wennU = wenn?.umgebung ? Number(wenn.umgebung) : null;
+  const wennV = wenn?.version ? Number(wenn.version) : null;
+  const mitWenn = vorbedingung !== 'nein' && (wennU !== null || wennV !== null);
+  const res = await anfrage(`${restUrl()}/rpc/board_aendern`, { method: 'POST', headers: JSON_KOPF, body: JSON.stringify({
+    p_besitzer: besitzer, p_board_id: boardId, p_patch: p, p_saved_at: savedAt ?? null,
+    ...(mitWenn ? { p_wenn_umgebung: wennU, p_wenn_version: wennV } : {}),
+  }) });
+  if (res.status === 404 && mitWenn) { vorbedingung = 'nein'; return boardAendern(besitzer, boardId, p, savedAt); }
   if (res.status === 404) { ohneBoardAendern = true; return null; }
-  if (res.status >= 400 && res.status < 500) return null;     // keine Freigabe, Board fehlt, ungültig: der bisherige Weg klärt es
+  if (res.status >= 400 && res.status < 500) {
+    const t = await res.text().catch(() => '');
+    if (mitWenn && /vorbedingung/i.test(t)) { vorbedingung = 'ja'; throw new VorbedingungFehler(); }
+    return null;     // keine Freigabe, Board fehlt, ungültig: der bisherige Weg klärt es
+  }
   if (!res.ok) throw new Error(`PixiNotes-Konto: Schreiben fehlgeschlagen (HTTP ${res.status}).`);
-  const j = (await res.json().catch(() => null)) as Partial<AendernAntwort> | null;
+  const j = (await res.json().catch(() => null)) as (Partial<AendernAntwort> & { geprueft?: unknown }) | null;
   if (!j || typeof j.version !== 'number' || typeof j.vor !== 'number') { ohneBoardAendern = true; return null; }
+  if (mitWenn) vorbedingung = j.geprueft === true ? 'ja' : 'nein';
   return { version: j.version, vor: j.vor, umgebung: typeof j.umgebung === 'number' ? j.umgebung : null, umgebung_vor: typeof j.umgebung_vor === 'number' ? j.umgebung_vor : null };
 }
 /** Geteiltes Board ohne die Angaben, die nur dieses Gerät betreffen */
@@ -1119,7 +1143,8 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
     // (autoPush) und hier liegen die Warteschlange und das Zusammenstellen des Stands, bei großen Boards Sekunden.
     // Darum unmittelbar vor dem Schreiben noch einmal der Mini-Abruf: Hat inzwischen ein anderer geschrieben, erst
     // dessen Stand einarbeiten (das schreibt dann selbst, mit beiden Anteilen).
-    if (nochmal && sitz?.anbieter === 'supabase' && !ohneBoardAendern && kenn.etag) {
+    // M529: Prüft der Server die Vorbedingung selbst (board_aendern mit p_wenn_umgebung), braucht es den Blick nicht
+    if (nochmal && sitz?.anbieter === 'supabase' && !ohneBoardAendern && kenn.etag && vorbedingung !== 'ja') {
       const kopf = await lw.kopf(UMGEBUNG);
       if (kopf !== null && kopf !== kenn.etag) throw new VorbedingungFehler();
     }
@@ -1145,7 +1170,7 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
             if (!f) continue;                                     // Name, Reihenfolge … geändert: das ganze Board
             if (!f.p) { stempelNeu[b.id] = alt; aliasBleibt[b.id] = { st: alt, hash: fingerabdruck(b) }; continue; }   // nur anders gemessen
             if (JSON.stringify(f.p).length > PATCH_MAX_ZEICHEN) continue;
-            const r = await boardAendern(sitz.userId, b.id, f.p, payload.savedAt);
+            const r = await boardAendern(sitz.userId, b.id, f.p, payload.savedAt, { umgebung: kenn.etag });
             if (!r || r.umgebung === null) continue;
             // Hat inzwischen ein anderer geschrieben, liegt die eigene Änderung jetzt auf dessen Stand — den erst holen
             if (String(r.umgebung_vor) !== kenn.etag) throw new VorbedingungFehler();
@@ -1166,7 +1191,7 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
             if (!pf || !vor || !kf) continue;
             if (!pf.p) { fremdNeu[f.b.id] = { ...kf, stempel: f.st }; fremdErledigt.add(f.b.id); continue; }
             if (JSON.stringify(pf.p).length > PATCH_MAX_ZEICHEN) continue;
-            const r = await boardAendern(f.b.geteiltVon!, f.b.id, pf.p);
+            const r = await boardAendern(f.b.geteiltVon!, f.b.id, pf.p, undefined, { version: kf.version });
             if (!r) continue;                                     // etwa: Freigabe beendet oder nur noch lesend — das klärt der bisherige Weg
             if (String(r.vor) !== kf.version) throw new VorbedingungFehler();
             fremdNeu[f.b.id] = { besitzer: f.b.geteiltVon!, version: String(r.version), stempel: f.st };
