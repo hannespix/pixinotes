@@ -27,7 +27,7 @@ PDF-Vorschau, Aufklappen und Fokus mit Seitenzahl; Bild-Lupe und Esc im Fokus; L
 
 | Nr | Schwere | Was der Nutzer merkt | Ursache | Stand |
 |----|---------|----------------------|---------|-------|
-| KA1 | hoch | Eine geteilte Board-Datei (`.pixiboard.json`) – ebenso Link, Abgleich oder ein Gast im Live-Board – mit einer Notiz, deren Inhalt keine Block-Liste ist (oder einen leeren Eintrag enthält), legt die ganze App lahm: „PixiNotes lässt sich gerade nicht anzeigen", auch nach jedem Neuladen (der Stand ist gespeichert). Eine Mail ohne Absender übersteht das Zeichnen, der erste Klick auf sie nicht. | `karteGueltig` prüft nur das Äußere einer Karte (Kennung, Art, Lage, „hat Daten"). Den Inhalt lesen aber auch Suche, Aufgaben, Rückverweise, Auswahl-Leiste und Fokus-Kopf – außerhalb der Fehlergrenze der Karte. | behoben: `lib/kartenDaten.ts` bringt den Inhalt von Karten von außen in die Gestalt seiner Art (Notiz, Form, Mail, Datei, Diagramm, App, Bild, Portal); eingehängt in `karteEntschaerfen` (lib/sicher.ts), durch das alle Wege von außen laufen. Prüfpunkte A1–A4. |
+| KA1 | hoch | Eine geteilte Board-Datei (`.pixiboard.json`) – ebenso Link, Abgleich oder ein Gast im Live-Board – mit einer Notiz, deren Inhalt keine Block-Liste ist (oder einen leeren Eintrag enthält), legt die ganze App lahm: „PixiNotes lässt sich gerade nicht anzeigen", auch nach jedem Neuladen (der Stand ist gespeichert). Eine Mail ohne Absender übersteht das Zeichnen, der erste Klick auf sie nicht. | `karteGueltig` prüft nur das Äußere einer Karte (Kennung, Art, Lage, „hat Daten"). Den Inhalt lesen aber auch Suche, Aufgaben, Rückverweise, Auswahl-Leiste und Fokus-Kopf – außerhalb der Fehlergrenze der Karte. | behoben – gemeinsam mit M522, das denselben Befund von der Daten-Seite fand und die Gestalt-Prüfung `lib/sicherGestalt.ts` gebaut hat (eine eigene, gleichartige Prüfung aus diesem Audit ist ihr beim Einmischen gewichen). Von hier kommt die Block-Regel **bis in die Unterblöcke**: `children: "x"` oder ein Inline-Inhalt, der weder Text noch Liste noch Tabelle ist, ließ die App auch mit der neuen Prüfung noch ausfallen (Prüfpunkt A1 blieb rot). Dazu rechnen Mail-, Datei- und Diagramm-Karte bei fehlenden Feldern (alte Stände) mit Vorgaben, und die Textfassung einer Mail ohne Anhang-Liste stürzt nicht mehr ab (das war der Absturz beim ersten Klick). Prüfpunkte A1–A4. |
 | KA2 | mittel | Ein Diagramm mit kaputtem oder leerem Code hängt eine Grafik „Syntax error in text / mermaid version …" (Bombe) unter die App – je ungültigem Zwischenstand im Code-Editor eine weitere. Das Dokument wird höher als das Fenster: Die Grafiken rutschen ins Bild, sobald etwas das Dokument rollt, und stehen im Ausdruck. | mermaid hängt sein Arbeits-Element an `document.body` und räumt es nur nach Erfolg weg; die Render-Kennung ist je Versuch neu (M90), also blieb jedes stehen. | behoben: `suppressErrorRendering` beim Einrichten (gilt auch für Folien), dazu `mermaidResteWeg()` nach einem gescheiterten Versuch. B1–B5. |
 | KA15 | mittel | Telefon: Wer eine (verkleinerte) Karte doppelt antippt, öffnet mit dem ersten Tipp den Fokus – der zweite traf, was inzwischen unter dem Finger lag. Nachgestellt an Notiz, Mail, Datei, Bild, Diagramm, Kontakt, App, Pixi (198 Fälle, 60 mit Folge): Fokus gleich wieder zu, daneben eine neue Notiz angelegt, Haken gesetzt, Rufnummer gewählt (`tel:`), Lupe oder Dialog offen, Cursor im Text (Tastatur fährt aus). Hinweis aus dem Audit Karten B (dort: Kanban-Spalte gelöscht). | Mit dem Öffnen ist die Karte sofort bedienbar, die Kamera fährt, die Leisten erscheinen – der zweite Tipp (90–250 ms später) gilt schon der neuen Ansicht. | behoben in `FocusSheet.tsx`: 450 ms Schonfrist nach dem Öffnen (nicht beim Blättern) – Druck, Klick und Doppelklick werden in dieser Zeit verworfen; ausgenommen ist die Kopfzeile (Zurück). H (drei Kartenarten × 8 Stellen × 2 Abstände, dazu: danach normal bedienbar). |
 | KA14 | mittel | Diagramm: Einen Schritt anklicken und „Entfernen" löscht auch die Nachbarn. Im Vorlagen-Diagramm („Start → Prüfen → Fertig") bleibt nach „Prüfen entfernen" nur die Kopfzeile – ein leeres Diagramm. Steht die Kennung eines Schritts als Wort in der Beschriftung eines anderen („Zurück an A"), fällt auch dessen Zeile weg. | `removeNode` strich jede Zeile, in der die Kennung vorkam – auch `A[Start] --> B{Prüfen}`, in der die Beschriftung von A steht – und suchte die Kennung auch in Beschriftungen. | behoben: `removeFlowNode()` (lib/mermaidEdit.ts) zerlegt die Zeile an ihren Pfeilen; was links und rechts vom Schritt stand, bleibt. G1–G4. |
@@ -44,11 +44,13 @@ PDF-Vorschau, Aufklappen und Fokus mit Seitenzahl; Bild-Lupe und Esc im Fokus; L
 | KA13 | niedrig | Eine Kontakt-Karte bleibt im Bearbeiten-Formular, bis „Fertig" gedrückt wird – auch wenn man woanders hinklickt; leere Zeilen (＋ Rufnummer) bleiben bis dahin gespeichert (in Ruhe werden sie nicht gezeigt). | Bearbeiten ist ein Zustand der Karte, kein Fokus-Zustand (M450) | offen – Verhaltensänderung. |
 
 ## Wie (Architektur)
-- `src/lib/kartenDaten.ts` (neu): `kartenDatenGerade(node)` – je Kartenart die Felder, die Karten und Auswertungen als
-  Text, Zahl oder Liste voraussetzen. Notiz/Form: `blocks` als Liste von Objekten, `children` als Liste, Inline-Inhalt
-  als Text, Liste oder Tabelle. Mail: Betreff, Absender, Text als Text, Anhänge als Liste von `{name, size, …}`.
-  Datei/App: Name und Größe. Diagramm: Code. Gibt dieselbe Karte zurück, wenn nichts zu tun war (der Abgleich
-  vergleicht per Identität). Aufruf in `karteEntschaerfen` (`src/lib/sicher.ts`, zwei Zeilen).
+- `src/lib/sicherGestalt.ts` (M522), Tabelle `GESTALT`: neue Regel `block` für `blocks` von Notiz, Form (dort neu
+  eingetragen) und Protokoll-Sitzung – Unterblöcke (`children`) müssen eine Liste sein und werden ebenso gerichtet,
+  Inline-Stücke sind Objekte (ein Link braucht seine Stück-Liste), `content` ist Text, Liste oder Tabelle, `type` Text,
+  `props` ein Objekt. Notiz: `hex` als Text. Heiles bleibt dasselbe Objekt.
+- Vorgaben in den Karten selbst (für alte gespeicherte Stände ohne ein Feld): `EmailCard` (Betreff, Absender, Text,
+  Anhänge), `FileCard` (Name, Größe), `MermaidCard` (Code); `lib/serialize.ts` (`nodeToText`, HTML-Fassung der Mail)
+  kommt ohne Anhang-Liste aus. Kontakt, Flüssige Schrift, Pixi, Bild, Portal, Form und App rechneten schon so.
 - `src/lib/mermaid.ts`: `suppressErrorRendering: true` in `getMermaid()`; `mermaidResteWeg(renderId)` entfernt
   `d<id>`/`i<id>`/`<id>`, soweit sie lose am Dokument hängen. `MermaidCard.tsx` ruft es im Fehlerfall.
 - `src/lib/mermaidEdit.ts`: `removeFlowNode(code, kennung)` – Beschriftungen werden für die Suche ausgeblendet
@@ -73,16 +75,13 @@ PDF-Vorschau, Aufklappen und Fokus mit Seitenzahl; Bild-Lupe und Esc im Fokus; L
   die Korrekturen oben brachten 3,2 KB dazu. Dafür kommen Bild-Lupe (`BildLupe.tsx` samt `lib/lupe.ts`) und die
   Text-Chips der Bilder (`BildTextChips.tsx` samt `lib/bildTextAufgabe.ts`) jetzt erst bei Bedarf:
   `src/components/nodes/bildSpaet.tsx` (nachgeladen, `bildTeileVorladen()` holt sie vier Sekunden nach dem ersten
-  Bild auf einem Board im Hintergrund – für den ersten Klick und für offline). Start-JS danach 2 062 173 B
-  (2,8 KB unter der Grenze, 2,7 KB weniger als vorher).
+  Bild auf einem Board im Hintergrund – für den ersten Klick und für offline). Das nimmt 2,7 KB aus dem Start; mit
+  M522 eingemischt liegt das Start-JS bei rund 2,058 MB (etwa 7 KB unter der Grenze).
 
 ## Grenzen / offen
 - KA10–KA13 siehe Tabelle.
-- KA1 heilt Karten **beim Hereinkommen**. Ein schon gespeicherter kaputter Stand (entstanden vor dieser Korrektur)
-  wird beim Laden aus dem Browser-Speicher nicht nachbehandelt – das wäre `speicherMigration` in
-  `src/store/speicher.ts` (Bereich Daten/Team). Ebenso prüft der Ordner-/WebDAV-Abgleich Karten bisher nur auf ihre
-  Zeitstempel (`zeitenVonAussen`), nicht über `kartenVonAussen`.
-- Module (Kanban, Zeitplan, Tabelle …) haben dieselbe Art Lücke in ihren Daten; `kartenDatenGerade` deckt nur die
-  Inhaltskarten ab (Bereich Karten B).
+- Die Schonfrist (KA15) verwirft auch einen ABSICHTLICHEN zweiten Tipp, der binnen 450 ms nach dem Öffnen kommt;
+  die Kopfzeile (Zurück, Darstellung) ist ausgenommen. Bei der Notiz setzt weiterhin schon der erste Tipp in den
+  Text den Cursor (so gewollt: antippen und schreiben).
 - Konsole: BlockNote meldet beim Öffnen eines Editors, dem `viewport`-Meta fehle
   `interactive-widget=resizes-content` (`index.html`, Bereich Rahmen-Oberfläche) – nur eine Warnung.
