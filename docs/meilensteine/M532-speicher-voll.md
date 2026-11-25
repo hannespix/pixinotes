@@ -41,7 +41,9 @@ dem Neuladen eines Fensters mit ungespeicherter Arbeit: Einstellungen → Daten 
   `vollText`) laufen durch `ersetzer`. Bis die Ablage geladen ist, ist das ein winziger Wächter: Trifft er eine
   `data:`-URL ab `AUSLAGERN_AB` (10 000) Zeichen, lädt er `ablageIdb.ts` (und damit `ablage.ts`) nach; die meldet sich
   mit `ablageAnmelden` an, setzt ihren Ersetzer ein, verwirft das Text-Gedächtnis (M525) und schreibt einmal neu. So
-  kostet M532 das Start-Paket rund 1 KB (Grenze m502: 2 065 000 B).
+  kostet M532 das Start-Paket rund 1 KB; zum Ausgleich lädt die einmalige Umbenennung alter Emoji-Namen (M397,
+  `store/ohneEmoji.ts`) über dasselbe Modul nach — und nur, wenn überhaupt ein Name einen Vorsatz trägt
+  (`alteNamenOhneEmoji` in `start.ts`). Unterm Strich bleibt das Start-Paket gleich groß (m502: 2 064 885 B).
   `speicherAblage.getItem` ruft `nachDemLaden(roh)`: Stehen Verweise im Text (oder alte große data-URLs), lädt die
   Ablage nach; `standBereit()` ist das Versprechen dazu, und **`main.tsx` zeichnet erst danach** (und erst danach
   `alteNamenOhneEmoji`) — keine Karte ohne Bild, kein Abgleich/Export, der einen Verweis sieht. `adoptPersistedState`
@@ -61,7 +63,7 @@ dem Neuladen eines Fensters mit ungespeicherter Arbeit: Einstellungen → Daten 
 - **`ablageVorab(wert)`** (speicher.ts): Ein Stand von außen wird vor dem Übernehmen in die Ablage gelegt, sonst
   scheiterte schon das erste Speichern nach dem Einarbeiten. Aufgerufen in `fremdStandEinarbeiten` (Konto, Ordner,
   WebDAV), `projectSync` (Team-Ordner: Beitreten, Prüfen) und den Lade-Knöpfen in `Settings.tsx`.
-- **Meldung:** `flushPersist` merkt den Grund (`QuotaExceededError` → `voll`, sonst `anderer`, `speicherFehlerArt`);
+- **Meldung:** `flushPersist` merkt den Grund (`QuotaExceededError` → `voll`, sonst `anderer`, `letzterFehler`);
   `speicherFehlerText()` in `kontoSync.ts` baut daraus den Satz (drei Stellen). Der allgemeine Hinweis bei vollem
   Speicher (`pixinotes:quota` in `App.tsx`) nennt „Alles sichern".
 
