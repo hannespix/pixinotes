@@ -43,6 +43,7 @@ Prüfpunkte sind gegen den Stand vor dem Fix rot und danach grün (`PN_DIST=<alt
 | O21 | niedrig | Beschädigter Teilen-Link (`#b=…` abgeschnitten): die App startet stumm, der Rest bleibt in der Adresse | Fehler beim Entpacken wird verschluckt | ✅ Hinweis, Adresse aufgeräumt (K1) |
 | O22 | niedrig | Aus dem Teilen-Menü (Android) gekommen, aber nichts liegt bereit: die App startet stumm | `if (!g) return` | ✅ Hinweis (K2) |
 | O23 | niedrig | Teilnehmer-Seite `mitmachen.html` ohne Netz: es erscheint die App unter dieser Adresse | Offline-Ersatz galt für jede Navigation | ✅ nur noch für die App-Seite (F4, F5) |
+| O23b | mittel | Alt+E oder Alt+H während der Präsentation: Einstellungen bzw. Hilfe öffneten sich **unsichtbar** hinter der Präsentation — das nächste Esc schloss scheinbar nichts | Präsentation z-index 95, Fenster 80 | ✅ Was aufgeht, hebt sich auch über die Präsentation; erstes Esc schließt das Fenster, das zweite die Präsentation (A11a, A11) |
 | O24 | niedrig | Englisch (Hinweis aus M520): Zeiterfassung zeigt „day" neben „Week/Month/Year"; Fristen „in 3 T."; am Beschluss „ohne TOP" | „Tag" steht im Wörterbuch klein (Einheit); das Muster im Wörterbuch hieß noch „in {1} Tagen"; die Auswahl trägt `translate="no"` (TOP-Texte des Nutzers) | ✅ Reiter per CSS groß, Muster „{0} · in {1} T.", fester Eintrag über `t()` (L1–L3) |
 | O25 | niedrig | Zähl-Texte mit Klammer-Endung (Hinweis aus M520): „1 Checklisten-Punkt(e)", „3 Frist(en)", „2 Karte(n)", „Eintrag/Einträge", „Quelle(n)", „Verbindung(en)", „Aufgabe(n)" — zwölf Stellen | vor M461 geschrieben bzw. später dazugekommen | ✅ `zahlWort` (deutsch und englisch), die Prüfreihe sucht den Quelltext danach ab (L4) |
 
@@ -68,7 +69,7 @@ sehr langer Name, Sonderzeichen), Fokus + Fenster + Esc.
   3 KB. Ausgleich ohne die Grenze anzuheben: `SprachHinweis` (M368, Texte in 13 Sprachen, gut 3 KB) lädt nur noch, wenn
   der Browser kein Deutsch führt (`sprachHinweisNoetig` in `App.tsx`, dieselben Bedingungen wie in der Komponente;
   scheitert das Nachladen, bleibt der Hinweis aus), und das Leerlauf-Vorladen nutzt die benannten Lader der Fenster
-  (`ladeEinstellungen`, `ladeHilfe` …) statt eigener `import()`-Ausdrücke. Stand danach: 2 064 033 B (967 B Luft).
+  (`ladeEinstellungen`, `ladeHilfe` …) statt eigener `import()`-Ausdrücke. Stand danach: 2 064 033 B; mit M522 eingemischt 2 061 723 B (3,3 KB Luft).
 
 ## Grenzen / offen
 - **Fehlgeschlagenes Nachladen reißt die ganze Darstellung mit.** Jeder nachgeladene Teil ohne eigene Fehlergrenze
@@ -96,6 +97,9 @@ sehr langer Name, Sonderzeichen), Fokus + Fenster + Esc.
   sie lassen sich nicht unter ein anderes Fenster bringen, außer über Alt+E/Alt+H; dort greift O3 nicht.
 
 ## Für andere Bereiche
+- **M521 (Präsentation):** Strg+K während der Präsentation, dann Esc: Suche **und** Präsentation schließen zusammen —
+  `Presenter.tsx` wartet bei Esc nur auf `.ticket-modal-backdrop, .modal-backdrop, .pdf-backdrop`, nicht auf
+  `.search-backdrop`. (Für Einstellungen und Hilfe stimmt die Reihenfolge, A11.)
 - **M519 (HTML-App/Präsentation):** Beim Anlegen einer „Präsentation" (Vibe Studio) meldet der Rahmen
   `Failed to read the 'sessionStorage' property from 'Window': The document is sandboxed and lacks the
   'allow-same-origin' flag` (pageerror aus dem eingebetteten Dokument).
