@@ -42,3 +42,13 @@ export function zugSetzen(an: boolean): void {
 }
 /** Einmal rufen, sobald der laufende Zug vorbei ist */
 export const nachZug = (f: () => void): void => { nachZugHoerer.add(f); };
+/**
+ * M539: Was die App nach dem Start von selbst nachlädt (Vorladen im Leerlauf, Zurück-Taste, Texterkennung,
+ * Sicherung), nicht mitten in einen Zug legen. Jedes `import()` hängt `<link rel="modulepreload">` in den Kopf — das
+ * prüft Chromium gegen alle `:has()`-Regeln mit Subjekt `html` und rechnet den Stil des ganzen Dokuments neu (gut
+ * 40 ms, ein Ruckler; Regel aus M491). Läuft ein Zug, kommt es kurz nach dem Ablegen.
+ */
+export function ausserhalbZug(f: () => void): void {
+  if (!zug) { f(); return; }
+  nachZug(() => { window.setTimeout(() => ausserhalbZug(f), 400); });
+}

@@ -7,6 +7,7 @@
  *      Verbindungen), Maus → Bild höchstens 15 ms über dem Board ohne Verbindungen.
  *   T  Trace (Thread-Zeit, unabhängig von fremder Last): Chromium ordnet die Ebenen nicht mehr in jedem Bild neu ein
  *      (Layerize), und keine Stil-Rechnung über das ganze Dokument (`:has()` nach Ein-/Aushängen der Fanglinien).
+ *      M539: auch das Nachladen nach dem Start hängt im Zug nichts in den Kopf (T3).
  *   S  Schatten: im Ruhezustand wie vorher; im Zug ist der Schatten der bewegten Kante weg (und rastert nicht neu),
  *      nach dem Ablegen ist er an der neuen Stelle zurück; zurückgezogen sieht das Board Bild für Bild aus wie vorher.
  *   B  Bedienung: die leere Beschriftung („+" in der Mitte einer Verbindung) ist nach dem Zug wieder da und liegt oben;
@@ -164,6 +165,35 @@ if (NUR.includes('T')) {
   pruefe('T1 Layerize je Bild (Median) mit 100 Verbindungen höchstens 1,5 ms über dem Board ohne Verbindungen', mit.spur.layerize <= ohne.spur.layerize + 1.5, { mit: mit.spur, ohne: ohne.spur });
   // vorher: 36 Mal auf 50 Mausbewegungen je 7 000–8 400 Elemente (Fanglinien ein- und ausgehängt → `:has()`)
   pruefe('T2 im Zug keine Stil-Rechnung über das ganze Dokument (höchstens eine, beim ersten Platz für eine Fanglinie)', mit.spur.gross <= 1 && ohne.spur.gross <= 1, { mit: mit.spur.gross, ohne: ohne.spur.gross });
+
+  // M539: Was die App nach dem Start von selbst nachlädt (4 s nach dem Laden: Vorladen, Zurück-Taste, Texterkennung),
+  // hängt `<link rel="modulepreload">` in den Kopf — mitten im Zug rechnete Chromium dafür den Stil des ganzen
+  // Dokuments neu (T2 rot seit M534). Ein Zug über diesen Zeitpunkt: im Zug kommt nichts in den Kopf, danach schon.
+  let t3 = null;
+  for (let v = 0; v < 3 && !t3; v += 1) {
+    const { ctx, P } = await seite(VIELE(0));
+    await P.evaluate(() => {
+      window.__pnKopf = [];
+      new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) window.__pnKopf.push([performance.now(), n.nodeName, (n.href ?? n.textContent ?? '').slice(-60)]); })
+        .observe(document.head, { childList: true });
+    });
+    const r = await rahmen(P, 'k42');
+    const start = await P.evaluate(() => performance.now());
+    if (start > 3300) { await ctx.close(); continue; }   // Start unter Last zu langsam: der Zeitpunkt läge vor dem Zug
+    // Der Druck selbst darf holen, was er braucht (z. B. lib/stricheLoesen) — gezählt wird ab dem laufenden Zug
+    await P.mouse.move(r.cx, r.cy); await P.mouse.down();
+    await P.mouse.move(r.cx + 3, r.cy + 3, { steps: 2 }); await P.mouse.move(r.cx + 6, r.cy + 6, { steps: 2 });
+    await P.waitForTimeout(150);
+    const ab = await P.evaluate(() => performance.now());
+    for (let i = 1; await P.evaluate(() => performance.now()) < 6500; i += 1) { await P.mouse.move(r.cx + (i % 40) * 6, r.cy + Math.sin(i / 5) * 60); await P.waitForTimeout(40); }
+    const bis = await P.evaluate(() => performance.now());
+    await P.mouse.up();
+    await P.waitForTimeout(4000);
+    const k = await P.evaluate(() => window.__pnKopf.slice());
+    t3 = { zugAb: Math.round(ab), zugBis: Math.round(bis), imZug: k.filter(([t]) => t > ab && t < bis).length, was: k.filter(([t]) => t > ab && t < bis).slice(0, 4).map((x) => [Math.round(x[0]), x[1], x[2]]), danach: k.filter(([t]) => t >= bis).length };
+    await ctx.close();
+  }
+  pruefe('T3 im Zug hängt das Nachladen nach dem Start nichts in den Kopf, nach dem Ablegen kommt es', !!t3 && t3.imZug === 0 && t3.danach > 0, t3 ?? 'Start dreimal zu langsam');
 }
 
 /* ═══════════════════════ Schatten ═══════════════════════ */
