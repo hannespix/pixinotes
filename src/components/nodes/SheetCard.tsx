@@ -1,19 +1,23 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '@xyflow/react';
-import { useBoard } from '../../store';
+import { mutedHistory, useBoard } from '../../store';
 import { useKartenAnsicht } from '../../lib/kartenAnsicht';
 import type { SheetData, SheetNode, ZellStil } from '../../types';
 import { formatiereZahl } from '../../lib/zahlFormat';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
-import { indexZuAdresse, rechneBlattMitLinks, zeigeWert } from '../../lib/formel';
-import { IPlus, ISigma, IDownload, IFilter, ICheck, IArrowUp, IArrowDown, IPen } from '../Icons';
+import { adresseZuIndex, indexZuAdresse, rechneBlattMitLinks, zeigeWert } from '../../lib/formel';
+// M528: ganze Spalten/Zeilen, Datumsrechnung, Bezüge umschreiben — kommt mit der Tabelle, nicht ins Start-Paket
+import { bezuegeVerlegen, bezuegeVerschieben, tageVon, ZEILEN_MAX } from '../../lib/formelPlus';
+import { tsvLesen, tsvSchreiben, umbauAnwenden, umbauNeu } from '../../lib/tabellenUmbau';
+import { useEscSchliesst } from '../../lib/useEscSchliesst';
+import { IPlus, ISigma, IDownload, IFilter, ICheck, IArrowUp, IArrowDown, IPen, IChevronL, IChevronR, ITrash } from '../Icons';
 import { alsCsv, ersteZeile, gezeigteZeilen, sichererLink, spaltenName, spaltenWerte } from '../../lib/tabellenAnsicht';
 
 /** M409: Breite einer Spalte, für die nichts festgelegt ist – darunter wird sie nicht gequetscht */
 const SPALTE_STD = 84;
-import { MenuHuelle } from '../EbenenMenu';
+import { insBild, MenuHuelle } from '../EbenenMenu';
 import { loadFile } from '../../lib/fileStore';
 import { triggerDownload } from '../../lib/download';
 import { zahlWort } from '../../lib/sprache';
@@ -41,6 +45,24 @@ export function SheetCard({ id, data, selected }: NodeProps<SheetNode>) {
 }
 
 /** M380: Der Inhalt ohne Kartenhülle — derselbe auf dem Board und als Folie in der Präsentation */
+/**
+ * M528: Auswahl, Zwischenablage, Zeilen und Spalten einfügen/löschen.
+ * Eine Auswahl entsteht mit Umschalt+Klick, Ziehen über Zellen, Klick auf einen Spalten- oder Zeilenkopf oder Esc aus
+ * dem Bearbeiten. Dann hat ein unsichtbares Textfeld (`sheet-ablage`) den Fokus: Es nimmt Pfeiltasten, Entf, Tippen
+ * und — als echtes Textfeld — Strg+C/X/V samt der Ereignisse der Zwischenablage, auch aus Excel, LibreOffice und
+ * Google Sheets (Tabulator-Text). Kopiert wird, was man sieht; innerhalb von PixiNotes reisen die Formeln mit (relative
+ * Bezüge wandern, $-Bezüge nicht).
+ */
+type Rechteck = { s0: number; s1: number; z0: number; z1: number };
+type Punkt = [number, number];
+const rechteck = (a: Punkt, b: Punkt): Rechteck => ({ s0: Math.min(a[0], b[0]), s1: Math.max(a[0], b[0]), z0: Math.min(a[1], b[1]), z1: Math.max(a[1], b[1]) });
+const drin = (r: Rechteck | null, s: number, z: number): boolean => !!r && s >= r.s0 && s <= r.s1 && z >= r.z0 && z <= r.z1;
+/** Was zuletzt in einer Rechen-Tabelle kopiert wurde — mit Formeln, Links und Aussehen (die Zwischenablage hält nur Text) */
+let zwischen: { text: string; quelle: string; r: Rechteck; roh: string[][]; links: (string | undefined)[][]; stile: (ZellStil | undefined)[][]; schnitt: boolean } | null = null;
+/** Mehr Spalten legt die Tabelle von sich aus nicht an (A bis Z; aus Excel kann es mehr geben) */
+const SPALTEN_GRENZE = 26;
+const nurZeilenumbruch = (t: string): string => t.replace(/\r\n?/g, '\n').replace(/\n$/, '');
+
 /** M520: nur Ansicht (Filter, Sortierung, Spaltenbreite) — gilt in einem Board, das man nicht ändern darf, lokal (lib/kartenAnsicht.ts) */
 const TABELLE_ANSICHT = ['filterAn', 'filter', 'sort', 'kopf', 'bis', 'colW'] as const;
 export function SheetBody({ id, data: daten }: { id: string; data: SheetData }) {
@@ -120,11 +142,34 @@ export function SheetBody({ id, data: daten }: { id: string; data: SheetData }) 
     return sichererLink(anzeige);
   };
 
-  const oeffne = (adr: string) => {
+  /** M528: Die Auswahl (Anker → anderes Ende, Spalte/Zeile ab 0); beim Bearbeiten ist sie die bearbeitete Zelle */
+  const [auswahl, setAuswahl] = useState<{ a: Punkt; b: Punkt } | null>(null);
+  const r = auswahl ? rechteck(auswahl.a, auswahl.b) : null;
+  const [schnitt, setSchnitt] = useState<Rechteck | null>(null);
+  const [menue, setMenue] = useState<{ art: 'z' | 's' | 'zelle'; x: number; y: number } | null>(null);
+  const ablage = useRef<HTMLTextAreaElement | null>(null);
+  /** Wurde gerade gezogen oder mit Umschalt erweitert, öffnet der Klick danach keine Zelle */
+  const gezogen = useRef(false);
+  const ablageFokus = () => requestAnimationFrame(() => {
+    const t = ablage.current;
+    if (!t) return;
+    t.value = ' ';
+    t.focus({ preventScroll: true });
+    t.select();
+  });
+
+  const oeffne = (adr: string, anfang?: string) => {
     setEdit(adr);
-    setEntwurf(cells[adr] ?? '');
+    setEntwurf(anfang ?? cells[adr] ?? '');
     setLinkEntwurf(data.links?.[adr] ?? '');
-    requestAnimationFrame(() => eingabe.current?.select());
+    const p = adresseZuIndex(adr);
+    if (p) setAuswahl({ a: [p.spalte, p.zeile], b: [p.spalte, p.zeile] });
+    requestAnimationFrame(() => {
+      const el = eingabe.current;
+      if (!el) return;
+      // M528: Wer in der Auswahl lostippt, ersetzt den Inhalt (wie Excel) — der Cursor steht hinter dem Getippten
+      if (anfang !== undefined) el.setSelectionRange(el.value.length, el.value.length); else el.select();
+    });
   };
 
   const uebernimm = (weiter?: 'runter' | 'rechts') => {
@@ -152,6 +197,250 @@ export function SheetBody({ id, data: daten }: { id: string; data: SheetData }) 
     if (weiter === 'runter' && naechste) oeffne(indexZuAdresse(spIdx, naechste - 1));
     else if (weiter === 'rechts' && spIdx + 1 < cols) oeffne(indexZuAdresse(spIdx + 1, z - 1));
     else setEdit(null);
+  };
+
+  // ───────── M528: Auswahl, Zwischenablage, Umbau ─────────
+  const editRef = useRef(edit); editRef.current = edit;
+  const uebernimmRef = useRef(uebernimm); uebernimmRef.current = uebernimm;
+  /** Eine Änderung als eigener Rückgängig-Schritt (nicht mit dem Tippen davor gebündelt) */
+  const schreiben = (patch: Record<string, unknown>) => {
+    useBoard.getState().pushHistory();
+    mutedHistory(() => useBoard.getState().updateNodeData(id, patch));
+  };
+  const maxSpalten = Math.max(cols, SPALTEN_GRENZE);
+
+  /** Klick daneben (außerhalb der Karte und ihrer Menüs) hebt die Auswahl auf */
+  useEffect(() => {
+    if (!auswahl || edit) return;
+    const weg = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      const wurzel = rollRef.current?.parentElement;
+      if (!t || wurzel?.contains(t) || t.closest?.('.ebenen-menu')) return;
+      setAuswahl(null); setMenue(null);
+    };
+    window.addEventListener('pointerdown', weg, true);
+    return () => window.removeEventListener('pointerdown', weg, true);
+  }, [auswahl, edit]);
+
+  const zelleUnter = (x: number, y: number): Punkt | null => {
+    const el = document.elementFromPoint(x, y)?.closest?.('td[data-zelle]') as HTMLElement | null;
+    if (!el || !rollRef.current?.contains(el)) return null;
+    const p = adresseZuIndex(el.dataset.zelle ?? '');
+    return p ? [p.spalte, p.zeile] : null;
+  };
+  const zelleRunter = (e: React.PointerEvent, s: number, z: number) => {
+    if (e.button !== 0 || (e.target as HTMLElement).closest('input, a, button')) return;
+    gezogen.current = false;
+    if (e.shiftKey) {
+      e.preventDefault();
+      gezogen.current = true;
+      const anker = auswahl?.a ?? [s, z];
+      if (edit) uebernimm();
+      setAuswahl({ a: anker, b: [s, z] });
+      ablageFokus();
+      return;
+    }
+    if (e.pointerType === 'touch') return;   // am Finger rollt Ziehen die Tabelle
+    const start: Punkt = [s, z];
+    const zieh = (ev: PointerEvent) => {
+      const p = zelleUnter(ev.clientX, ev.clientY);
+      if (!p || (!gezogen.current && p[0] === s && p[1] === z)) return;
+      if (!gezogen.current) {
+        gezogen.current = true;
+        if (editRef.current) uebernimmRef.current();
+        window.getSelection()?.removeAllRanges();
+      }
+      setAuswahl({ a: start, b: p });
+    };
+    const ende = () => {
+      window.removeEventListener('pointermove', zieh);
+      window.removeEventListener('pointerup', ende);
+      window.removeEventListener('pointercancel', ende);
+      if (gezogen.current) ablageFokus();
+    };
+    window.addEventListener('pointermove', zieh);
+    window.addEventListener('pointerup', ende);
+    window.addEventListener('pointercancel', ende);
+  };
+  /** Klick auf einen Spalten- oder Zeilenkopf wählt die ganze Spalte bzw. Zeile (mit Umschalt: bis dorthin) */
+  const kopfRunter = (e: React.MouseEvent, art: 'z' | 's', i: number) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    if (edit) uebernimm();
+    const von = e.shiftKey && auswahl ? (art === 's' ? auswahl.a[0] : auswahl.a[1]) : i;
+    setAuswahl(art === 's' ? { a: [von, 0], b: [i, rows - 1] } : { a: [0, von], b: [cols - 1, i] });
+    ablageFokus();
+  };
+  /** Rechtsklick auf Kopf oder Zelle: Menü zum Einfügen und Löschen; liegt die Stelle außerhalb der Auswahl, gilt sie allein */
+  const kontext = (e: React.MouseEvent, art: 'z' | 's' | 'zelle', s: number, z: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (edit) uebernimm();
+    if (!drin(r, art === 'z' ? (r?.s0 ?? 0) : s, art === 's' ? (r?.z0 ?? 0) : z)) {
+      setAuswahl(art === 's' ? { a: [s, 0], b: [s, rows - 1] } : art === 'z' ? { a: [0, z], b: [cols - 1, z] } : { a: [s, z], b: [s, z] });
+    }
+    setMenue({ art, x: e.clientX, y: e.clientY });
+  };
+  /** Was das Menü einfügt bzw. löscht: die Zeilen/Spalten der Auswahl */
+  const spanne = (a: 'z' | 's'): { bei: number; n: number } => (r ? (a === 'z' ? { bei: r.z0, n: r.z1 - r.z0 + 1 } : { bei: r.s0, n: r.s1 - r.s0 + 1 }) : { bei: 0, n: 1 });
+
+  /**
+   * Zeilen oder Spalten einfügen (n > 0) bzw. löschen (n < 0) — alles, was an Adressen hängt, wandert mit, Formeln
+   * passen ihre Bezüge an (lib/tabellenUmbau.ts). Ein Schritt für Strg+Z.
+   */
+  const umbauen = (a: 'z' | 's', bei: number, n: number) => {
+    setMenue(null);
+    if (edit) uebernimm();
+    if (n < 0 && -n >= (a === 'z' ? rows : cols)) { showToast(a === 'z' ? 'Mindestens eine Zeile bleibt stehen.' : 'Mindestens eine Spalte bleibt stehen.'); return; }
+    if (a === 's' && n > 0 && cols + n > maxSpalten) {
+      // Platz nur, wenn die Spalten, die hinten hinausfielen, leer sind
+      const frei = Object.keys(cells).every((k) => (adresseZuIndex(k)?.spalte ?? 0) < maxSpalten - n);
+      if (!frei) { showToast(`Mehr als ${maxSpalten} Spalten (A bis ${indexZuAdresse(maxSpalten - 1, 0).replace(/\d+/g, '')}) fasst die Tabelle nicht.`); return; }
+    }
+    const inhalt = n < 0 && Object.keys(cells).some((k) => {
+      const p = adresseZuIndex(k);
+      const x = p ? (a === 'z' ? p.zeile : p.spalte) : -1;
+      return x >= bei && x < bei - n;
+    });
+    const patch = umbauAnwenden(data as SheetData, umbauNeu(a, bei, n));
+    if (a === 's' && patch.cols !== undefined) patch.cols = Math.min(patch.cols, maxSpalten);
+    schreiben(patch as Record<string, unknown>);
+    // die Auswahl bleibt bei den eingefügten Zeilen/Spalten bzw. rückt an die Stelle der gelöschten
+    const ende = Math.max(0, (a === 'z' ? (patch.rows ?? rows) : (patch.cols ?? cols)) - 1);
+    const lo = Math.min(bei, ende), hi = Math.min(bei + Math.max(n, 1) - 1, ende);
+    setAuswahl(a === 'z' ? { a: [0, lo], b: [(patch.cols ?? cols) - 1, hi] } : { a: [lo, 0], b: [hi, (patch.rows ?? rows) - 1] });
+    setSchnitt(null);
+    if (inhalt) showToast(a === 'z' ? `${zahlWort(-n, 'Zeile', 'Zeilen')} gelöscht.` : `${zahlWort(-n, 'Spalte', 'Spalten')} gelöscht.`, 'schritt');
+    ablageFokus();
+  };
+
+  const zellenDerAuswahl = (q: Rechteck, fn: (adr: string, s: number, z: number) => void) => {
+    for (let z = q.z0; z <= q.z1; z += 1) for (let sp = q.s0; sp <= q.s1; sp += 1) fn(indexZuAdresse(sp, z), sp, z);
+  };
+  /** Strg+C / Strg+X: sichtbarer Text als Tabulator-Text (für Excel & Co.), Formeln merkt sich die Tabelle selbst */
+  const kopieren = (dt: DataTransfer, ausschneiden: boolean) => {
+    if (!r) return;
+    const roh: string[][] = [], anz: string[][] = [], li: (string | undefined)[][] = [], st: (ZellStil | undefined)[][] = [];
+    for (let z = r.z0; z <= r.z1; z += 1) {
+      roh.push([]); anz.push([]); li.push([]); st.push([]);
+      for (let sp = r.s0; sp <= r.s1; sp += 1) {
+        const adr = indexZuAdresse(sp, z);
+        roh[roh.length - 1].push(cells[adr] ?? '');
+        anz[anz.length - 1].push(text(adr));
+        li[li.length - 1].push(data.links?.[adr]);
+        st[st.length - 1].push(stilVon(adr));
+      }
+    }
+    const tsv = tsvSchreiben(anz);
+    dt.setData('text/plain', tsv);
+    zwischen = { text: tsv, quelle: id, r, roh, links: li, stile: st, schnitt: ausschneiden };
+    setSchnitt(ausschneiden ? r : null);
+  };
+  /** Ein Aussehen aus einer anderen Tabelle in die eigene Stil-Liste übernehmen */
+  const stilNummer = (liste: ZellStil[], stil: ZellStil): number => {
+    const t = JSON.stringify(stil);
+    const i = liste.findIndex((x) => JSON.stringify(x) === t);
+    if (i >= 0) return i;
+    liste.push(stil);
+    return liste.length - 1;
+  };
+  /** Strg+V: an den Anfang der Auswahl; ein einzelner Wert füllt die ganze Auswahl. Formeln aus PixiNotes wandern mit */
+  const einfuegen = (roherText: string) => {
+    if (!r) return;
+    const intern = zwischen && nurZeilenumbruch(zwischen.text) === nurZeilenumbruch(roherText) ? zwischen : null;
+    const block = intern ? intern.roh : tsvLesen(roherText);
+    if (!block.length) return;
+    const h = block.length, w = Math.max(...block.map((x) => x.length));
+    const fuellen = h === 1 && w === 1 && (r.s1 > r.s0 || r.z1 > r.z0);
+    const ziel: Rechteck = fuellen ? r : { s0: r.s0, z0: r.z0, s1: r.s0 + w - 1, z1: r.z0 + h - 1 };
+    let gekappt = false;
+    if (ziel.s1 >= maxSpalten) { ziel.s1 = maxSpalten - 1; gekappt = true; }
+    if (ziel.z1 >= ZEILEN_MAX) { ziel.z1 = ZEILEN_MAX - 1; gekappt = true; }
+    const neu = { ...cells };
+    const links: Record<string, string> = { ...(data.links ?? {}) };
+    const stile: Record<string, number> = { ...(data.stile ?? {}) };
+    const stilListe = [...(data.stilListe ?? [])];
+    let stileAnders = false;
+    const verlegen = !!intern?.schnitt && intern.quelle === id;
+    if (verlegen && intern) zellenDerAuswahl(intern.r, (adr) => { delete neu[adr]; delete links[adr]; if (adr in stile) { delete stile[adr]; stileAnders = true; } });
+    zellenDerAuswahl(ziel, (adr, sp, z) => {
+      const i = fuellen ? 0 : z - ziel.z0, j = fuellen ? 0 : sp - ziel.s0;
+      let v = block[i]?.[j] ?? '';
+      // kopiert: relative Bezüge wandern um den Abstand zur Herkunft; ausgeschnitten: die Formel bleibt, wie sie ist
+      if (intern && !intern.schnitt && v.startsWith('=')) v = bezuegeVerschieben(v, z - (intern.r.z0 + i), sp - (intern.r.s0 + j));
+      if (v === '') delete neu[adr]; else neu[adr] = v;
+      const link = intern?.links[i]?.[j];
+      if (link) links[adr] = link; else delete links[adr];
+      if (intern) {
+        const stil = intern.stile[i]?.[j];
+        if (stil) { stile[adr] = stilNummer(stilListe, stil); stileAnders = true; } else if (adr in stile) { delete stile[adr]; stileAnders = true; }
+      }
+    });
+    // ausgeschnitten und in derselben Tabelle eingefügt: Bezüge auf die verschobenen Zellen folgen ihnen (wie Excel)
+    if (verlegen && intern) {
+      for (const [k, v] of Object.entries(neu)) if (v.startsWith('=')) neu[k] = bezuegeVerlegen(v, intern.r, ziel.z0 - intern.r.z0, ziel.s0 - intern.r.s0);
+    }
+    const patch: Record<string, unknown> = { cells: neu, links: Object.keys(links).length ? links : undefined };
+    if (stileAnders) { patch.stile = Object.keys(stile).length ? stile : undefined; patch.stilListe = stilListe.length ? stilListe : undefined; }
+    if (ziel.z1 + 1 > rows) patch.rows = ziel.z1 + 1;
+    if (ziel.s1 + 1 > cols) patch.cols = ziel.s1 + 1;
+    schreiben(patch);
+    setAuswahl({ a: [ziel.s0, ziel.z0], b: [ziel.s1, ziel.z1] });
+    if (intern?.schnitt) {
+      // aus einer anderen Tabelle ausgeschnitten: dort leeren (eigener Schritt)
+      if (!verlegen) {
+        const quelle = useBoard.getState().boards.flatMap((b) => b.nodes).find((n) => n.id === intern.quelle);
+        const qd = quelle?.data as SheetData | undefined;
+        if (qd?.cells) {
+          const qc = { ...qd.cells }; const ql = { ...(qd.links ?? {}) };
+          zellenDerAuswahl(intern.r, (adr) => { delete qc[adr]; delete ql[adr]; });
+          useBoard.getState().pushHistory();
+          mutedHistory(() => useBoard.getState().updateNodeData(intern.quelle, { cells: qc, links: Object.keys(ql).length ? ql : undefined }));
+        }
+      }
+      zwischen = null;
+      setSchnitt(null);
+    }
+    if (gekappt) showToast(`Nicht alles passt hinein: Die Tabelle fasst höchstens ${maxSpalten} Spalten – der Rest wurde weggelassen.`);
+  };
+  /** Entf: Inhalt der Auswahl leeren (Aussehen bleibt) */
+  const leeren = () => {
+    if (!r) return;
+    const neu = { ...cells }; const links = { ...(data.links ?? {}) };
+    let anders = false;
+    zellenDerAuswahl(r, (adr) => { if (adr in neu || adr in links) anders = true; delete neu[adr]; delete links[adr]; });
+    if (anders) schreiben({ cells: neu, links: Object.keys(links).length ? links : undefined });
+  };
+  /** Tasten im unsichtbaren Feld der Auswahl */
+  const ablageTaste = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    e.stopPropagation();
+    if (!auswahl || e.nativeEvent.isComposing) return;
+    const strg = e.ctrlKey || e.metaKey;
+    const st = useBoard.getState();
+    if (strg && !e.altKey && /^[zy]$/i.test(e.key)) { e.preventDefault(); if (e.key.toLowerCase() === 'y' || e.shiftKey) st.redo(); else st.undo(); return; }
+    if (strg && e.key.toLowerCase() === 'a') { e.preventDefault(); setAuswahl({ a: [0, 0], b: [cols - 1, rows - 1] }); return; }
+    if (strg) return;                                   // Strg+C/X/V: die Ereignisse der Zwischenablage
+    const schritt: Record<string, Punkt> = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], Tab: [e.shiftKey ? -1 : 1, 0] };
+    if (schritt[e.key]) {
+      e.preventDefault();
+      const [ds, dz] = schritt[e.key];
+      const von = e.shiftKey && e.key !== 'Tab' ? auswahl.b : auswahl.a;
+      const p: Punkt = [Math.max(0, Math.min(cols - 1, von[0] + ds)), Math.max(0, Math.min(rows - 1, von[1] + dz))];
+      setAuswahl(e.shiftKey && e.key !== 'Tab' ? { a: auswahl.a, b: p } : { a: p, b: p });
+      rollRef.current?.querySelector(`[data-zelle="${indexZuAdresse(p[0], p[1])}"]`)?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+      return;
+    }
+    if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); leeren(); return; }
+    if (e.key === 'Escape') { e.preventDefault(); if (schnitt) { setSchnitt(null); zwischen = null; } else { setAuswahl(null); ablage.current?.blur(); } return; }
+    if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); oeffne(indexZuAdresse(auswahl.a[0], auswahl.a[1])); return; }
+    if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
+      e.preventDefault();
+      const el = rollRef.current?.querySelector(`[data-zelle="${indexZuAdresse(auswahl.a[0], auswahl.a[1])}"]`)?.getBoundingClientRect();
+      setMenue({ art: r && r.s0 === 0 && r.s1 === cols - 1 ? 'z' : r && r.z0 === 0 && r.z1 === rows - 1 ? 's' : 'zelle', x: el ? el.left + 8 : 0, y: el ? el.bottom : 0 });
+      return;
+    }
+    // Lostippen ersetzt den Inhalt der Zelle (wie Excel)
+    if (e.key.length === 1 && !e.altKey) { e.preventDefault(); oeffne(indexZuAdresse(auswahl.a[0], auswahl.a[1]), e.key); }
   };
 
   /**
@@ -266,6 +555,17 @@ export function SheetBody({ id, data: daten }: { id: string; data: SheetData }) 
           </button>
           <MenuHuelle titel="Mehr: Spalte, Auto-Summe, CSV" klasse="kopf-mehr" kinder={(zu) => (
             <>
+              {/* M528: mit einer Auswahl — dieselben Schritte wie im Rechtsklick-Menü der Köpfe */}
+              {r && (
+                <>
+                  <div className="ebenen-menu-titel">Zeilen und Spalten</div>
+                  <button role="menuitem" data-taste="sheet-zeile-einfuegen" onClick={() => { const x = spanne('z'); umbauen('z', x.bei, x.n); zu(); }}><IArrowUp size={14} /> Zeile oberhalb einfügen</button>
+                  <button role="menuitem" data-taste="sheet-zeile-loeschen" onClick={() => { const x = spanne('z'); umbauen('z', x.bei, -x.n); zu(); }}><ITrash size={14} /> Zeile löschen</button>
+                  <button role="menuitem" data-taste="sheet-spalte-einfuegen" onClick={() => { const x = spanne('s'); umbauen('s', x.bei, x.n); zu(); }}><IChevronL size={14} /> Spalte links einfügen</button>
+                  <button role="menuitem" data-taste="sheet-spalte-loeschen" onClick={() => { const x = spanne('s'); umbauen('s', x.bei, -x.n); zu(); }}><ITrash size={14} /> Spalte löschen</button>
+                  <div className="ebenen-menu-titel">Mehr</div>
+                </>
+              )}
               {/* M520: bei 26 Spalten (A bis Z) ist Schluss — der Knopf sagt es, statt nichts zu tun */}
               <button role="menuitem" onClick={() => { if (cols >= 26) showToast('Mehr als 26 Spalten (A bis Z) fasst die Tabelle nicht.'); else updateNodeData(id, { cols: cols + 1 }); zu(); }} aria-label="Spalte anhängen">
                 <IPlus size={14} /> Spalte anhängen
@@ -318,7 +618,15 @@ export function SheetBody({ id, data: daten }: { id: string; data: SheetData }) 
       <div className="sheet-scroll nodrag" ref={rollRef}>
         {/* M409: Spalten behalten eine lesbare Breite – passt nicht alles in die Karte, rollt die Tabelle seitwärts
             (statt jede Spalte auf wenige Zeichen zu quetschen) */}
-        <table className={`sheet-grid${filterAn ? ' datentabelle' : ''}`} style={{ minWidth: 34 + Array.from({ length: cols }, (_, s) => data.colW?.[spaltenName(s)] ?? SPALTE_STD).reduce((x, y) => x + y, 0) }}>
+        {/* M528: hält den Fokus, solange Zellen ausgewählt sind — Tasten und Zwischenablage der Auswahl */}
+        <textarea ref={ablage} className="sheet-ablage" aria-label={r ? `Auswahl ${indexZuAdresse(r.s0, r.z0)}${r.s1 > r.s0 || r.z1 > r.z0 ? `:${indexZuAdresse(r.s1, r.z1)}` : ''}` : 'Auswahl'}
+          tabIndex={-1} inputMode="none" spellCheck={false} data-rechtschreibung="aus" autoComplete="off" readOnly={false}
+          onKeyDown={ablageTaste} onKeyUp={(e) => e.stopPropagation()}
+          onCopy={(e) => { e.preventDefault(); kopieren(e.clipboardData, false); }}
+          onCut={(e) => { e.preventDefault(); kopieren(e.clipboardData, true); }}
+          onPaste={(e) => { e.preventDefault(); e.stopPropagation(); einfuegen(e.clipboardData.getData('text/plain')); }}
+          onContextMenu={(e) => e.preventDefault()} />
+        <table data-eigenes-menue className={`sheet-grid${filterAn ? ' datentabelle' : ''}${auswahl && !edit ? ' mit-auswahl' : ''}`} style={{ minWidth: 34 + Array.from({ length: cols }, (_, s) => data.colW?.[spaltenName(s)] ?? SPALTE_STD).reduce((x, y) => x + y, 0) }}>
           <colgroup>
             <col style={{ width: 34 }} />
             {Array.from({ length: cols }, (_, s) => (
@@ -331,7 +639,8 @@ export function SheetBody({ id, data: daten }: { id: string; data: SheetData }) 
               {Array.from({ length: cols }, (_, s) => {
                 const name = indexZuAdresse(s, 0).replace(/\d+/, '');
                 return (
-                  <th key={s} className="sheet-kopf">
+                  <th key={s} className={`sheet-kopf${r && s >= r.s0 && s <= r.s1 ? ' gewaehlt' : ''}`} data-spalte={name}
+                    onMouseDown={(e) => kopfRunter(e, 's', s)} onContextMenu={(e) => kontext(e, 's', s, 0)}>
                     {name}
                     {/* Spaltenbreite ziehen — bei importierten Listen stehen in
                         einer Spalte gern lange Texte, in der nächsten nur Zahlen */}
@@ -348,7 +657,8 @@ export function SheetBody({ id, data: daten }: { id: string; data: SheetData }) 
           <tbody>
             {reihen.map((zeile) => { const z = zeile - 1; const istKopf = filterAn && zeile === kopf; return (
               <tr key={z} className={istKopf ? 'sheet-kopfzeile' : filterAn && ansicht && zeile >= ansicht.bereich.von && zeile <= ansicht.bereich.bis ? 'sheet-datenzeile' : undefined} data-zeile={zeile}>
-                <th className={`sheet-kopf sheet-zeilenkopf${gefiltert && ansicht && zeile >= ansicht.bereich.von && zeile <= ansicht.bereich.bis ? ' gefiltert' : ''}`}>{z + 1}</th>
+                <th className={`sheet-kopf sheet-zeilenkopf${gefiltert && ansicht && zeile >= ansicht.bereich.von && zeile <= ansicht.bereich.bis ? ' gefiltert' : ''}${r && z >= r.z0 && z <= r.z1 ? ' gewaehlt' : ''}`}
+                  onMouseDown={(e) => kopfRunter(e, 'z', z)} onContextMenu={(e) => kontext(e, 'z', 0, z)}>{z + 1}</th>
                 {Array.from({ length: cols }, (_, s) => {
                   const adr = indexZuAdresse(s, z);
                   // M409: Teil einer verbundenen Zelle – entfällt (über mehrere Zeilen nur, solange nicht gefiltert oder sortiert ist)
@@ -360,7 +670,8 @@ export function SheetBody({ id, data: daten }: { id: string; data: SheetData }) 
                   const gezeigt = anzeigeVon(adr);
                   const anzeige = gezeigt.text;
                   const fehler = anzeige.startsWith('#');
-                  const zahl = typeof wert === 'number';
+                  // M528: ein ausgerechnetes Datum steht rechtsbündig wie eine Zahl
+                  const zahl = typeof wert === 'number' || (roh.startsWith('=') && tageVon(wert ?? null) !== null);
                   const stil = stilVon(adr);
                   const linie = (l: string | undefined, x: number, y: number) => (l ? `inset ${x * (parseInt(l, 10) || 1)}px ${y * (parseInt(l, 10) || 1)}px 0 ${l.split(' ').slice(2).join(' ') || 'currentColor'}` : '');
                   const zellStil: React.CSSProperties | undefined = stil ? {
@@ -380,9 +691,10 @@ export function SheetBody({ id, data: daten }: { id: string; data: SheetData }) 
                   const link = edit === adr || fehler || anzeige === '' ? null : linkVon(adr, anzeige);
                   const spalteAktiv = istKopf && (!!data.filter?.[spalte] || data.sort?.spalte === spalte);
                   return (
-                    <td key={s} className={`sheet-zelle${zahl ? ' zahl' : ''}${fehler ? ' fehler' : ''}${link ? ` mit-link${(stil?.a ? stil.a === 'r' : zahl) ? ' stift-links' : ''}` : ''}${istKopf ? ' mit-filter' : ''}${stil?.um ? ' umbruch' : ''}${stil?.bg ? ' gefuellt' : ''}`}
+                    <td key={s} className={`sheet-zelle${zahl ? ' zahl' : ''}${fehler ? ' fehler' : ''}${link ? ` mit-link${(stil?.a ? stil.a === 'r' : zahl) ? ' stift-links' : ''}` : ''}${istKopf ? ' mit-filter' : ''}${stil?.um ? ' umbruch' : ''}${stil?.bg ? ' gefuellt' : ''}${drin(r, s, z) && !edit ? ' gewaehlt' : ''}${auswahl && !edit && auswahl.a[0] === s && auswahl.a[1] === z ? ' anker' : ''}${drin(schnitt, s, z) ? ' ausgeschnitten' : ''}`}
                       style={zellStil} colSpan={spanne && spanne.cs > 1 ? spanne.cs : undefined} rowSpan={spanne && spanne.rs > 1 && !gefiltert ? spanne.rs : undefined}
-                      data-zelle={adr} onClick={() => edit !== adr && oeffne(adr)}>
+                      data-zelle={adr} onPointerDown={(e) => zelleRunter(e, s, z)} onContextMenu={(e) => kontext(e, 'zelle', s, z)}
+                      onClick={() => { if (gezogen.current) { gezogen.current = false; return; } if (edit !== adr) oeffne(adr); }}>
                       {edit === adr ? (
                         <input
                           ref={eingabe}
@@ -395,7 +707,7 @@ export function SheetBody({ id, data: daten }: { id: string; data: SheetData }) 
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') { e.preventDefault(); uebernimm('runter'); }
                             else if (e.key === 'Tab') { e.preventDefault(); uebernimm('rechts'); }
-                            else if (e.key === 'Escape') { e.preventDefault(); setEdit(null); }
+                            else if (e.key === 'Escape') { e.preventDefault(); setEdit(null); ablageFokus(); }
                           }}
                           // Eigene Tastenkürzel der App sollen beim Tippen ruhen
                           onKeyUp={(e) => e.stopPropagation()}
@@ -449,8 +761,15 @@ export function SheetBody({ id, data: daten }: { id: string; data: SheetData }) 
             <span className="sheet-fuss-text" data-taste="sheet-filter-stand">{`${ansicht.gezeigt} von ${zahlWort(ansicht.daten, 'Zeile', 'Zeilen')}`}</span>
             <button className="sheet-filter-weg nodrag" data-taste="sheet-filter-weg" onClick={() => updateNodeData(id, { filter: undefined, sort: undefined })}>Filter aufheben</button>
           </>
+        ) : r ? (
+          <span className="sheet-fuss-text" data-taste="sheet-auswahl-stand">{`${indexZuAdresse(r.s0, r.z0)}${r.s1 > r.s0 || r.z1 > r.z0 ? `:${indexZuAdresse(r.s1, r.z1)}` : ''} · Strg+C, Strg+X, Strg+V · Rechtsklick: Zeilen und Spalten`}</span>
         ) : <>Zelle antippen zum Bearbeiten · <code>=</code> beginnt eine Formel · Σ setzt Summen</>}
       </div>
+      {menue && r && createPortal(
+        <UmbauMenue x={menue.x} y={menue.y} zu={() => setMenue(null)}
+          zeilen={menue.art !== 's' ? spanne('z') : null} spalten={menue.art !== 'z' ? spanne('s') : null} umbauen={umbauen} />,
+        document.body,
+      )}
       {filterAuf && ansicht && createPortal(
         <SpaltenFilter
           spalte={filterAuf.spalte} x={filterAuf.x} y={filterAuf.y}
@@ -463,6 +782,58 @@ export function SheetBody({ id, data: daten }: { id: string; data: SheetData }) 
         document.body,
       )}
     </>
+  );
+}
+
+/**
+ * M528: Rechtsklick auf einen Zeilen- oder Spaltenkopf (oder eine Zelle): einfügen und löschen. Sind mehrere
+ * Zeilen/Spalten ausgewählt, gilt der Schritt für alle („3 Zeilen oberhalb einfügen").
+ */
+function UmbauMenue({ x, y, zu, zeilen, spalten, umbauen }: {
+  x: number; y: number; zu: () => void;
+  zeilen: { bei: number; n: number } | null; spalten: { bei: number; n: number } | null;
+  umbauen: (a: 'z' | 's', bei: number, n: number) => void;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  const zuRef = useRef(zu); zuRef.current = zu;
+  useLayoutEffect(() => { insBild(box.current); box.current?.querySelector('button')?.focus({ preventScroll: true }); }, []);
+  useEffect(() => {
+    const raus = (e: PointerEvent) => { if (!box.current?.contains(e.target as Node)) zuRef.current(); };
+    window.addEventListener('pointerdown', raus, true);
+    return () => window.removeEventListener('pointerdown', raus, true);
+  }, []);
+  useEscSchliesst(true, zu);
+  const wie = (n: number, eins: string, viele: string, rest: string): string => (n === 1 ? `${eins} ${rest}` : `${zahlWort(n, eins, viele)} ${rest}`);
+  const eintrag = (taste: string, icon: React.ReactNode, text: string, tun: () => void) => (
+    <button role="menuitem" data-taste={taste} onClick={() => { tun(); zu(); }}>{icon} {text}</button>
+  );
+  return (
+    <div ref={box} className="ebenen-menu" role="menu" data-taste="sheet-umbau-menu" style={{ left: x, top: y }}
+      onClick={(e) => e.stopPropagation()} onKeyUp={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+        e.preventDefault();
+        const k = [...(box.current?.querySelectorAll('button') ?? [])];
+        const i = k.indexOf(document.activeElement as HTMLButtonElement);
+        k[(i + (e.key === 'ArrowDown' ? 1 : -1) + k.length) % k.length]?.focus();
+      }}>
+      {zeilen && (
+        <>
+          {eintrag('sheet-zeile-oben', <IArrowUp size={14} />, wie(zeilen.n, 'Zeile', 'Zeilen', 'oberhalb einfügen'), () => umbauen('z', zeilen.bei, zeilen.n))}
+          {eintrag('sheet-zeile-unten', <IArrowDown size={14} />, wie(zeilen.n, 'Zeile', 'Zeilen', 'unterhalb einfügen'), () => umbauen('z', zeilen.bei + zeilen.n, zeilen.n))}
+          {eintrag('sheet-zeile-weg', <ITrash size={14} />, wie(zeilen.n, 'Zeile', 'Zeilen', 'löschen'), () => umbauen('z', zeilen.bei, -zeilen.n))}
+        </>
+      )}
+      {zeilen && spalten && <div className="ebenen-menu-titel" />}
+      {spalten && (
+        <>
+          {eintrag('sheet-spalte-links', <IChevronL size={14} />, wie(spalten.n, 'Spalte', 'Spalten', 'links einfügen'), () => umbauen('s', spalten.bei, spalten.n))}
+          {eintrag('sheet-spalte-rechts', <IChevronR size={14} />, wie(spalten.n, 'Spalte', 'Spalten', 'rechts einfügen'), () => umbauen('s', spalten.bei + spalten.n, spalten.n))}
+          {eintrag('sheet-spalte-weg', <ITrash size={14} />, wie(spalten.n, 'Spalte', 'Spalten', 'löschen'), () => umbauen('s', spalten.bei, -spalten.n))}
+        </>
+      )}
+    </div>
   );
 }
 

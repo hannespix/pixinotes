@@ -40,7 +40,7 @@ import { boardVonAussen, karteEntschaerfen, karteGueltig } from './sicher';
 import './sicherGestalt';   // M522: hängt die Gestalt-Prüfung in lib/sicher.ts ein
 import { anhangKarte, idbDel, idbGet, idbSet, liveHaken } from './syncFolder';
 import { anhangGroesse, anhangLokal, loadHtml, saveHtml } from './htmlStore';
-import { berichtAlsSatz, dreiWegeMerge, ohneAuswahl } from './syncMerge';
+import { berichtAlsSatz, dreiWegeMerge, ohneAuswahl, tabellenMischen } from './syncMerge';
 import type { AppNode } from '../types';
 
 const KEY = 'pixinotes-gast';
@@ -525,6 +525,7 @@ async function holen(boardId: string): Promise<void> {
   let fremd: BoardDoc;
   // M388: Der Stand vom Server wird geprüft; seine Kennung ist die des Boards, das hier abgeglichen wird
   try { const b = boardVonAussen(JSON.parse(g.inhalt), boardId); if (!b) return; fremd = gezeichnet(b, g, e.token); } catch { return; }
+  if (!tabellenMischen.f) await import('./tabellenUmbau').catch(() => null);   // M528: Tabellen nach Umbau-Protokoll mischen
   const basis = await basisLesen(boardId);
   const st = useBoard.getState();
   const lokal = st.boards.find((b) => b.id === boardId);
