@@ -232,26 +232,44 @@ await teil(async () => {
 // ══ D: Nachladen robust ════════════════════════════════════════════════════════════════════════════════════
 console.log('\n════ D: Nachladen scheitert – Hinweis statt Absturz ════');
 await teil(async () => {
+  // Netz weg, nachdem die App stand (Datensparmodus: nichts wurde im Leerlauf vorgeladen; kein Service Worker). Nur die
+  // Einstellungen sind betroffen (Abruf gesperrt, der Browser meldet „offline") — so vergiftet kein anderer Teil, der
+  // ohne Netz nachladen wollte, gemeinsame Dateien (dann hülfe nur Neuladen, siehe M534-Doku)
   let sperre = true;
   const { P, ctx } = await seite({ sparen: true, route: (c) => c.route(/\/assets\/Settings-[^/]+\.js(\?.*)?$/, (r) => (sperre ? r.abort('internetdisconnected') : r.continue())) });
+  await P.evaluate(() => {
+    window.__m534 = 'unverändert';
+    window.__netz = false;
+    Object.defineProperty(Navigator.prototype, 'onLine', { configurable: true, get: () => window.__netz });
+    dispatchEvent(new Event('offline'));
+  });
   await P.keyboard.press('Alt+e');
   const hinweis = await warteBis(P, () => !!document.querySelector('.nachlade-fehler'), 15000);
   const lage = await P.evaluate(() => ({ voll: !!document.querySelector('.err-full'), board: !!document.querySelector('.react-flow__node[data-id="n1"]'), text: document.querySelector('.nachlade-fehler')?.textContent ?? '' }));
   pruefe('D1 Einstellungen laden nicht (Netz weg): Hinweis an der Stelle, Board bleibt – kein „lässt sich nicht anzeigen"', hinweis && !lage.voll && lage.board && /nicht geladen/.test(lage.text), JSON.stringify(lage));
-  sperre = false;   // Netz wieder da — auch unter frischer Adresse (?neu=…), die der zweite Versuch nimmt
+  pruefe('D1b ohne Netz startet die Seite nicht von selbst neu (die Arbeit bleibt, wo sie ist)', await P.evaluate(() => window.__m534 === 'unverändert'));
+  // Noch ohne Netz „Nochmal versuchen": Der Hinweis kommt wieder, nichts bricht
   await P.locator('.nachlade-fehler button', { hasText: 'Nochmal versuchen' }).click();
-  pruefe('D2 „Nochmal versuchen" lädt wirklich – die Einstellungen gehen auf', await warteBis(P, () => !!document.querySelector('.modal[aria-label="Einstellungen"]') && !document.querySelector('.nachlade-fehler'), 10000));
+  await P.waitForTimeout(400);
+  pruefe('D2 noch ohne Netz: „Nochmal versuchen" zeigt wieder den Hinweis, die App steht', await warteBis(P, () => !!document.querySelector('.nachlade-fehler') && !document.querySelector('.err-full'), 8000));
+  sperre = false;
+  await P.evaluate(() => { window.__netz = true; dispatchEvent(new Event('online')); });
+  await P.locator('.nachlade-fehler button', { hasText: 'Nochmal versuchen' }).click();
+  pruefe('D3 Netz wieder da: „Nochmal versuchen" lädt wirklich – die Einstellungen gehen auf, ohne Neuladen', await warteBis(P, () => !!document.querySelector('.modal[aria-label="Einstellungen"]') && !document.querySelector('.nachlade-fehler'), 10000)
+    && await P.evaluate(() => window.__m534 === 'unverändert'));
   await ctx.close();
 });
 await teil(async () => {
+  // Wie nach einem Update: Die Datei der Karte ist auf dem Server nicht mehr da (Netz steht). Die Seite lädt einmal
+  // neu (M321); kommt die Datei dann immer noch nicht, steht der Hinweis in der Karte.
   let sperre = true;
   const kanban = { id: 'k1', type: 'kanban', width: 520, height: 300, position: { x: 0, y: 260 }, data: { title: 'Plan', items: [{ id: 'i1', text: 'Aufgabe', col: 0 }] } };
-  const { P, ctx } = await seite({ sparen: true, extra: { b1: [kanban] }, route: (c) => c.route(/\/assets\/KanbanCard-[^/]+\.js(\?.*)?$/, (r) => (sperre ? r.abort('internetdisconnected') : r.continue())) });
+  const { P, ctx } = await seite({ sparen: true, extra: { b1: [kanban] }, route: (c) => c.route(/\/assets\/KanbanCard-[^/]+\.js(\?.*)?$/, (r) => (sperre ? r.fulfill({ status: 404, body: 'weg' }) : r.continue())) });
   const hinweis = await warteBis(P, () => !!document.querySelector('.react-flow__node[data-id="k1"] .nachlade-fehler'), 15000);
-  pruefe('D3 Kanban-Karte lädt nicht: Hinweis in der Karte, die anderen Karten stehen', hinweis && await P.evaluate(() => !!document.querySelector('.react-flow__node[data-id="n1"]') && !document.querySelector('.err-full')));
+  pruefe('D4 Kanban-Karte lädt nicht (Datei nach einem Update weg): Hinweis in der Karte, die anderen Karten stehen', hinweis && await P.evaluate(() => !!document.querySelector('.react-flow__node[data-id="n1"]') && !document.querySelector('.err-full')));
   sperre = false;
   await P.locator('.react-flow__node[data-id="k1"] .nachlade-fehler button', { hasText: 'Nochmal versuchen' }).click();
-  pruefe('D4 „Nochmal versuchen" zeigt die Karte', await warteBis(P, () => !document.querySelector('.react-flow__node[data-id="k1"] .nachlade-fehler') && /Plan/.test(document.querySelector('.react-flow__node[data-id="k1"]')?.textContent ?? ''), 10000));
+  pruefe('D5 „Nochmal versuchen" holt die Datei frisch und zeigt die Karte', await warteBis(P, () => !document.querySelector('.react-flow__node[data-id="k1"] .nachlade-fehler') && /Plan/.test(document.querySelector('.react-flow__node[data-id="k1"]')?.textContent ?? ''), 10000));
   await ctx.close();
 });
 

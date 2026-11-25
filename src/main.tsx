@@ -34,7 +34,10 @@ import { appInstallierenStarten } from './lib/appInstallieren';
 // Sitzung, die noch die alte Seite offen hat, bekäme beim ersten Bedarf ein
 // „Failed to fetch dynamically imported module". Dann EINMAL neu laden (der
 // Stand liegt im Speicher), nicht in Schleife: Stempel merken.
+// M534: … aber nicht ohne Netz — dann hilft Neuladen nicht, und der Teil zeigt an seiner Stelle „Nochmal versuchen"
+// (lib/nachLazy.tsx), statt dass die Seite mitten in der Arbeit neu startet.
 window.addEventListener('vite:preloadError', () => {
+  if (!navigator.onLine) return;
   try {
     const k = 'pixinotes-neu-geladen';
     if (sessionStorage.getItem(k) === __BUILD_STAMP__) return;

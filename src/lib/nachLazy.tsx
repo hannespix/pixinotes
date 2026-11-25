@@ -28,15 +28,21 @@ async function neuHolen(e: unknown): Promise<Teil> {
   if (!istTeil(k)) throw e;
   return k;
 }
+/* Ohne Netz und ohne Service Worker kann nichts kommen — dann gar nicht erst anfragen: Ein gescheiterter Abruf vergiftet
+   auch die Dateien, die der Teil mitbringt (dieselbe Modul-Tabelle), und danach hülfe nur noch Neuladen. Mit Service
+   Worker wird es versucht: Was im Leerlauf vorgeladen wurde, liegt dort auch ohne Netz bereit (M446/M523). */
+const ohneNetz = () => !navigator.onLine && !navigator.serviceWorker?.controller;
 export function nachLazy<T extends Teil>(lade: () => Promise<{ default: T }>): T {
   let da: Teil | null = null;
-  const versuch1 = () => lade().then((m) => m.default as Teil);
+  const versuch1 = () => (ohneNetz() ? Promise.reject(new Error('offline')) : lade().then((m) => m.default as Teil));
   const holen = () => versuch1().catch(() => new Promise((r) => setTimeout(r, 700)).then(versuch1))
     .catch(neuHolen).then((k) => (da = k));
   function Ersatz(p: object) {
     const [K, setK] = useState<Teil | null>(() => da);
     const [fehlt, setFehlt] = useState(false);
     const versuch = () => { setFehlt(false); holen().then((k) => setK(() => k), () => setFehlt(true)); };
+    // Kein selbsttätiger Versuch, wenn das Netz zurückkommt: Hat ohne Netz ein anderer Teil eine gemeinsame Datei nicht
+    // bekommen, lädt der Abruf die Seite neu (main.tsx, vite:preloadError) — das soll nur auf einen Klick hin geschehen.
     useEffect(() => { if (!K) versuch(); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
     return K ? <K {...p} /> : fehlt ? (
       <div className="nachlade-fehler" role="alert">

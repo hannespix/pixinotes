@@ -941,7 +941,8 @@ export function Board() {
   // Zieh-Schwelle überschreitet, ist sie längst da.
   const zg = useRef<typeof import('../lib/ziehGefuehl') | null>(null);
   const zieh = useRef<import('../lib/ziehGefuehl').Zug | null>(null);
-  const zgLaden = useCallback(() => import('../lib/ziehGefuehl').then((m) => { zg.current = m; return m; }), []);
+  // M534: ohne Netz nicht geladen — dann ziehen die Karten eben ohne das Gefühl (kein unbehandelter Fehler)
+  const zgLaden = useCallback(() => import('../lib/ziehGefuehl').then((m) => { zg.current = m; return m; }, () => null), []);
   useEffect(() => {
     const wrap = zoomWrapRef.current;
     if (!wrap) return;
@@ -964,7 +965,7 @@ export function Board() {
     };
     if (zg.current) { starten(zg.current); return; }
     // Allererster Zug (Finger: kein Überfahren vorher) — die Datei kommt noch; dann setzt das Gefühl mitten im Zug ein
-    void zgLaden().then((m) => { if (zugSchritt.current && !zieh.current) starten(m); });
+    void zgLaden().then((m) => { if (m && zugSchritt.current && !zieh.current) starten(m); });
   }, [getViewport, zgLaden]);
   const ziehSchritt = useCallback((node: Node, e?: MouseEvent | TouchEvent) => {
     const z = zieh.current;
