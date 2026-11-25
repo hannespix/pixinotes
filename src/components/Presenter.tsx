@@ -5,7 +5,7 @@ import type { PartialBlock } from '@blocknote/core';
 import { de as blockNoteDe, en as blockNoteEn } from '@blocknote/core/locales';
 import { sprache } from '../lib/sprache';
 import { selectActiveBoard, selectNurLesen, useBoard } from '../store';
-import { nodeToHtml } from '../lib/serialize';
+import { nodeToHtml } from '../lib/serializeFormate';
 import { buildMermaidSource, getMermaid, preloadHandFont } from '../lib/mermaid';
 import { folieAb, kartenFolge } from '../lib/kartenFolge';
 import { useAndroidBackspaceFix } from '../lib/blocknoteAndroidFix';
