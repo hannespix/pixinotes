@@ -480,7 +480,9 @@ const inKarte = async (P, text) => {
   await k.locator('.note-editor').first().click({ position: { x: 24, y: 12 } }); await P.waitForTimeout(500);
   const ed = k.locator('[contenteditable="true"]').first();
   if ((await ed.count()) && !(await P.evaluate(() => !!document.activeElement?.isContentEditable))) { await ed.click({ position: { x: 24, y: 12 } }).catch(() => {}); await P.waitForTimeout(350); }
-  return P.evaluate(() => !!document.activeElement?.isContentEditable && !!document.activeElement.closest('.react-flow__node'));
+  // M533: Unter Last baut sich der Editor erst nach Sekunden auf (der Yjs-Teil wird gefragt, lehnt ab, der Editor kommt
+  // allein wieder) — vorher getippte Tasten fehlten, und C1 sah keinen Rahmen. Auf den Cursor warten statt fester Pausen.
+  return P.waitForFunction(() => !!document.activeElement?.isContentEditable && !!document.activeElement.closest('.react-flow__node'), null, { timeout: 10000 }).then(() => true).catch(() => false);
 };
 const heraus = async (P) => { await P.keyboard.press('Escape'); await P.waitForTimeout(150); await P.evaluate(() => document.activeElement?.blur?.()); await P.waitForTimeout(350); };
 /** Eine Stelle suchen, an der eine ganze neue Karte Platz hat (auch neben Karten, die erst vom anderen Gerät kamen) */
@@ -623,6 +625,8 @@ async function geraet2(name, stand, anker = '') {
     localStorage.setItem('pixinotes-board', JSON.stringify({ version: 5, state: st }));
   }, { st: stand, konfig: { url: SB_URL, key: SB_KEY } });
   const P = await ctx.newPage();
+  // M533: künstliche Last zum Nachstellen (PN_DROSSEL=4 → die Seite rechnet viermal langsamer, CDP)
+  if (Number(process.env.PN_DROSSEL ?? 1) > 1) await (await ctx.newCDPSession(P)).send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.PN_DROSSEL) });
   P.fehler = [];
   P.on("pageerror", (e) => { P.fehler.push(e.message); console.log(`    PAGEERROR[${name}]:`, e.message, String(e.stack).split("\n").slice(0, 4).join(" | ")); });
   P.on('dialog', (d) => d.accept());

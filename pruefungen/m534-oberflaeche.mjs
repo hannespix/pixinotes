@@ -54,9 +54,10 @@ const app = http.createServer((q, r) => {
   if (!existsSync(f)) { r.writeHead(404, kopf); r.end('nicht da'); return; }
   let inhalt = readFileSync(f);
   if (fassung !== null && rel === 'index.html') inhalt = Buffer.from(inhalt.toString().replace(CSS, cssName(fassung)));
-  if (fassung !== null && rel === 'sw.js') {
+  const swListe = rel === 'sw.js' ? inhalt.toString().match(/const DATEIEN = (\[.*?\]);/s) : null;
+  if (fassung !== null && swListe) {
     const text = inhalt.toString();
-    const liste = JSON.parse(text.match(/const DATEIEN = (\[.*?\]);/s)[1]);
+    const liste = JSON.parse(swListe[1]);
     inhalt = Buffer.from(fassung === 0
       ? text.replace(/const DATEIEN = \[.*?\];/s, 'const DATEIEN = [] /*__PIXINOTES_DATEIEN__*/;')
       : text.replace(/const DATEIEN = \[.*?\];/s, `const DATEIEN = ${JSON.stringify(liste.map((d) => (d === CSS ? cssName(fassung) : d)))};`));
@@ -276,6 +277,10 @@ await teil(async () => {
 // ══ E: Service Worker räumt auf ════════════════════════════════════════════════════════════════════════════
 console.log('\n════ E: Service-Worker-Cache räumt auf, Update ohne Hängenbleiben ════');
 await teil(async () => {
+  const sw = readFileSync(join(DIST, 'sw.js'), 'utf8').match(/const DATEIEN = (\[.*?\]);/s);
+  const liste = sw ? JSON.parse(sw[1]) : [];
+  pruefe('E0 der Build setzt die Liste seiner Dateien in sw.js ein', liste.length > 20 && liste.includes(CSS), String(liste.length));
+  if (!liste.length) return;
   fassung = 0;
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   await ctx.addInitScript(() => { try { localStorage.setItem('pixinotes-onboarded', '1'); } catch { /* egal */ } });

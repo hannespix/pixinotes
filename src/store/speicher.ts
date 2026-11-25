@@ -7,7 +7,7 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { TimeSeg } from '../types';
 import { anchorStroke } from '../lib/strokeAnchor';
-import type { BoardDoc, Space, BoardState } from './typen';
+import type { BoardDoc, BoardState } from './typen';
 import { persistHaken } from './schutz';
 import { defaultHierarchy } from './start';
 import { useBoard } from '../store';
@@ -44,9 +44,9 @@ type Gespeichert = { state: Record<string, unknown>; version?: number };
 let textVon = new WeakMap<object, string>();
 const istObjekt = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
 const einzeln = (v: unknown): string => {
-  if (v === null || typeof v !== 'object') return JSON.stringify(v) ?? 'null';
+  if (v === null || typeof v !== 'object') return JSON.stringify(v, ersetzer) ?? 'null';
   let t = textVon.get(v);
-  if (t === undefined) { t = JSON.stringify(v) ?? 'null'; textVon.set(v, t); }
+  if (t === undefined) { t = JSON.stringify(v, ersetzer) ?? 'null'; textVon.set(v, t); }
   return t;
 };
 /** Objekt wie JSON.stringify — `eigen` liefert für ausgewählte Felder einen eigenen Text (sonst undefined) */
@@ -54,7 +54,7 @@ const objektText = (o: Record<string, unknown>, eigen: (k: string, v: unknown) =
   let aus = '{'; let erster = true;
   for (const k of Object.keys(o)) {
     const v = o[k];
-    const t = eigen(k, v) ?? JSON.stringify(v);
+    const t = eigen(k, v) ?? JSON.stringify(v, ersetzer);
     if (t === undefined) continue;   // undefined/Funktion: lässt JSON.stringify ebenfalls aus
     aus += `${erster ? '' : ','}${JSON.stringify(k)}:${t}`; erster = false;
   }
@@ -66,9 +66,9 @@ const liste = (v: unknown, eintrag: (e: unknown) => string): string | undefined 
  *  (Rückgängig) viele Lagen derselben Karte hält. */
 const karteText = (n: unknown): string => (istObjekt(n) && istObjekt(n.data)
   ? objektText(n, (k, v) => (k === 'data' ? einzeln(v) : undefined))
-  : JSON.stringify(n) ?? 'null');
+  : JSON.stringify(n, ersetzer) ?? 'null');
 const boardText = (b: unknown): string => {
-  if (!istObjekt(b)) return JSON.stringify(b) ?? 'null';
+  if (!istObjekt(b)) return JSON.stringify(b, ersetzer) ?? 'null';
   let t = textVon.get(b);
   if (t === undefined) {
     t = objektText(b, (k, v) => (k === 'nodes' ? liste(v, karteText) : k === 'edges' || k === 'drawings' || k === 'comments' ? liste(v, einzeln) : undefined));
@@ -76,9 +76,33 @@ const boardText = (b: unknown): string => {
   }
   return t;
 };
-/** Der Text, der in localStorage geht — gleich JSON.stringify(wert) */
+/* M532: Große data-URLs (Bilder) gehen nicht in den localStorage-Stand, sondern in die Ablage (ablage.ts, IndexedDB);
+   im Text steht ein Verweis. Das Wie lädt nach: Bis ablage.ts da ist, merkt dieser kleine Ersetzer nur, DASS es etwas
+   auszulagern gibt, und holt das Modul — das setzt dann seinen Ersetzer ein und schreibt den Stand einmal neu. */
+export const AUSLAGERN_AB = 10_000;
+export const ablageModul = () => import('./ablageIdb');
+let ersetzer = (_k: string, v: unknown): unknown => {
+  if (typeof v === 'string' && v.length >= AUSLAGERN_AB && v.startsWith('data:')) void ablageModul();
+  return v;
+};
+/** ablage.ts meldet sich an: ab jetzt lagert der Speicher aus (Gedächtnis verwerfen, einmal neu schreiben) */
+export function ablageAnmelden(f: (k: string, v: unknown) => unknown, nachSichern: { an: () => void }): void {
+  ersetzer = f;
+  textVon = new WeakMap();
+  nachSichern.an = () => { textVon = new WeakMap(); if (writerRole === 'writer') reassertPersist(); };
+  if (writerRole === 'writer') setTimeout(reassertPersist, 0);
+}
+/** Gemerkten Text verwerfen (die Ablage hat Neues als gesichert übernommen) */
+export const gedaechtnisVerwerfen = (): void => { textVon = new WeakMap(); };
+/**
+ * Einen Stand von außen (Konto, Ordner, WebDAV) VOR dem Übernehmen in die Ablage legen: Dann trägt schon das erste
+ * Speichern nach dem Einarbeiten Verweise statt der Bilder — und scheitert nicht am vollen localStorage.
+ */
+export const ablageVorab = (wert: unknown): Promise<void> => ablageModul().then((m) => m.vorab(wert), () => {});
+/** Der Text, der in localStorage geht — gleich JSON.stringify(wert, ersetzer) */
+export const vollText = (wert: unknown): string => JSON.stringify(wert, ersetzer);
 export function speicherText(wert: Gespeichert, ohneGedaechtnis = false): string {
-  if (ohneGedaechtnis) return JSON.stringify(wert);
+  if (ohneGedaechtnis) return vollText(wert);
   return objektText(wert as unknown as Record<string, unknown>, (k, v) => (k === 'state' && istObjekt(v)
     ? objektText(v, (k2, v2) => (k2 === 'boards' ? liste(v2, boardText) : undefined))
     : undefined));
@@ -143,11 +167,12 @@ function setWriterRole(role: WriterRole): void {
  *  M525 `gruendlich` (Seite wird verlassen/verdeckt): Text ohne Gedächtnis, siehe speicherText. */
 export function flushPersist(gruendlich?: boolean): boolean {
   if (!pendingWrite) return true;
+  let text = '';
   try {
     const wert = pendingWrite.wert;
-    let text = speicherText(wert, gruendlich === true);
+    text = speicherText(wert, gruendlich === true);
     if (gruendlich !== true && pruefenAn()) {
-      const soll = JSON.stringify(wert);
+      const soll = vollText(wert);
       if (soll !== text) { abweichung(); text = soll; }
     }
     localStorage.setItem(pendingWrite.key, text);
@@ -155,9 +180,15 @@ export function flushPersist(gruendlich?: boolean): boolean {
     ungeprueft = gruendlich === true ? null : { key: pendingWrite.key, wert };
     pendingWrite = null;
     quotaWarned = false;
+    letzterFehler = null;
     speicherZaehler.geschrieben += 1;
+    if (reserve.da) { reserve.da = false; void ablageModul().then((m) => m.reserveLoeschen()); }
     return true;
-  } catch {
+  } catch (e) {
+    // M532: voll oder anders gesperrt? — der Abgleich nennt es beim Namen statt zu raten
+    letzterFehler = /quota/i.test((e as Error)?.name) ? 'voll' : 'anderer';
+    // M532: voll → der Stand geht in den Ersatzspeicher (IndexedDB) statt verloren (ablageIdb.ts → reserveSchreiben)
+    if (text && letzterFehler === 'voll' && writerRole === 'writer') void ablageModul().then((m) => m.reserveSchreiben(text));
     if (!quotaWarned) {
       quotaWarned = true;
       window.dispatchEvent(new CustomEvent('pixinotes:quota'));
@@ -165,6 +196,11 @@ export function flushPersist(gruendlich?: boolean): boolean {
     return false;
   }
 }
+/** M532: Warum das letzte Schreiben scheiterte (null = es gelang) */
+/* (die Meldung dazu baut kontoSync.ts → speicherFehlerText) */
+export let letzterFehler: 'voll' | 'anderer' | null = null;
+/** M532: Liegt ein Stand im Ersatzspeicher, der nach dem nächsten gelungenen Schreiben weg kann? (ablageIdb.ts setzt es) */
+export const reserve = { da: false };
 /** Meldung des Prüfbetriebs (kein Oberflächentext — Nutzer sehen sie nie) */
 const ABWEICHUNG = 'M525: gemerkter Speichertext weicht vom Stand ab';
 /** Der zuletzt MIT Gedächtnis geschriebene Stand — beim Verlassen der Seite einmal ohne Gedächtnis gegengeprüft */
@@ -172,7 +208,7 @@ let ungeprueft: { key: string; wert: Gespeichert } | null = null;
 function abweichung(): void {
   speicherZaehler.abweichungen += 1;
   textVon = new WeakMap();   // dem Gedächtnis ist nicht mehr zu trauen
-  console.error('PixiNotes: Der gemerkte Speichertext wich vom Stand ab (M525) – der Stand wurde vollständig neu geschrieben.');
+  console.error('PixiNotes: Speichertext wich vom Stand ab (M525), neu geschrieben.');
   // Im Prüfbetrieb laut scheitern (die Prüfreihen sammeln Seitenfehler) — geschrieben ist der richtige Stand trotzdem
   if (pruefenAn()) setTimeout(() => { throw new Error(ABWEICHUNG); }, 0);
   if (PRUEF_BAU === '2') document.documentElement.textContent = ABWEICHUNG;
@@ -183,7 +219,7 @@ function nachpruefen(): void {
   if (!u || writerRole !== 'writer') return;
   ungeprueft = null;
   try {
-    const soll = JSON.stringify(u.wert);
+    const soll = vollText(u.wert);
     if (soll === speicherText(u.wert)) return;
     abweichung();
     localStorage.setItem(u.key, soll);
@@ -203,8 +239,11 @@ export const speicherAblage = {
   // pendingWrite mitlesen: ein getItem direkt nach setItem darf nie den
   // schon überholten localStorage-Stand liefern
   getItem: (k: string): Gespeichert | null => {
-    const roh = pendingWrite?.key === k ? speicherText(pendingWrite.wert, true) : localStorage.getItem(k);
-    return roh === null ? null : (JSON.parse(roh) as Gespeichert);
+    // (Puffer: der Stand im Arbeitsspeicher — ohne Verweise, M532)
+    const roh = pendingWrite?.key === k ? JSON.stringify(pendingWrite.wert) : localStorage.getItem(k);
+    if (roh === null) return null;
+    nachDemLaden(roh);
+    return JSON.parse(roh) as Gespeichert;
   },
   setItem: (k: string, v: Gespeichert): void => {
     if (writerRole !== 'writer') return; // Mitlese-Fenster schreibt NIE
@@ -229,20 +268,39 @@ export const speicherAblage = {
   },
 };
 
+/* ───── M532: Verweise im gespeicherten Stand wieder durch ihre Inhalte ersetzen ─────
+   Der Stand kommt synchron aus localStorage (wie immer) — mit Verweisen statt großer data-URLs. Ihre Inhalte holt
+   die IndexedDB nach; erst danach zeichnet main.tsx die Oberfläche (standBereit), damit nie eine Karte ohne Bild
+   erscheint und kein Abgleich, Export oder Teilen einen Verweis zu sehen bekommt. Ersetzt wird nur, was ein Verweis
+   ist; alles andere bleibt dasselbe Objekt. */
+let bereit: Promise<void> = Promise.resolve();
+const VERWEIS = '"pixinotes-ablage:';
+export const RESERVE_MARKE = 'pixinotes-reserve';
+/** Verweise einsetzen oder alte eingebettete Bilder umziehen — das Wie lädt nach (ablageIdb.ts) */
+function nachDemLaden(roh: string): void {
+  // (… oder liegt im Ersatzspeicher ein neuerer Stand? Die Marke steht immer da — '0' —, damit ablageIdb.ts sie auch
+  // in einem vollen Speicher auf '1' setzen kann: gleich lang, braucht keinen Platz)
+  let marke: string | null = '0';
+  try { marke = localStorage.getItem(RESERVE_MARKE); if (marke === null) localStorage.setItem(RESERVE_MARKE, '0'); } catch { /* voll: dann eben ohne */ }
+  if (roh.includes(VERWEIS) || (roh.length > AUSLAGERN_AB && roh.includes('"data:')) || marke === '1') {
+    bereit = ablageModul().then((m) => m.nachDemLaden(roh)).catch(() => { /* keine IndexedDB: nichts wird überschrieben */ });
+  }
+}
+/** Auf die Inhalte des gespeicherten Stands warten (main.tsx: vor dem ersten Zeichnen) */
+export const standBereit = (): Promise<void> => bereit;
+
+
 /** Persistierten Stand aus localStorage in den laufenden Store übernehmen —
  *  Mitleser folgen so dem Schreiber; ein Nachfolger übernimmt vor dem ersten
  *  eigenen Write, was der alte Schreiber zuletzt gesichert hat. */
 export function adoptPersistedState(): boolean {
-  try {
-    const raw = localStorage.getItem('pixinotes-board');
-    if (!raw) return false;
-    const st = (JSON.parse(raw) as { state?: { boards?: BoardDoc[]; spaces?: Space[]; activeId?: string } }).state;
-    if (!st || !Array.isArray(st.boards) || st.boards.length === 0 || !Array.isArray(st.spaces)) return false;
-    useBoard.getState().importSync(st.boards, st.spaces, st.activeId ?? st.boards[0].id);
-    return true;
-  } catch {
-    return false;
-  }
+  // Der Text wird JETZT gelesen (ein Nachfolger schreibt gleich selbst) — Prüfen, Bilder einsetzen und Übernehmen laden
+  // nach (ablageIdb.ts → uebernehmen; M532: hält das Start-Paket klein, Mitlesen ist nicht eilig)
+  let raw: string | null = null;
+  try { raw = localStorage.getItem('pixinotes-board'); } catch { /* gesperrt */ }
+  if (!raw) return false;
+  void ablageModul().then((m) => m.uebernehmen(raw!));
+  return true;
 }
 
 const holdForever = () => new Promise<never>(() => {});

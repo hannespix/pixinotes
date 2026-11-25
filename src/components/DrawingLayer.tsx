@@ -1,3 +1,4 @@
+import { fensterDarueber } from '../lib/overlay';
 import { aufDemselbenBoard } from '../lib/zielBoard';
 import { useEffect, useRef, useState } from 'react';
 import { useReactFlow, useViewport } from '@xyflow/react';
@@ -243,7 +244,8 @@ export function DrawingLayer() {
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setTool('select');
+      // M530: Liegt ein Fenster darüber (Einstellungen, Hilfe, Suche …), schließt Esc erst das — der Stift bleibt in der Hand
+      if (e.key === 'Escape' && !fensterDarueber(null, e)) setTool('select');
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

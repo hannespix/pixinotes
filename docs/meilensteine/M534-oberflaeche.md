@@ -58,8 +58,8 @@ gescheitertes Nachladen reißt die ganze Darstellung mit, Esc-Stapel in weiteren
 - `lib/fensterEsc.ts` `escDarueber(el, e, sel)` (eigenes Modul, nicht im Start-Paket) für die Dialoge;
   `EingangFenster` fragt `fensterDarueber(null, e)` (Stapel vom Tastendruck) statt `querySelector`.
 - `Board.tsx` `zgLaden`: ohne Netz kein unbehandelter Fehler mehr (Zieh-Gefühl fehlt dann eben).
-- **Start-Paket:** vorher 2 064 874 B (126 B Luft); nach M534 2 064 7xx B — Neues nachgeladen, `AufRuf` spart mehr,
-  als `nachLazy` und der Verlaufs-Auslöser kosten.
+- **Start-Paket:** vorher 2 064 874 B (126 B Luft); mit M534 2 064 721 B — Neues nachgeladen, `AufRuf` spart mehr,
+  als `nachLazy` und der Verlaufs-Auslöser kosten. Mit M535 eingemischt 2 027 757 B.
 
 ## Prüfreihe
 A Suche (8) · B Zurück-Taste (10, davon B9/B10 am Telefon mit Fokus) · C Esc-Stapel (5 Dialoge) · D Nachladen

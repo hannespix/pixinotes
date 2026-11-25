@@ -469,13 +469,15 @@ export interface BoardState {
   updateEdgeKind: (id: string, kind: string) => void;
   /** M146/M147: feingliedrige Verbindungsoptionen — Spitzen (Ende/Anfang),
    *  Spitzenform, Linienstärke, eigene Farbe */
+  /** M530: Reihenfolge der Ausgänge eines Rahmens für die Rahmen-Reise (Kanten-Kennungen in der neuen Folge) */
+  ausgaengeOrdnen: (ids: string[]) => void;
   updateEdgeStyle: (id: string, patch: {
     head?: boolean; headStart?: boolean; shape?: string; width?: number; color?: string | null;
   }) => void;
   removeEdge: (id: string) => void;
   addNode: (node: AppNode) => void;
   /** M390: Karten des aktiven Boards duplizieren — ein Rückgängig-Schritt, mit Verbindungen und Anhängen; Rückgabe: Anzahl */
-  dupliziere: (ids: string[]) => number;
+  dupliziere: (ids: string[]) => Promise<number>;
   /** Karte in ein BELIEBIGES Board einfügen (Schnell-Eingabe der Aufgaben-Zentrale, M114) */
   addNodeToBoard: (boardId: string, node: AppNode) => void;
   /**

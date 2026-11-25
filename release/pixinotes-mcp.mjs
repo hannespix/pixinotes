@@ -40628,9 +40628,6 @@ init_define_import_meta_env();
 init_define_import_meta_env();
 init_types();
 
-// src/lib/editorFarben.ts
-init_define_import_meta_env();
-
 // src/lib/parseEmail.ts
 init_define_import_meta_env();
 function formatBytes(size) {
