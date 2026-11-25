@@ -67,6 +67,19 @@ html[data-alles-zeigen] .react-flow__node.selectable.selected:focus-visible { ou
 [data-weit] .pn-handle.react-flow__handle-bottom { translate: 0 50%; }
 [data-weit] .pn-handle.react-flow__handle-left { translate: -50% 0; }
 [data-weit] .pn-handle.react-flow__handle-right { translate: 50% 0; }
+/* Dasselbe für die Größen-Kanten und -Ecken: auf der Kante (je 5 Bildpunkte innen) blieben von einer 24 Bildpunkte
+   hohen Karte bei 15 % nur 4 zum Verschieben — der Zug änderte meist die Größe. */
+[data-weit] .react-flow__resize-control.top:not(.left, .right) { translate: 0 -50%; }
+[data-weit] .react-flow__resize-control.bottom:not(.left, .right) { translate: 0 50%; }
+[data-weit] .react-flow__resize-control.left:not(.top, .bottom) { translate: -50% 0; }
+[data-weit] .react-flow__resize-control.right:not(.top, .bottom) { translate: 50% 0; }
+/* Die Ecken skaliert React Flow selbst (`scale`), ihr `translate` rechnet in Flächenpunkten: eine halbe Ecke nach außen */
+[data-weit] .react-flow__resize-control.handle { --pn-eck: calc(5px * var(--pn-inv, 1)); }
+[data-weit] .react-flow__resize-control.top.left { translate: calc(-50% - var(--pn-eck)) calc(-50% - var(--pn-eck)); }
+[data-weit] .react-flow__resize-control.top.right { translate: calc(-50% + var(--pn-eck)) calc(-50% - var(--pn-eck)); }
+[data-weit] .react-flow__resize-control.bottom.left { translate: calc(-50% - var(--pn-eck)) calc(-50% + var(--pn-eck)); }
+[data-weit] .react-flow__resize-control.bottom.right { translate: calc(-50% + var(--pn-eck)) calc(-50% + var(--pn-eck)); }
+@media (pointer: coarse) { [data-weit] .react-flow__resize-control.handle { --pn-eck: calc(8px * var(--pn-inv, 1)); } }
 @media (hover: hover) and (pointer: fine) {
   /* „Die kann ich greifen": ein dünner Rahmen unter dem Zeiger */
   [data-weit] .react-flow__node:hover:not(.selected):not(.dragging) {
