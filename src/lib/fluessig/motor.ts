@@ -116,13 +116,18 @@ function takt(t: number): void {
   // Rechenzeit weg. Wer die Flüssigkeit selbst anfasst, bewegt sie weiter. Der Takt läuft leer mit (ein Vergleich).
   if (zugLaeuft()) {
     for (const f of laufen) if (f.wirdBeruehrt()) { zaehler.schritte++; f.schritt(t, dt); }
-    raf = requestAnimationFrame(takt);
+    if (!raf) raf = requestAnimationFrame(takt);
     return;
   }
   const arbeit = performance.now();
   for (const f of laufen) { zaehler.schritte++; f.schritt(t, dt); }
   qualitaet?.frame(interval, performance.now() - arbeit);
-  if ([...flaechen].some((f) => f.willLaufen())) raf = requestAnimationFrame(takt);
+  // M537: Nur anfordern, wenn nicht schon während dieses Takts geweckt wurde. Ein Wecken mitten im Takt (der
+  // Qualitätsregler tastet neu ab, „lebendig" weckt sich danach selbst, M535) hatte schon ein Bild angefordert; das
+  // hier überschrieb dessen Nummer und startete eine zweite Kette. Jede Kette rechnete und zeichnete je Bild, die
+  // zweite mit dt = 0 — doppelte Arbeit, weniger Bilder, der Regler drosselte weiter und startete die nächste Kette:
+  // die Schrift lief in Zeitlupe und ruckelte.
+  if ([...flaechen].some((f) => f.willLaufen())) { if (!raf) raf = requestAnimationFrame(takt); }
   else { letzterTakt = 0; zaehler.laufend = 0; }
 }
 
@@ -243,7 +248,9 @@ export class Flaeche {
     an('pointerup', (ev) => this.los(ev));
     an('pointercancel', (ev) => { if (ev.pointerId === this.pointer.id) this.langerDruck(); this.los(ev); });
     an('lostpointercapture', (ev) => this.los(ev));
-    an('pointerleave', () => { this.magnetAn = false; this.mausDrueber = false; if (!this.pointer.down) this.pointer.last = 0; });
+    // M537: Hielt sie an, weil die Maus still über ihr stand, fließt sie weiter, sobald die Maus geht – „lebendig" lebt
+    // weiter, eine vom Magnet gehaltene Schrift schwingt aus (vorher blieb sie verbogen stehen, bis jemand sie berührte)
+    an('pointerleave', () => { this.magnetAn = false; this.mausDrueber = false; if (!this.pointer.down) this.pointer.last = 0; wecken(); });
     an('contextmenu', (ev) => { if (this.pointer.id !== -1 && this.pointer.typ !== 'mouse') { ev.preventDefault(); this.langerDruck(); } });
   }
 
