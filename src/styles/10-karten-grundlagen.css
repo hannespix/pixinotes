@@ -18,6 +18,9 @@
 }
 .notiz-ruhend .ProseMirror [contenteditable="false"] { white-space: normal; }
 .notiz-ruhend .bn-editor { outline: none; }
+/* M527: Text einer ruhenden Notiz lässt sich mit der Maus markieren wie im Editor — die Markierung zieht beim Loslassen
+   in den Editor um (NoteCard). Vorher verschluckte die Karte (user-select: none) den ersten Zug über den Text. */
+@media (hover: hover) and (pointer: fine) { .react-flow__node .notiz-ruhend .bn-editor { user-select: text; -webkit-user-select: text; } }
 /* M338: Fern-Ruhe (lib/fernRuhe.ts) — der Inhalt einer Karte weit außerhalb des Bildes wird nicht
    gerechnet und nicht gezeichnet; die gemerkten Innenmaße halten ihre Größe. Export und Druck zeigen alles. */
 .card-shell[data-fern] > .card-body { content-visibility: hidden; contain-intrinsic-size: var(--fern-w, auto) var(--fern-h, auto); }

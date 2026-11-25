@@ -526,8 +526,27 @@ export async function bildBlockEinfuegen(editor: typeof noteSchema.BlockNoteEdit
   );
 }
 
-/** Formatier-Leiste = Standard-Knöpfe + Typo-Knöpfe (M201) */
-export function NoteToolbar() {
+/**
+ * M527: Die Formatier-Leiste wohnt auf dem Board in einer EIGENEN Ebene über allem (`.pn-format-schicht` am `body`).
+ *
+ * Vorher hing sie im Knoten der Karte und damit in der gezoomten Fläche: bei 50 % waren ihre Knöpfe 15 Punkte groß,
+ * bei 300 % 90 Punkte und die Leiste breiter als der Schirm (A−, A+, Aa außer Reichweite); unter ~45 % lag sie im
+ * Kartenkörper, der dort keine Zeiger annimmt (die ganze Karte ist der Griff, M343) — ein Klick auf die Leiste traf die
+ * Karte, der Editor verlor die Markierung, und die Leiste war weg, bevor sich etwas ändern ließ. In der Ebene hat sie
+ * in jeder Zoomstufe dieselbe Bildschirm-Größe, liegt über Nachbarkarten und Karten-Leiste und nimmt jeden Klick an.
+ * BlockNote zählt die Ebene weiter zum Editor (PortalElementOverride registriert sie), der Fokus gilt also als „drin".
+ * `nokey`: Tasten, die dort landen, sind keine Board-Kürzel (Entf löscht keine Karte).
+ */
+const FLOAT_FEST = { useFloatingOptions: { strategy: 'fixed' as const } };
+let formatSchichtEl: HTMLElement | null = null;
+function formatSchicht(): HTMLElement {
+  if (!formatSchichtEl?.isConnected) formatSchichtEl = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'pn-format-schicht nokey' }));
+  return formatSchichtEl;
+}
+
+/** Formatier-Leiste = Standard-Knöpfe + Typo-Knöpfe (M201). `aufDemBoard` (M527): in die Ebene über dem Board. */
+export function NoteToolbar({ aufDemBoard = false }: { aufDemBoard?: boolean } = {}) {
+  const [schicht] = useState(() => (aufDemBoard ? formatSchicht() : undefined));
   // Dieselbe Abfrage wie die M226-CSS-Regel — beide müssen sich einig sein,
   // wer die Leiste unten andockt
   const [telefon, setTelefon] = useState(() => window.matchMedia(TELEFON_ABFRAGE).matches);
@@ -562,7 +581,8 @@ export function NoteToolbar() {
        * scrollbar) — die Regel dort setzt ihre eigenen Werte und bleibt
        * unberührt.
        */
-      floatingUIOptions={{ useFloatingOptions: { strategy: 'fixed' } }}
+      floatingUIOptions={FLOAT_FEST}
+      portalElement={schicht}
       formattingToolbar={() => (
         <FormattingToolbar>
           {getFormattingToolbarItems()}

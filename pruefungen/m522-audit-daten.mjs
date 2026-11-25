@@ -529,7 +529,9 @@ console.log('H  Nur lesen: kein Erfolg melden, wo nichts gespeichert wurde');
   const fremd = { ...board('lz', 'Nur zum Lesen', [zeit('zeitFremd')]), geteiltVon: 'uid-fremd', geteiltVonName: 'anna@example.de', geteiltRolle: 'lesen' };
   const ctx = await kontext(stand([fremd, board('eigen', 'Mein Board', [zeit('zeitEigen')])]));
   const P = await seite(ctx);
-  await P.waitForSelector('.react-flow__node[data-id="zeitFremd"] .time-stop', { timeout: 15000 });
+  // M531: Auf einem Nur-lesen-Board gibt es die Erfassen-Knöpfe nicht mehr (nur im DOM, ausgeblendet). Der Handgriff wird
+  // deshalb ausgelöst (Zeiger + Klick) — geprüft wird weiter, dass der Speicher nichts annimmt und die Karte keinen Erfolg meldet.
+  await P.waitForSelector('.react-flow__node[data-id="zeitFremd"] .time-stop', { state: 'attached', timeout: 15000 });
   /** Jeden Hinweis mitschreiben, der während des Handgriffs erscheint (M484: nicht hinterher abfragen) */
   const mitschreiben = () => P.evaluate(() => {
     const w = window; w.__hinweise = [];
@@ -539,7 +541,8 @@ console.log('H  Nur lesen: kein Erfolg melden, wo nichts gespeichert wurde');
   const hinweise = () => P.evaluate(() => window.__hinweise ?? []);
   const segEnde = async (bid, kid) => (await zustand(P)).boards.find((b) => b.id === bid).nodes.find((n) => n.id === kid).data.segs[0].end;
   await mitschreiben();
-  await P.locator('.react-flow__node[data-id="zeitFremd"] .time-stop').click();
+  const stopFremd = P.locator('.react-flow__node[data-id="zeitFremd"] .time-stop');
+  await stopFremd.dispatchEvent('pointerdown'); await stopFremd.dispatchEvent('click');
   await warteBis(P, async () => (await hinweise()).length > 0, 4000);
   await P.waitForTimeout(600);
   const h1 = await hinweise();
