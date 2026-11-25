@@ -51,7 +51,10 @@ const ANHALTEN_MS = 2000;
 const SCHRIFT_REF = 100;
 
 /** Für Prüfreihen und Fehlersuche: wie oft der Takt lief und wie viele Karten gerade rechnen */
-export const zaehler = { takte: 0, laufend: 0, flaechen: 0, schritte: 0 };
+/** M540: Länge eines Physik-Schritts (s) */
+const SCHRITT = 1 / 120;
+
+export const zaehler = { takte: 0, laufend: 0, flaechen: 0, schritte: 0, physik: 0 };
 if (typeof window !== 'undefined') (window as unknown as { pixinotesFluessig: typeof zaehler }).pixinotesFluessig = zaehler;
 
 let zeichner: Zeichner | null = null;
@@ -196,6 +199,8 @@ export class Flaeche {
   private tropfen: { indices: number[]; until: number } | null = null;
   private naechsterTropfen = 0;
   private ruhigSeit = 0;
+  /** M540: noch nicht gerechnete Zeit (s) — wandert ins nächste Bild, statt verworfen zu werden */
+  private zeitRest = 0;
   private idleSince = 0;
   private hand: { x: number; y: number } | null = null;
   private restCalm = 0;
@@ -415,7 +420,7 @@ export class Flaeche {
   }
 
   private aufwecken(): void {
-    this.ruht = false; this.ruhigSeit = 0;
+    this.ruht = false; this.ruhigSeit = 0; this.zeitRest = 0;
     this.beruehrt = performance.now();
     wecken();
   }
@@ -447,8 +452,12 @@ export class Flaeche {
     const prm = brush === this.magnet ? { ...basis, strength: FX.magnetStrength } : this.settle.params(basis, t);
     // Bei schwachem Prozessor holt ein später Takt nicht die ganze Zeit auf — die Flüssigkeit wird kurz langsamer
     const deckel = (qualitaet?.level.part ?? 0) >= 2 ? 1 / 40 : 0.04;
-    let rest = Math.min(deckel, dt);
-    while (rest >= 1 / 120 - 1e-6) { f.step(1 / 120, prm, brush); rest -= 1 / 120; }
+    // M540: Feste Schritte von 1/120 s, der Rest wandert ins nächste Bild. Vorher wurde er verworfen: Auf einem
+    // 144-Hz-Schirm (6,9 ms je Bild) rechnete dann fast kein Bild einen Schritt — Zeitlupe. So läuft die Flüssigkeit
+    // bei 60, 120, 144 oder 240 Hz gleich schnell (rund 120 Schritte je Sekunde).
+    this.zeitRest = Math.min(deckel, this.zeitRest + dt);
+    while (this.zeitRest >= SCHRITT - 1e-6) { f.step(SCHRITT, prm, brush); zaehler.physik++; this.zeitRest -= SCHRITT; }
+    if (this.zeitRest < 0) this.zeitRest = 0;
     const still = 1 - Math.max(0, Math.min(1, (meanSpeed(f) - 12) / 48));
     this.restCalm += (still - this.restCalm) * Math.min(1, dt * 8);
     // Ruhe: kein Druck, keine Einschwingphase, kein Tropfen, nichts Lebendiges — und alles fast an seinem Platz
