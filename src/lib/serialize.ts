@@ -442,7 +442,7 @@ function baseNodeText(node: AppNode): string {
       return blocksToText(node.data.blocks);
     case 'email': {
       const e = node.data;
-      const atts = e.attachments.length
+      const atts = e.attachments?.length
         ? `\nAnhänge: ${e.attachments.map((a) => a.name).join(', ')}`
         : '';
       return `E-Mail: ${e.subject}\nVon: ${e.fromName}${e.fromAddress ? ` <${e.fromAddress}>` : ''}\n\n${e.text}${atts}`;
@@ -565,7 +565,7 @@ export function nodeToHtml(node: AppNode): string {
       return blocksToHtml(node.data.blocks);
     case 'email': {
       const e = node.data;
-      const atts = e.attachments.length
+      const atts = e.attachments?.length
         ? `<p><b>Anhänge:</b> ${e.attachments.map((a) => esc(a.name)).join(', ')}</p>`
         : '';
       return `<h3>${esc(e.subject)}</h3><p><b>Von:</b> ${esc(e.fromName)}${e.fromAddress ? ` &lt;${esc(e.fromAddress)}&gt;` : ''}</p><p style="white-space:pre-wrap">${esc(e.text)}</p>${atts}`;
