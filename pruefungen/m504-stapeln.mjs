@@ -94,19 +94,29 @@ const zappeln = async (P, x, y, ms) => { const bis = Date.now() + ms; let i = 0;
  */
 const zappler = (P, x, y) => {
   let an = true;
-  const lauf = (async () => { let i = 0; while (an) { i += 1; await P.mouse.move(x + (i % 2 ? 16 : 0), y); await P.waitForTimeout(60); } })();
+  // Fünf Stellen im Wechsel (je mindestens 24 Punkte auseinander) statt zwei: Der Browser fasst Mausbewegungen je
+  // Bild zusammen – bei zwei Stellen und langsamen Bildern sah die App zufällig immer dieselbe („hält still").
+  const lauf = (async () => { let i = 0; while (an) { i += 1; await P.mouse.move(x + ((i * 2) % 5) * 12, y); await P.waitForTimeout(60); } })();
   return { stopp: async () => { an = false; await lauf; } };
 };
 /**
- * M518: Die Seite schreibt selbst mit, wann der Zeiger zuletzt bewegt wurde, wie lang die längste Pause zwischen
- * zwei Bewegungen war und wie lange nach der letzten Bewegung eine Stapel-Markierung erschien. So lässt sich
+ * M518: Die Seite schreibt selbst mit, wann der Zeiger zuletzt (um mehr als die Ruhe-Toleranz) bewegt wurde, wie
+ * lang die längste Pause zwischen zwei Bewegungen war und wie lange nach der letzten Bewegung eine
+ * Stapel-Markierung erschien. So lässt sich
  * prüfen, ob die Voraussetzung eines Schritts („ohne stillzuhalten") auf dieser Maschine überhaupt galt, und die
  * Verweildauer wird mit der Uhr der Seite gemessen statt mit der des Prüfprogramms.
  */
 const uhrNeu = (P) => P.evaluate(() => {
   if (!window.__zug) {
-    const u = window.__zug = { letzter: 0, pause: 0, marke: null };
-    const zeit = () => { const t = performance.now(); if (u.letzter) u.pause = Math.max(u.pause, t - u.letzter); u.letzter = t; };
+    const u = window.__zug = { letzter: 0, pause: 0, marke: null, x: 0, y: 0 };
+    // „Bewegt" heißt wie in der App: mehr als 10 Punkte vom letzten Ruhepunkt (RUHE_PX) – gezählt werden die
+    // Ereignisse, wie sie die Seite erreichen (also nach dem Zusammenfassen durch den Browser)
+    const zeit = (e) => {
+      const t = performance.now();
+      if (e.type === 'pointermove' && Math.hypot(e.clientX - u.x, e.clientY - u.y) <= 10) return;
+      if (u.letzter) u.pause = Math.max(u.pause, t - u.letzter);
+      u.letzter = t; u.x = e.clientX; u.y = e.clientY;
+    };
     window.addEventListener('pointermove', zeit, true);
     window.addEventListener('pointerup', zeit, true);
     new MutationObserver(() => {
@@ -153,7 +163,7 @@ const nah = (a, b, t = 1.5) => Math.abs(a.x - b.x) < t && Math.abs(a.y - b.y) < 
     bA = await rahmen(P, 'b');
     marken = await markiert(P);
     await zap.stopp();
-    await Promise.all([P.mouse.move(ziel[0], ziel[1]), P.mouse.up()]);   // letzter Schritt und Loslassen ohne Pause dazwischen
+    await P.mouse.move(ziel[0], ziel[1]); await P.mouse.up();   // (nicht in einem Zug abschicken: die App übernimmt dann die vorletzte Lage)
     uhr = await uhrLesen(P);
     sA = await standRuhig(P, (s) => s.a.x !== s0.a.x && s.b.y !== s0.b.y, uhr.pause < 400 ? 8000 : 2500);
     if (uhr.pause < 400 || versuch === 3) break;
@@ -162,6 +172,7 @@ const nah = (a, b, t = 1.5) => Math.abs(a.x - b.x) < t && Math.abs(a.y - b.y) < 
     await standBis(P, (s) => s.a.x === s0.a.x && s.b.x === s0.b.x && s.b.y === s0.b.y);
     await P.waitForTimeout(500);
   }
+  console.log(`  (längste Pause zwischen zwei Bewegungen im Zug: ${uhr.pause} ms; Verweilen wäre ab 450 ms)`);
   pruefe('A1 über b gezogen (ohne stillzuhalten) weicht b aus', Math.hypot(bA.x - b0.x, bA.y - b0.y) > 40 * z, { b0: [b0.x, b0.y], bA: [bA.x, bA.y], uhr });
   pruefe('A2 … keine Stapel-Markierung', marken.length === 0 && uhr.marke === null, { marken, uhr });
   pruefe('A3 abgelegt: b bleibt beiseite, a liegt dort, wo sie losgelassen wurde (nicht im Stapel-Versatz)',
