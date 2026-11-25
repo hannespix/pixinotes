@@ -447,8 +447,7 @@ export function SelectionToolbar() {
 
   const duplicate = () => {
     // M530: gewählte Rahmen samt Inhalt (vorher nur die Karten)
-    const n = useBoard.getState().dupliziere([...selected, ...selFrames].map((x) => x.id));
-    if (n) showToast(`${zahlWort(n, 'Karte', 'Karten')} dupliziert`);
+    void useBoard.getState().dupliziere([...selected, ...selFrames].map((x) => x.id)).then((n) => { if (n) showToast(`${zahlWort(n, 'Karte', 'Karten')} dupliziert`); });
   };
 
   const remove = () => removeNodes([...selected, ...selFrames].map((n) => n.id));

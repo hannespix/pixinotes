@@ -477,7 +477,7 @@ export interface BoardState {
   removeEdge: (id: string) => void;
   addNode: (node: AppNode) => void;
   /** M390: Karten des aktiven Boards duplizieren — ein Rückgängig-Schritt, mit Verbindungen und Anhängen; Rückgabe: Anzahl */
-  dupliziere: (ids: string[]) => number;
+  dupliziere: (ids: string[]) => Promise<number>;
   /** Karte in ein BELIEBIGES Board einfügen (Schnell-Eingabe der Aufgaben-Zentrale, M114) */
   addNodeToBoard: (boardId: string, node: AppNode) => void;
   /**

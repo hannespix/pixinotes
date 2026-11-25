@@ -133,8 +133,7 @@ export function useBoardTasten(kamera: Kamera, anzRef: MutableRefObject<number>)
       const mitRahmen = board.nodes.filter((n) => n.selected && (!n.archived || st.showArchived));
       if (strg && !e.altKey && !e.shiftKey && e.code === 'KeyD' && mitRahmen.length) {
         return tun(() => {
-          const zahl = st.dupliziere(mitRahmen.map((n) => n.id));
-          if (zahl) st.showToast(`${zahlWort(zahl, 'Karte', 'Karten')} dupliziert`);
+          void st.dupliziere(mitRahmen.map((n) => n.id)).then((zahl) => { if (zahl) st.showToast(`${zahlWort(zahl, 'Karte', 'Karten')} dupliziert`); });
         });
       }
       if (strg || e.altKey) return;
