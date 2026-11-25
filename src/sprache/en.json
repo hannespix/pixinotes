@@ -3868,6 +3868,7 @@
 "Reihenfolge der Ausgänge":"Order of exits",
 "Kommt in der Rahmen-Reise zuerst dran":"Comes first in the frame tour",
 "Einen Platz nach vorn – kommt in der Rahmen-Reise früher dran":"One place forward – comes earlier in the frame tour",
+"Die geöffnete Karte wird nicht dupliziert. Esc schließt sie – dann dupliziert Strg+D die Auswahl.":"The open card is not duplicated. Esc closes it – then Ctrl+D duplicates the selection.",
 "In diese Karte lässt sich nichts einfügen. Esc schließt sie – dann landet Eingefügtes auf dem Board.":"Nothing can be pasted into this card. Esc closes it – then pasted content lands on the board.",
 "Diese Notiz lässt sich hier nur lesen – Einfügen geht nicht.":"This note is read-only here – pasting isn't possible.",
 "Board „{0}\" gelöscht.":"Board “{0}” deleted.",
