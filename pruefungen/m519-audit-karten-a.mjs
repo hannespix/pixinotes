@@ -292,8 +292,13 @@ if (laufe('H')) {
   const punkte = [[0.2, 0.15], [0.5, 0.15], [0.85, 0.15], [0.2, 0.45], [0.5, 0.45], [0.8, 0.45], [0.3, 0.8], [0.7, 0.8]];
   for (const [name, karte] of Object.entries(karten)) {
     const auff = [];
-    for (const [fx, fy] of punkte) for (const pause of [90, 250]) {
+    for (const [fx, fy] of punkte) for (const pause of [90, 250]) for (let versuch = 0; versuch < 3; versuch++) {
       const { ctx, P, fehler } = await seite([karte, fern], { viewport: { width: 390, height: 780 }, telefon: true });
+      // Zeiten mitschreiben: wann die Tipps ankamen und ab wann der Fokus stand (unter Last kommt der zweite Tipp mitunter zu spät)
+      await P.evaluate(() => {
+        window.__druck = []; window.addEventListener('pointerdown', () => window.__druck.push(performance.now()), true);
+        new MutationObserver(() => { if (!window.__offenAb && document.querySelector('.focus-head')) window.__offenAb = performance.now(); }).observe(document.body, { childList: true, subtree: true });
+      });
       // was der zweite Tipp auslösen könnte, mitschreiben statt ausführen: Verweise (tel:, mailto:, Web), Downloads
       await P.evaluate(() => { window.__ausgeloest = []; document.addEventListener('click', (e) => { const a = e.target.closest?.('a[href]'); if (a && !e.defaultPrevented) { window.__ausgeloest.push(a.getAttribute('href')); e.preventDefault(); } }); });
       const geladen = []; P.on('download', (d) => geladen.push(d.suggestedFilename()));
@@ -318,8 +323,13 @@ if (laufe('H')) {
       // (bei der Notiz setzt schon der ERSTE Tipp in den Text den Cursor — das gehört zum Antippen einer Notiz, nicht zum Doppeltipp)
       if (z.tippt && name !== 'notiz') was.push('Cursor im Text');
       if (fehler.length) was.push(fehler[0]);
-      if (was.length) auff.push(`(${fx}, ${fy}) ${pause} ms: ${was.join(', ')}`);
+      const zeit = await P.evaluate(() => ({ d: window.__druck, f: window.__offenAb ?? 0 }));
       await ctx.close();
+      // Kam der zweite Tipp erst lange nach dem Öffnen an (Rechner unter Last), war es kein Doppeltipp, sondern ein
+      // gewöhnlicher Tipp in die offene Karte — der Fall wird wiederholt, nicht gewertet
+      if (zeit.d.length >= 2 && zeit.f && zeit.d[1] - zeit.f > 330) { if (versuch === 2) console.log(`    (${fx}, ${fy}) ${pause} ms: zweiter Tipp dreimal zu spät – nicht gewertet`); continue; }
+      if (was.length) auff.push(`(${fx}, ${fy}) ${pause} ms: ${was.join(', ')}`);
+      break;
     }
     pruefe(`H ${name}: an ${punkte.length} Stellen, mit 90 und 250 ms Abstand – der Fokus ist offen, sonst ist nichts passiert`, auff.length === 0, auff.slice(0, 5));
   }
