@@ -242,8 +242,14 @@ export const speicherAblage = {
     // (Puffer: der Stand im Arbeitsspeicher — ohne Verweise, M532)
     const roh = pendingWrite?.key === k ? JSON.stringify(pendingWrite.wert) : localStorage.getItem(k);
     if (roh === null) return null;
-    nachDemLaden(roh);
-    return JSON.parse(roh) as Gespeichert;
+    nachDemLaden(roh);   // (verträgt Unlesbares: das Nachgeladene fängt seinen Fehler selbst)
+    try { return JSON.parse(roh) as Gespeichert; } catch {
+      // M529 (M522 O2): Unlesbar — sofort (synchron, vor jedem Überschreiben) aufheben. sessionStorage hat ein eigenes
+      // Kontingent; lib/rettung.ts (lädt im Leerlauf mit den Einstellungen) legt es in die Geräte-Ablage. Hier steht
+      // so wenig wie möglich — das Start-Paket hat kaum Luft.
+      try { sessionStorage.setItem('pixinotes-rettung', roh); } catch { /* kein Platz: nichts zu retten */ }
+      return null;
+    }
   },
   setItem: (k: string, v: Gespeichert): void => {
     if (writerRole !== 'writer') return; // Mitlese-Fenster schreibt NIE

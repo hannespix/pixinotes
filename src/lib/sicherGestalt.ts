@@ -123,6 +123,19 @@ const GESTALT: Record<string, { felder: Record<string, FeldArt>; eintraege?: Rec
  * M522: Inhalt einer Karte in die Gestalt ihrer Art bringen (siehe oben). Unbekannte Arten und Felder bleiben, wie sie
  * sind. Gibt dieselbe Karte zurück, wenn nichts zu tun war.
  */
+/** M529: Speicherstand eines eigenen Tools von außen (Konto) — eine flache Liste aus Texten, höchstens 5 MB.
+ *  (Hier statt in lib/sicher.ts: Nur der nachgeladene Konto-Abgleich braucht es, nicht der Start.) */
+export function toolSpeicherVonAussen(roh: unknown): Record<string, string> | null {
+  if (!roh || typeof roh !== 'object' || Array.isArray(roh)) return null;
+  let summe = 0;
+  for (const [k, v] of Object.entries(roh as Record<string, unknown>)) {
+    if (typeof v !== 'string') return null;
+    summe += k.length + v.length;
+    if (summe > 5_000_000) return null;
+  }
+  return roh as Record<string, string>;
+}
+
 export function karteGestalt<T extends AppNode>(n: T): T {
   const regel = GESTALT[n.type as string];
   if (!regel) return n;
