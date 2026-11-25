@@ -167,15 +167,37 @@ if (NUR.includes('S')) {
   pruefe('S0 das Board steht: 31 Karten', n0 === 31, n0);
   const pruefbar = await P.evaluate(() => typeof window.pixinotesSpeicher === 'object');
   pruefe('S0b der Speicher zählt mit', pruefbar);
+  // M536: Der Start schreibt einmal (M532: Bilder ziehen in die Ablage um, der Stand wird mit Verweisen neu geschrieben).
+  // S1 gilt dem Ziehen — also erst messen, wenn der Start fertig geschrieben hat (kein großes Bild mehr im Text,
+  // Zähler der Schreibvorgänge 1,5 s ruhig).
+  await warteBis(P, async () => {
+    const a = await P.evaluate(() => ({ g: window.pixinotesSpeicher?.geschrieben ?? 0, daten: /"data:[^"]{10000,}"/.test(localStorage.getItem('pixinotes-board') ?? '') }));
+    await P.waitForTimeout(1500);
+    const b = await P.evaluate(() => window.pixinotesSpeicher?.geschrieben ?? 0);
+    return !a.daten && a.g === b;
+  }, 30000);
+  // M536: Versionen des Boards (M449) — die Version „Sitzung" sichert den Stand vor der ersten EIGENEN Änderung
+  const versionen = () => P.evaluate(() => new Promise((ok) => {
+    const q = indexedDB.open('pixinotes-sync', 1);
+    q.onupgradeneeded = () => q.result.createObjectStore('kv');
+    q.onsuccess = () => { const r = q.result.transaction('kv').objectStore('kv').get('ver-ix:b1'); r.onsuccess = () => ok((r.result ?? []).map((v) => v.grund)); };
+  }));
+  await P.waitForTimeout(2500);   // das Kanban sammelt rund 4,5 s nach dem Start von selbst ein (runDerived)
+  const vorS1 = await versionen();
+  pruefe('S0c was beim Start von selbst entsteht (Kanban sammelt ein), legt keine Version „Sitzung" an', !vorS1.includes('sitzung'), vorS1);
   // S1: 30 Mausbewegungen ziehen — wie viel JSON entsteht?
   await P.evaluate(() => { window.__m525.strZeichen = 0; window.__m525.strGross = 0; });
   const lage0 = await lageVon(P, 'k2');
   await ziehen(P, 'k2', 30);
   const z1 = await zaehler(P);
   console.log(`  (30 Mausbewegungen: ${(z1.strZeichen / 1e6).toFixed(2)} Mio. Zeichen JSON, davon ${z1.strGross} große Texte; ein Stand = ${(STAND_ZEICHEN / 1e6).toFixed(2)} Mio.)`);
+  // (M536: dieser Zug ist die erste eigene Änderung — die Version „Sitzung" davor baute das ganze Board als JSON MITTEN
+  // im Zug; auf einer ausgelasteten Maschine gemessen: 1,0 Stände. Sie entsteht jetzt nach dem Ablegen im Leerlauf.)
   pruefe('S1 Ziehen schreibt nicht je Mausbewegung den ganzen Stand als JSON (vorher ≥ 30 Stände, jetzt < 1)', z1.strZeichen < STAND_ZEICHEN, { zeichen: z1.strZeichen, staende: (z1.strZeichen / STAND_ZEICHEN).toFixed(1) });
   const da = await warteBis(P, async () => (await lageVon(P, 'k2')) !== lage0, 8000);
   pruefe('S2 die neue Lage steht kurz nach dem Ablegen im Speicher', da, `${lage0} → ${await lageVon(P, 'k2')}`);
+  const sitzung = await warteBis(P, async () => (await versionen()).includes('sitzung'), 15000);
+  pruefe('S2b die Version „Sitzung" (Stand vor dem Zug) entsteht trotzdem — nach dem Ablegen', sitzung, await versionen());
   // S3: reine Oberfläche — Einstellungen auf und zu, Hinweis: kein Schreiben des Boards
   await P.waitForTimeout(900);
   const w0 = (await zaehler(P)).lsBoard;

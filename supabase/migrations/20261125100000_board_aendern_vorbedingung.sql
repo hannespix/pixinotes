@@ -30,7 +30,21 @@
 --   -- danach den Abschnitt „create or replace function public.board_aendern …" samt revoke/grant aus
 --   -- 20261115100000_board_aendern.sql ausführen.
 
-drop function if exists public.board_aendern(uuid, text, json, text);
+-- M536: JEDE andere Fassung entfernen, nicht nur die bekannte mit vier Parametern. Stünde daneben noch eine
+-- (andere Parameterliste aus einem Entwurf, die alte Migration ein zweites Mal eingespielt …), wären Aufrufe mit
+-- benannten Parametern mehrdeutig („function … is not unique") — dann schriebe KEIN App-Stand mehr.
+do $$
+declare
+  v_f regprocedure;
+begin
+  for v_f in
+    select p.oid::regprocedure from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'board_aendern'
+       and p.oid::regprocedure::text <> 'board_aendern(uuid,text,json,text,bigint,bigint)'
+  loop
+    execute 'drop function ' || v_f::text;
+  end loop;
+end $$;
 
 create or replace function public.board_aendern(
   p_besitzer uuid,

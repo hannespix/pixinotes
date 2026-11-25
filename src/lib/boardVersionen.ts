@@ -28,9 +28,10 @@
  * Sonderweg, der Ordner oder Konto übergeht.
  */
 import { idbDel, idbGet, idbKeys, idbSet } from './syncFolder';
-import { persistHaken, useBoard, vorUmbauHaken, type BoardDoc, type CommentThread, type Stroke } from '../store';
+import { inDerived, persistHaken, useBoard, vorUmbauHaken, type BoardDoc, type CommentThread, type Stroke } from '../store';
 import type { AppNode } from '../types';
 import { inhaltGeaendert } from './kartenZeit';
+import { nachZug, zugLaeuft } from './zugAnzeige';
 import type { Edge } from '@xyflow/react';
 
 export type VersionGrund = 'verlassen' | 'automatisch' | 'sitzung' | 'manuell' | 'abgleich' | 'import' | 'ki' | 'wiederherstellen' | 'team';
@@ -144,6 +145,8 @@ export function ausduennen(liste: VersionInfo[], jetzt = Date.now()): VersionInf
 
 /** Alle Schreibvorgänge nacheinander — sonst überschrieben sich zwei Sicherungen gegenseitig die Liste */
 let kette: Promise<unknown> = Promise.resolve();
+/** M536: holt eine wartende Version „Sitzung" nach (initBoardVersionen setzt sie) */
+let sitzungZuerst = (): void => {};
 function nacheinander<T>(fn: () => Promise<T>): Promise<T> {
   const p = kette.then(fn, fn);
   kette = p.catch(() => {});
@@ -154,6 +157,9 @@ const letzteSig = new Map<string, string>();
 const letzteZeit = new Map<string, number>();
 
 export async function versionenVon(boardId: string): Promise<VersionInfo[]> {
+  // M536: eine wartende Version „Sitzung" gehört in die Liste — erst sichern, dann lesen
+  sitzungZuerst();
+  await kette;
   try {
     const l = (await idbGet<VersionInfo[]>(IX(boardId))) ?? [];
     return [...l].sort((a, b) => b.at - a.at);
@@ -200,11 +206,13 @@ const ANHANG_TYPEN = new Set(['file', 'htmlapp', 'sheet']);
  * `abstandMs`: nicht sichern, wenn der letzte Stand jünger ist (Abgleich im Hintergrund).
  * Rückgabe: der neue Stand, `'gleich'` (schon gesichert) oder null (leer, zu früh, Fehler).
  */
-export function versionSichern(b: BoardDoc | undefined, grund: VersionGrund, abstandMs = 0): Promise<VersionInfo | 'gleich' | null> {
+export function versionSichern(b: BoardDoc | undefined, grund: VersionGrund, abstandMs = 0, zeit?: number): Promise<VersionInfo | 'gleich' | null> {
+  // M536: eine noch wartende Version „Sitzung" (älterer Stand) kommt zuerst in die Reihe
+  if (grund !== 'sitzung') sitzungZuerst();
   if (!b) return Promise.resolve(null);
   const stand = standVon(b);
   const name = b.name;
-  const jetzt = Date.now();
+  const jetzt = zeit ?? Date.now();
   return nacheinander(async () => {
     try {
       const json = JSON.stringify(stand);
@@ -423,11 +431,29 @@ export function initBoardVersionen(): void {
     }
   };
 
+  // M536: Die erste Änderung einer Sitzung ist oft der erste Schritt eines Zugs. Die Sicherung davor baut das ganze Board
+  // als JSON — mitten im Zug ein Ruckler (m525 S1 maß ihn als vollen Stand). Der Stand davor (`a`) ändert sich nie
+  // (Store-Objekte werden ersetzt, nicht verändert), also wird nach dem Zug im Leerlauf gesichert; vor dem Verdecken
+  // der Seite sofort.
+  // Zeitpunkt = der Moment der Änderung; jede andere Sicherung holt sie vorher nach (sitzungZuerst), damit die Reihenfolge
+  // der Versionen stimmt
+  const offen = new Map<string, { b: BoardDoc; at: number }>();
+  const leerlauf = (f: () => void) => (window.requestIdleCallback ? window.requestIdleCallback(f, { timeout: 5000 }) : setTimeout(f, 200));
+  const nachholen = () => { for (const [id, { b, at }] of offen) { offen.delete(id); void versionSichern(b, 'sitzung', 0, at); } };
+  sitzungZuerst = nachholen;
+  // (nach dem Ablegen noch 1,5 s Ruhe: wer gleich weiterzieht, bekommt den Ruckler auch nicht im nächsten Zug)
+  const nachDemZug = () => nachZug(() => { setTimeout(los, 1500); });
+  const los = (): void => { if (zugLaeuft()) nachDemZug(); else leerlauf(() => (zugLaeuft() ? nachDemZug() : nachholen())); };
+  const spaeter = (a: BoardDoc) => { const neu = !offen.size; offen.set(a.id, { b: a, at: Date.now() }); if (neu) setTimeout(los, 1500); };
   // Was beim Start von selbst nachgetragen wird (Fristen, Seitenbreiten, Abgleich hat seinen eigenen Haken), ist keine
-  // Änderung des Nutzers — sonst entstünde bei jedem Start eine Version
+  // Änderung des Nutzers — sonst entstünde bei jedem Start eine Version.
+  // M536: Die Version „Sitzung" (Stand vor der ersten EIGENEN Änderung) löst auch später nichts aus, was von selbst
+  // entsteht (runDerived: Eingesammeltes, gemessene Höhen, erkannter Text) — gemessen: ein Kanban sammelte 4,4 s nach
+  // dem Start ein, und jeder Start legte eine Version „Sitzung" an.
   const bereitAb = Date.now() + 2500;
   useBoard.subscribe((s, prev) => {
     if (s.boards !== prev.boards && Date.now() >= bereitAb) {
+      const vonSelbst = inDerived();
       const alt = new Map(prev.boards.map((b) => [b.id, b]));
       for (const b of s.boards) {
         const a = alt.get(b.id);
@@ -435,7 +461,7 @@ export function initBoardVersionen(): void {
         if (a.nodes === b.nodes && a.edges === b.edges && a.drawings === b.drawings && a.comments === b.comments) continue;
         geaendert.add(b.id);
         // Der Stand vor der ersten Änderung dieser Sitzung — der wichtigste, wenn etwas schiefgeht
-        if (!basis.has(b.id)) { basis.add(b.id); void versionSichern(a, 'sitzung'); }
+        if (!vonSelbst && !basis.has(b.id)) { basis.add(b.id); spaeter(a); }
       }
     }
     const verlassen = prev.activeId !== s.activeId || (prev.view === 'board' && s.view !== 'board');
@@ -462,5 +488,5 @@ export function initBoardVersionen(): void {
     }
   })();
   window.setInterval(() => faelligeSichern('automatisch', false), 60_000);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') faelligeSichern('verlassen', true); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { nachholen(); faelligeSichern('verlassen', true); } });
 }

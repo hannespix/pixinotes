@@ -78,7 +78,29 @@ async function seite({ telefon = false } = {}) {
   await P.waitForTimeout(1800);
   return { ctx, P, fehler };
 }
-const stand = (P) => P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board') ?? '{}').state?.boards?.[0] ?? null);
+/** M536: der GESPEICHERTE Stand, so wie ihn die App beim Neuladen liest. Seit M532 trägt der Text große Bilder nur als
+ *  Verweis (`pixinotes-ablage:…`), ihr Inhalt liegt in der IndexedDB — hier wie in `ablageIdb.ts` wieder eingesetzt.
+ *  Fehlt ein Inhalt in der Ablage, bleibt der Verweis stehen (und jeder Vergleich mit dem Bild schlägt fehl). */
+const gespeicherterStand = (P) => P.evaluate(async () => {
+  const roh = localStorage.getItem('pixinotes-board');
+  if (!roh) return null;
+  const st = JSON.parse(roh).state;
+  const verweise = [...new Set(roh.match(/pixinotes-ablage:[^"]+/g) ?? [])];
+  if (!verweise.length) return st;
+  const inhalte = await new Promise((ok) => {
+    const q = indexedDB.open('pixinotes-sync', 1);
+    q.onupgradeneeded = () => q.result.createObjectStore('kv');
+    q.onerror = () => ok(new Map());
+    q.onsuccess = () => {
+      const m = new Map(); const tx = q.result.transaction('kv');
+      for (const v of verweise) { const r = tx.objectStore('kv').get(v); r.onsuccess = () => { if (typeof r.result === 'string') m.set(v, r.result); }; }
+      tx.oncomplete = () => ok(m); tx.onerror = () => ok(m);
+    };
+  });
+  const tausch = (v) => (typeof v === 'string' ? (inhalte.get(v) ?? v) : Array.isArray(v) ? v.map(tausch) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, tausch(x)])) : v);
+  return tausch(st);
+});
+const stand = async (P) => (await gespeicherterStand(P))?.boards?.[0] ?? null;
 const karte = async (P, id) => (await stand(P))?.nodes.find((n) => n.id === id) ?? null;
 
 /** Maße und Aussehen einer Bild-Karte */

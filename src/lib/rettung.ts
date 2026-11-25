@@ -26,7 +26,7 @@ async function aufnehmen(): Promise<void> {
   if (!alt.some((r) => r.text === roh)) await idbSet(KEY, [...alt, { am: new Date().toISOString(), text: roh }].slice(-3));
   try { sessionStorage.removeItem(SITZUNG); } catch { /* bleibt liegen */ }
   window.dispatchEvent(new CustomEvent(RETTUNG_EREIGNIS));
-  useBoard.getState().showToast('Der gespeicherte Stand war nicht lesbar – PixiNotes startet leer. Eine Rettungskopie liegt unter Einstellungen → Daten.', false, 20000);
+  useBoard.getState().showToast('Gespeicherter Stand nicht lesbar – PixiNotes startet leer. Rettungskopie: Einstellungen → Daten.', false, 20000);
 }
 if (typeof window !== 'undefined') void aufnehmen().catch(() => {});
 
