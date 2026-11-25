@@ -24,7 +24,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '@xyflow/react';
-import { gruppeVon, GRUPPE_EREIGNIS, selectActiveBoard, useBoard, useKarteFest } from '../../store';
+import { gruppeVon, GRUPPE_EREIGNIS, mutedHistory, selectActiveBoard, useBoard, useKarteFest } from '../../store';
 import type { BubblesNode } from '../../types';
 import { uid } from '../../types';
 import { ich, liveAuf, meineKennung } from '../../lib/liveStand';
@@ -32,7 +32,7 @@ import { timerStart } from '../../lib/gruppenraum';
 import { makeNote } from '../../lib/nodes';
 import { aiReady, askAi } from '../../lib/ai';
 import {
-  beteiligte, blasenRadius, blasenVon, BUBBLE_FARBEN, bubblesAlsBloecke, bubblesDaten, bubblesSchritt, geordnet, meinePunkte, rangfolge,
+  beteiligte, blasenRadius, blasenVon, BUBBLE_FARBEN, bubblesAlsBloecke, bubblesDaten, bubblesSchritt, geordnet, KI_WIRBEL_MS, meinePunkte, rangfolge,
   type Blase, type BubbleRegeln, type BubbleSchritt, type BubblesData,
 } from '../../lib/bubbles';
 import { CardShell } from './CardShell';
@@ -59,11 +59,31 @@ const SCHRITT_MAX_MS = 100;
  *  (Punkte je ms; 0,3 = 5 Punkte je Bild bei 60 Hz, 300 je Sekunde) */
 const NAME_TAU = 67;
 const NAME_TEMPO = 0.3;
+/**
+ * M543: Wirbel, solange die KI gruppiert. Die Blasen kreisen langsam um die Mitte der Bühne (eine Runde in WIRBEL_RUNDE_MS)
+ * — als Kraft in der vorhandenen Physik, nicht als Drehung der Karte: Überlappungen und Wände gelten weiter, und kommt das
+ * Ergebnis, fließen die Blasen aus dem Kreisen heraus zu ihren neuen Gruppen. WIRBEL_ANLAUF_MS: so lange wächst er an.
+ */
+const WIRBEL_RUNDE_MS = 11000;
+const WIRBEL_ANLAUF_MS = 900;
+/** M543: Diese Sitzung — wer den Eintrag „KI gruppiert" geschrieben hat, zeigt den Wirbel nach seinem eigenen Zustand */
+const KI_SITZUNG = uid();
+/** M543: Wann dieses Gerät einen fremden Eintrag „KI gruppiert" zuerst gesehen hat (Karte|Stempel|Sitzung → ms) — damit
+ *  ein Neuaufbau der Karte (Board gewechselt und zurück) den Wirbel nicht von vorn beginnen lässt */
+const KI_GESEHEN = new Map<string, number>();
+/** M543: Wie lange andere Geräte höchstens kreisen (Prüfreihen kürzen es) */
+const kiWirbelMs = (): number => {
+  const w = (globalThis as { __pnKiWirbelMs?: number }).__pnKiWirbelMs;
+  return typeof w === 'number' && w > 0 ? w : KI_WIRBEL_MS;
+};
+/** M543: So schnell legt sich der Tropfen-Rand um eine Idee (ms; Zeitkonstante) — er wächst und schmilzt, statt zu springen */
+const RAND_TAU = 260;
 /** M422: Platz über einem Tropfen für die Kuppe mit dem Gruppennamen (Zeilenhöhe + Polster) */
 const TROPFEN_KUPPE = 26;
 /** M415: Pastell aus einer Kartenfarbe — auf hellem und dunklem Grund (die Bühne gibt --bub-grund vor) */
 const pastell = (farbe: string, anteil: number): string => `color-mix(in srgb, ${farbe} ${anteil}%, var(--bub-grund))`;
-interface Koerper { x: number; y: number; vx: number; vy: number; r: number; ziel: number; g: string | null; len: number; wort: number; wortText?: string }
+/** `rand` (M543): wie weit der Tropfen-Rand seiner Gruppe gerade um die Idee liegt (0 = frei, 1 = ganz in der Gruppe) */
+interface Koerper { x: number; y: number; vx: number; vy: number; r: number; ziel: number; g: string | null; len: number; wort: number; wortText?: string; rand: number }
 
 /**
  * M422: Breite des längsten Worts je Punkt Schriftgröße — gemessen, nicht geschätzt. Mit „Zeichen × 0,64" passten fette
@@ -170,6 +190,23 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   const [neuGruppe, setNeuGruppe] = useState('');
   const [bearbeite, setBearbeite] = useState<string | null>(null);
   const [kiLaeuft, setKiLaeuft] = useState(false);
+  /* M543: Gruppiert gerade ein anderes Gerät mit der KI (es hat „KI gruppiert" in die Karte geschrieben)? Dann kreisen
+     die Blasen auch hier — höchstens kiWirbelMs() nach dem Empfang, gezählt nach der hiesigen Uhr (die beiden Uhren müssen
+     nicht übereinstimmen), und nur bei frischen Einträgen: Ein Board, das Stunden später geöffnet wird, kreist nicht. */
+  const ki = d.ki;
+  const [fremdWirbel, setFremdWirbel] = useState(false);
+  useEffect(() => {
+    if (!ki?.an || ki.von === KI_SITZUNG || Math.abs(Date.now() - ki.t) > 10 * 60_000) { setFremdWirbel(false); return; }
+    const schluessel = `${id}|${ki.t}|${ki.von ?? ''}`;
+    if (!KI_GESEHEN.has(schluessel)) { if (KI_GESEHEN.size > 50) KI_GESEHEN.clear(); KI_GESEHEN.set(schluessel, Date.now()); }
+    const rest = kiWirbelMs() - (Date.now() - KI_GESEHEN.get(schluessel)!);
+    if (rest <= 0) { setFremdWirbel(false); return; }
+    setFremdWirbel(true);
+    const z = window.setTimeout(() => setFremdWirbel(false), rest);
+    return () => window.clearTimeout(z);
+  }, [id, ki?.an, ki?.t, ki?.von]);
+  /** M543: Hinweis „KI gruppiert …" in der Karte (auch bei reduzierter Bewegung) */
+  const kiSichtbar = kiLaeuft || fremdWirbel;
   /** M378: gewählte Gruppe (Pille zum Umbenennen/Auflösen), Listenansicht, Frage nach dem Fallenlassen auf eine Blase */
   const [gWahl, setGWahl] = useState<string | null>(null);
   const [liste, setListe] = useState(false);
@@ -327,6 +364,15 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   const kiGruppen = async () => {
     if (kiLaeuft || blasen.length < 3 || !leiten) return;
     setKiLaeuft(true);
+    /* M543: „KI gruppiert" in die Karte schreiben — so kreisen die Blasen auch bei den anderen. Ohne eigenen Schritt im
+       Verlauf (mutedHistory), und vor dem Ergebnis wieder aus: Der Verlaufsschritt des Ergebnisses sichert so den Stand
+       ohne Wirbel, ein Strg+Z ließe sonst bei den anderen die Blasen noch einmal kreisen. */
+    const kiAb = jetzt();
+    // ins Board, in dem gefragt wurde (wer währenddessen das Board wechselt, ließe den Eintrag sonst stehen)
+    const kiBoard = boardId;
+    const kiSetzen = (an: boolean) => mutedHistory(() => useBoard.getState().updateNodeDataOnBoard(kiBoard, id, { ki: { an, t: an ? kiAb : Math.max(jetzt(), kiAb + 1), von: KI_SITZUNG } }));
+    const kiAus = () => kiSetzen(false);
+    kiSetzen(true);
     try {
       const liste = blasen.map((b, i) => `${i + 1}. ${b.text}`).join('\n');
       const antwort = await askAi(`Ordne diese Ideen aus einem Workshop in 2 bis 6 thematische Gruppen. Jede Idee in genau eine Gruppe. Gruppennamen kurz (1–3 Wörter), in der Sprache der Ideen.\n${d.frage ? `Fragestellung: ${d.frage}\n` : ''}\nIdeen:\n${liste}\n\nAntworte NUR mit JSON in dieser Form, ohne Erklärung: [{"name":"…","ideen":[1,2]}]`);
@@ -348,8 +394,10 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
         }
       }
       if (!n) throw new Error('leer');
+      kiAus();
       updateNodeData(id, { gruppen: neueGruppen, ideen });
     } catch {
+      kiAus();
       showToast('Die KI hat keine brauchbaren Gruppen geliefert – bitte noch einmal versuchen oder von Hand gruppieren.');
     } finally { setKiLaeuft(false); }
   };
@@ -381,6 +429,12 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   const gruppenRef = useRef<string[]>([]);
   gruppenRef.current = gruppen.map(([g]) => g);
   const ruhig = useMemo(() => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches, []);
+  /** M543: seit wann der Wirbel läuft (performance.now) — null: kein Wirbel */
+  const wirbelAb = useRef<number | null>(null);
+  /** M543: Liegt die Bühne im Bild? Nur dann kreist es (außerhalb hält der Wirbel an und rechnet nichts) */
+  const imBild = useRef(true);
+  /** M543: wie weit der langsamste Tropfen-Rand noch von seinem Ziel weg ist (solange rechnet die Bühne weiter) */
+  const randRest = useRef(0);
 
   /**
    * Wo eine Blase hingehört. Ohne Gruppen: die Mitte. Mit Gruppen bekommt jede ein eigenes Feld der Bühne — so
@@ -476,20 +530,38 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
     }
     // M415: Tropfen — eine Scheibe je Idee; in einer Gruppe um den Rand der Gruppe größer (die Scheiben einer Gruppe
     // fließen so zu einem Tropfen zusammen), die gezogene ohne Rand: Sie löst sich sichtbar und fließt woanders hinein.
+    /* M543: Der Rand wächst und schmilzt mit der Zeit (RAND_TAU), statt zu springen: Beginnt der Wirbel, lösen sich die
+       Tropfen der Gruppen in einzelne Blasen; kommt das Ergebnis der KI, fließen sie zu neuen Tropfen zusammen. Die
+       gezogene Idee löst sich wie bisher sofort (sie soll sichtbar abreißen). */
+    const wirbel = wirbelAb.current != null;
+    const gezogen = zug.current?.bewegt ? zug.current.id : null;
+    const fr = sofort ? 1 : 1 - Math.exp(-dt / RAND_TAU);
+    randRest.current = 0;
+    /** je Gruppe: wie weit ihr Tropfen steht (Mittel der Ränder ihrer Ideen) — Kern und Kuppe wachsen mit */
+    const gruppeDa = new Map<string, number>();
+    const gruppeN = new Map<string, number>();
+    for (const [bid, k] of koerper.current) {
+      const soll = !wirbel && k.g && bid !== gezogen && gruppenRef.current.includes(k.g) ? 1 : 0;
+      k.rand = bid === gezogen ? 0 : k.rand + (soll - k.rand) * fr;
+      if (Math.abs(soll - k.rand) < 0.02) k.rand = soll;
+      randRest.current = Math.max(randRest.current, Math.abs(soll - k.rand));
+      if (k.g && bid !== gezogen) { gruppeDa.set(k.g, (gruppeDa.get(k.g) ?? 0) + k.rand); gruppeN.set(k.g, (gruppeN.get(k.g) ?? 0) + 1); }
+    }
+    const daVon = (gid: string): number => { const n = gruppeN.get(gid); return n ? gruppeDa.get(gid)! / n : wirbel ? 0 : 1; };
     if (tropfenRef.current) {
-      const gezogen = zug.current?.bewegt ? zug.current.id : null;
       for (const [bid, k] of koerper.current) {
         const f = formen.current.get(bid);
         if (!f) continue;
-        const R = k.r + (k.g && bid !== gezogen && gruppenRef.current.includes(k.g) ? TROPFEN_RAND : 0);
+        const R = k.r + TROPFEN_RAND * k.rand;
         setzen(f, k.x - R, k.y - R, R * 2, R * 2);
       }
       for (const [gid, f] of kernFormen.current) {
-        let n = 0;
-        for (const [bid, k] of koerper.current) if (k.g === gid && bid !== gezogen) n += 1;
+        const n = gruppeN.get(gid) ?? 0;
         const s0 = scheibe(gid, gezogen ?? undefined);
         // leer: der ganze Platz; ab drei Ideen ein Kern in der Mitte (zwischen drei Kreisen bliebe sonst ein Loch)
-        const r = n === 0 ? s0.r : n >= 3 ? 0.42 * (s0.r - TROPFEN_RAND) : 0;
+        // M543: Der Kern wächst erst, wenn der Tropfen steht (beim Hereinfliegen wäre der Kreis um die Gruppe riesig)
+        const da = daVon(gid);
+        const r = (n === 0 ? s0.r : n >= 3 ? 0.42 * (s0.r - TROPFEN_RAND) : 0) * da * da;
         setzen(f, s0.x - r, s0.y - r, r * 2, r * 2);
       }
     }
@@ -566,7 +638,8 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
         const tf = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
         if (nm.style.transform !== tf) nm.style.transform = tf;
         const kf = kopfFormen.current.get(gid);
-        if (kf) setzen(kf, x - 9, y - 5, nm.offsetWidth + 18, lh + 10);
+        // M543: die Kuppe wächst mit ihrem Tropfen (und schmilzt im Wirbel weg)
+        if (kf) { const da = daVon(gid); const kb = (nm.offsetWidth + 18) * da; const kh = (lh + 10) * da; setzen(kf, x - 9 + (nm.offsetWidth + 18 - kb) / 2, y - 5 + (lh + 10 - kh) / 2, kb, kh); }
       }
     }
     return weit;
@@ -593,16 +666,41 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
     //    außen an); Gruppen als Ganzes auseinander, in sich zusammen; freie aus den Feldern der Gruppen
     let rMax = 1;
     for (const [, k] of ks) if (k.ziel > rMax) rMax = k.ziel;
+    /* M543: Wirbel — statt zu ihren Feldern kreisen alle Blasen um die Mitte der Bühne (eine Runde in WIRBEL_RUNDE_MS)
+       und legen sich dabei sanft auf einen Kreis: ein Karussell. Auf einen Haufen in der Mitte gezogen, verkeilten sie
+       sich (die inneren standen still, die äußeren schoben sich vorbei); auf dem Kreis laufen alle frei. Die Kraft ist so
+       bemessen, dass die Dämpfung genau die gewünschte Geschwindigkeit stehen lässt; sie wächst in WIRBEL_ANLAUF_MS an. */
+    const wb = wirbelAb.current;
+    const anlauf = wb == null ? 0 : Math.min(1, (performance.now() - wb) / WIRBEL_ANLAUF_MS);
+    const omega = ((2 * Math.PI) / WIRBEL_RUNDE_MS) * SCHRITT_MS * anlauf;
+    // etwas unter der Mitte: oben links steht der Hinweis „KI gruppiert …"
+    const unter = Math.min(18, h * 0.05);
+    const kreis = Math.max(20, Math.min(Math.min(w, h) * 0.3, Math.min(w, h) / 2 - rMax - 14 - unter));
     for (const [bid, k] of ks) {
       k.r += (k.ziel - k.r) * 0.18;
       if (bid === gezogen) { k.vx = 0; k.vy = 0; continue; }
+      if (wb != null) {
+        const dx = k.x - w / 2; const dy = k.y - (h / 2 + unter); const dist = Math.hypot(dx, dy) || 1;
+        const schub = omega * Math.max(dist, kreis * 0.5) * ((1 - daempfung) / daempfung);
+        const hin = (kreis - dist) * 0.003 * anlauf;
+        k.vx += (-dy / dist) * schub + (dx / dist) * hin;
+        k.vy += (dx / dist) * schub + (dy / dist) * hin;
+        continue;
+      }
       const a = anker(k.g);
       const zugkraft = 0.0045 + 0.004 * (k.ziel / rMax);
       k.vx += (a.x - k.x) * zugkraft; k.vy += (a.y - k.y) * zugkraft;
     }
     const gs = gruppenRef.current;
-    if (gs.length) {
-      const sch = gs.map((g) => ({ g, s: scheibe(g, zug.current?.bewegt ? zug.current.id : undefined) }));
+    if (gs.length && wb == null) {
+      /* M543: Wie fest steht jede Gruppe schon (Mittel der Tropfen-Ränder ihrer Ideen, 0…1)? Bekommen verstreute Ideen eine
+         neue Gruppe (Ergebnis der KI), ist der Kreis um sie riesig — als Ganzes abgestoßen und in die Bühne geschoben,
+         flogen sie im ersten Augenblick bis zu 40 Punkte je Bild. Diese Kräfte wachsen jetzt mit der Gruppe heran; bis
+         dahin zieht jede Idee allein zu ihrem Feld. In Ruhe sind alle Gruppen fest (1) — dort ändert sich nichts. */
+      const festSumme = new Map<string, number>(); const festZahl = new Map<string, number>();
+      for (const [bid, k] of ks) if (k.g && bid !== gezogen) { festSumme.set(k.g, (festSumme.get(k.g) ?? 0) + k.rand); festZahl.set(k.g, (festZahl.get(k.g) ?? 0) + 1); }
+      const fest = (g: string): number => { const n = festZahl.get(g); return n ? festSumme.get(g)! / n : 1; };
+      const sch = gs.map((g) => ({ g, s: scheibe(g, zug.current?.bewegt ? zug.current.id : undefined), f: fest(g) }));
       for (let i = 0; i < sch.length; i++) {
         for (let j = i + 1; j < sch.length; j++) {
           const a = sch[i].s; const b = sch[j].s;
@@ -612,30 +710,34 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
           if (tiefe <= 0) continue;
           if (dist < 0.01) { dx = 1; dy = 0; dist = 1; }
           // M429: sanfter als zuvor (0,11) — die Gruppen schoben sich gegenseitig an, statt nur Abstand zu halten
-          const sx = (dx / dist) * tiefe * 0.08; const sy = (dy / dist) * tiefe * 0.08;
+          const ff = sch[i].f * sch[j].f;
+          // M543: höchstens 50 Punkte Tiefe — ein riesiger Kreis um eben verstreute Ideen schleuderte sie sonst davon
+          const tf = Math.min(tiefe, 50);
+          const sx = (dx / dist) * tf * 0.08 * ff; const sy = (dy / dist) * tf * 0.08 * ff;
           for (const [bid, k] of ks) {
             if (bid === gezogen) continue;
             if (k.g === sch[i].g) { k.vx -= sx; k.vy -= sy; } else if (k.g === sch[j].g) { k.vx += sx; k.vy += sy; }
           }
         }
       }
-      for (const { g, s: c } of sch) {
+      for (const { g, s: c, f } of sch) {
         // … und als Ganzes in die Bühne: Ragt der Ring über einen Rand, rückt die ganze Gruppe herein
         // M422: im Tropfen-Look oben mit Platz für die Kuppe des Namens
         const oben = tropfenRef.current ? 3 + TROPFEN_KUPPE : 3;
         const rx = c.x - c.r < 3 ? 3 - (c.x - c.r) : c.x + c.r > w - 3 ? (w - 3) - (c.x + c.r) : 0;
         const ry = c.y - c.r < oben ? oben - (c.y - c.r) : c.y + c.r > h - 3 ? (h - 3) - (c.y + c.r) : 0;
-        for (const [bid, k] of ks) if (k.g === g && bid !== gezogen) { k.vx += (c.x - k.x) * 0.012 + rx * 0.05; k.vy += (c.y - k.y) * 0.012 + ry * 0.05; }
+        const rxf = Math.max(-50, Math.min(50, rx)) * 0.05 * f; const ryf = Math.max(-50, Math.min(50, ry)) * 0.05 * f;   // M543: ebenso begrenzt
+        for (const [bid, k] of ks) if (k.g === g && bid !== gezogen) { k.vx += (c.x - k.x) * 0.012 + rxf; k.vy += (c.y - k.y) * 0.012 + ryf; }
       }
       for (const [bid, k] of ks) {
         if (k.g || bid === gezogen) continue;
         // Freie Blasen gehören in ihr eigenes Feld: aus den Feldern der Gruppen hinaus — und dabei nicht nur von
         // deren Mitte weg, sondern auch auf das eigene Feld zu (sonst bliebe eine zwischen zwei Gruppen stecken)
         const a = anker(null); const ax = a.x - k.x; const ay = a.y - k.y; const an = Math.hypot(ax, ay) || 1;
-        for (const { s: c } of sch) {
+        for (const { s: c, f } of sch) {
           const dx = k.x - c.x; const dy = k.y - c.y; const dist = Math.hypot(dx, dy) || 1;
-          const tiefe = c.r + k.r + (tropfenRef.current ? 22 : 4) - dist;
-          if (tiefe > 0) { k.vx += (dx / dist) * tiefe * 0.05 + (ax / an) * Math.min(tiefe, 40) * 0.05; k.vy += (dy / dist) * tiefe * 0.05 + (ay / an) * Math.min(tiefe, 40) * 0.05; }
+          const tiefe = (c.r + k.r + (tropfenRef.current ? 22 : 4) - dist) * f;
+          if (tiefe > 0) { const tf = Math.min(tiefe, 60); k.vx += (dx / dist) * tf * 0.05 + (ax / an) * Math.min(tiefe, 40) * 0.05; k.vy += (dy / dist) * tf * 0.05 + (ay / an) * Math.min(tiefe, 40) * 0.05; }   // M543: begrenzt wie oben
         }
       }
     }
@@ -684,8 +786,11 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
         // M422: Im Tropfen-Look ragt die Form einer Gruppe um TROPFEN_RAND über ihre Ideen hinaus, und oben wächst die
         // Kuppe mit dem Namen heraus. Beides gehört in die Bühne — sonst schnitt deren Kante den Tropfen glatt ab
         // (und der Name wich nach unten aus, mitten in die Nachbargruppe).
-        const rand = tropfenRef.current && k.g ? TROPFEN_RAND + 2 : 0;
-        const kuppe = tropfenRef.current && k.g ? TROPFEN_KUPPE : 0;
+        // M543: so weit, wie der Tropfen-Rand gerade steht (k.rand) — sonst stieß die Wand eine Idee, die eben in eine
+        // Gruppe kam, in einem Bild um Rand und Kuppe (40 Punkte) zurück
+        const anteil = tropfenRef.current && k.g ? k.rand : 0;
+        const rand = (TROPFEN_RAND + 2) * anteil;
+        const kuppe = TROPFEN_KUPPE * anteil;
         const xMin = k.r + 4 + rand; const xMax = Math.max(xMin, w - k.r - 4 - rand);
         const yMin = k.r + 4 + rand + kuppe; const yMax = Math.max(yMin, h - k.r - 4 - rand);
         // weich von der Wand zurück
@@ -728,19 +833,26 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
         let schub = 0; let i = 0;
         for (const k of koerper.current.values()) { const v = vor[i++]; if (v) schub = Math.max(schub, Math.abs(k.x - v[0]), Math.abs(k.y - v[1]), Math.abs(k.r - v[2])); }
         // M429: … und kein Name gleitet noch zu seinem Platz
-        ruhe.current = (e < 0.004 || schub < 0.1) && !zug.current && namenRest.current < 0.3 ? ruhe.current + 1 : 0;
+        ruhe.current = (e < 0.004 || schub < 0.1) && !zug.current && namenRest.current < 0.3 && randRest.current === 0 ? ruhe.current + 1 : 0;
         // M415: … oder über 20 Schritte hinweg hat sich keine Blase um mehr als einen Punkt bewegt. Eine Blase, die
         // gegen ihre Nachbarin drückt, pendelt sonst im Takt weniger Schritte auf der Stelle (Energie hoch, Weg null).
         if (++fe.n % 20 === 0) {
           let netto = 0;
           for (const [kid, k] of koerper.current) { const alt = fe.lage.get(kid); netto = Math.max(netto, alt ? Math.hypot(k.x - alt[0], k.y - alt[1]) : Infinity); fe.lage.set(kid, [k.x, k.y]); }
-          if (fe.n >= 60 && netto < 1 && !zug.current && namenRest.current < 0.3) ruhe.current = 46;
+          if (fe.n >= 60 && netto < 1 && !zug.current && namenRest.current < 0.3 && randRest.current === 0) ruhe.current = 46;
         }
       }
       zeichnen(false, dt);
+      /* M543: Wirbel — die Kräfte klingen nicht ab, die Bühne kommt nicht zur Ruhe, solange die KI rechnet. Liegt die
+         Bühne außerhalb des Bilds, hält er an (kein Rechnen für niemanden); zurück im Bild läuft er weiter (wecken). */
+      if (wirbelAb.current != null) {
+        alter.current = performance.now(); ruhe.current = 0;
+        lauf.current = imBild.current ? requestAnimationFrame(bild) : null;
+        return;
+      }
       // M429: Sind die Kräfte ausgeklungen (fünf Sekunden nach dem letzten Anstoß), steht alles — sofern gerade nichts
       // gezogen wird und kein Name mehr zu seinem Platz gleitet
-      if (performance.now() - alter.current > 5000 && !zug.current && namenRest.current < 0.3) ruhe.current = 46;
+      if (performance.now() - alter.current > 5000 && !zug.current && namenRest.current < 0.3 && randRest.current === 0) ruhe.current = 46;
       if (ruhe.current > 45) { lauf.current = null; return; }   // alles ruht: Schluss mit Rechnen
       lauf.current = requestAnimationFrame(bild);
     };
@@ -749,6 +861,20 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   useEffect(() => () => { if (lauf.current != null) cancelAnimationFrame(lauf.current); }, []);
   // M415: Darstellung gewechselt (oder Liste zu): neue Abstände, und die Scheiben der Tropfen brauchen ihre Lage
   useEffect(() => { wecken(); }, [tropfen, liste, wecken]);
+  /* M543: Wirbel an und aus. Aus heißt: Die Kräfte zu den Feldern greifen wieder, die Blasen fließen aus dem Kreisen
+     zu ihren (neuen) Gruppen — oder bei einem Fehler ruhig an ihren alten Platz. Bei reduzierter Bewegung kein Wirbel. */
+  const wirbelt = kiSichtbar && !liste && !ruhig;
+  useEffect(() => {
+    wirbelAb.current = wirbelt ? performance.now() : null;
+    wecken();
+    if (!wirbelt) return;
+    const el = buehne.current;
+    const io = el && typeof IntersectionObserver === 'function'
+      ? new IntersectionObserver((e) => { imBild.current = e.some((x) => x.isIntersecting); if (imBild.current) wecken(); }, { rootMargin: '120px' })
+      : null;
+    if (el && io) io.observe(el);
+    return () => { io?.disconnect(); imBild.current = true; };
+  }, [wirbelt, wecken]);
 
   /**
    * Radien an den Platz anpassen: Die Blasen sollen die Bühne gut füllen, aber nie überfüllen — zusammen höchstens
@@ -806,8 +932,8 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
       const st = b.ids.map((x) => startHier.current.get(x)).find(Boolean);
       for (const x of b.ids) startHier.current.delete(x);
       koerper.current.set(b.id, st
-        ? { x: st.x, y: st.y, vx: 0, vy: 0, r: zielR * 0.3, ziel: zielR, g: b.gruppe, len, wort, wortText }
-        : { x: w / 2 + Math.cos(winkel) * w * 0.42, y: h / 2 + Math.sin(winkel) * h * 0.42, vx: 0, vy: 0, r: zielR * 0.4, ziel: zielR, g: b.gruppe, len, wort, wortText });
+        ? { x: st.x, y: st.y, vx: 0, vy: 0, r: zielR * 0.3, ziel: zielR, g: b.gruppe, len, wort, wortText, rand: b.gruppe ? 1 : 0 }
+        : { x: w / 2 + Math.cos(winkel) * w * 0.42, y: h / 2 + Math.sin(winkel) * h * 0.42, vx: 0, vy: 0, r: zielR * 0.4, ziel: zielR, g: b.gruppe, len, wort, wortText, rand: b.gruppe ? 1 : 0 });
     });
     felderLegen();
     wecken();
@@ -969,7 +1095,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   };
 
   return (
-    <div className={`bub ${gross ? 'gross' : ''}${tropfen ? ' tropfen' : ''}`} data-ohne-sperre="" data-taste="bubbles" data-phase={phase}>
+    <div className={`bub ${gross ? 'gross' : ''}${tropfen ? ' tropfen' : ''}${wirbelt ? ' wirbelt' : ''}`} data-ohne-sperre="" data-taste="bubbles" data-phase={phase}>
       <div className="bub-frage">
         <input
           className="bub-frage-feld nodrag" value={d.frage ?? ''} disabled={fest} placeholder="Worum geht es? Frage hier eintragen …" translate="no"
@@ -1097,6 +1223,12 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
             style={{ color: BUBBLE_FARBEN[g.farbe % BUBBLE_FARBEN.length], ['--g' as string]: BUBBLE_FARBEN[g.farbe % BUBBLE_FARBEN.length], ...(tropfen ? { fontSize: `${Math.min(19, 12.5 + blasen.filter((b) => b.gruppe === gid).length * 0.9).toFixed(1)}px` } : {}) }} data-taste="bub-ring-name" data-gruppe={gid}
             title="Ziehen verschiebt die Gruppe · Tippen: umbenennen, auflösen" onPointerDown={(e) => gruppeZiehen(e, gid)}>{g.name}</span>
         ))}
+        {/* M543: zeigt einen Zustand (wie „Mitmachen läuft") — auch außerhalb des Fokus und bei reduzierter Bewegung */}
+        {kiSichtbar && (
+          <div className="bub-ki-hinweis" role="status" data-taste="bub-ki-hinweis">
+            <IWand size={13} aria-hidden="true" />KI gruppiert …
+          </div>
+        )}
         {hier && (
           <input className="bub-hier" autoFocus maxLength={140} translate="no" data-taste="bub-hier" enterKeyHint="done"
             placeholder={hier.g && d.gruppen[hier.g] ? `Idee für „${d.gruppen[hier.g].name}“ …` : 'Neue Idee …'}
@@ -1113,7 +1245,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
               : 'Unten eintragen und Enter drücken. Gleiche Ideen verschmelzen und wachsen – in einem gemeinsamen Board können alle gleichzeitig beitragen.'}</span>
           </div>
         )}
-        {!fest && phase === 'aus' && blasen.length > 0 && !gewaehlt && !gGewaehlt && !fallen && (
+        {!fest && !kiSichtbar && phase === 'aus' && blasen.length > 0 && !gewaehlt && !gGewaehlt && !fallen && (
           <button className="bub-gruppe-neu" data-taste="bub-gruppe-neu" title="Leere Gruppe anlegen – Ideen hineinziehen"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={() => { const gid = gruppeAnlegen(`Gruppe ${gruppen.length + 1}`); if (gid) { setGWahl(gid); setWahl(null); } }}>＋ Gruppe</button>
