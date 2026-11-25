@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useBoard } from '../store';
+import { useImZugFest } from '../lib/imZugFest';
 import { useRandZiehen } from '../lib/randZiehen';
 import { useOutsideClose } from '../lib/useOutsideClose';
 import { useEscSchliesst } from '../lib/useEscSchliesst';
@@ -36,7 +37,7 @@ import { zahlWort } from '../lib/sprache';
  * nur noch in der Übersicht.
  */
 export function Tabs() {
-  const boards = useBoard((s) => s.boards);
+  const boards = useImZugFest((s) => s.boards);   // M525: im Zug festgehalten (die Reiter zeigen keine Karten-Lage)
   const spaces = useBoard((s) => s.spaces);
   const activeId = useBoard((s) => s.activeId);
   const view = useBoard((s) => s.view);
