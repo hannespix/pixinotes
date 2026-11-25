@@ -625,7 +625,7 @@ export default function App() {
   useEffect(() => {
     const warn = () =>
       // M532: Bilder liegen inzwischen im Datei-Speicher — voll wird es nur noch durch viel Text; der Ausweg steht dabei
-      showToast('Speicher voll – Änderungen werden gerade nicht gesichert. Bitte unter Einstellungen → Daten „Alles sichern“ wählen und danach nicht mehr gebrauchte Boards löschen.');
+      showToast('Speicher voll – Änderungen werden nicht gesichert. Bitte unter Einstellungen → Daten „Alles sichern“.');
     window.addEventListener('pixinotes:quota', warn);
     return () => window.removeEventListener('pixinotes:quota', warn);
   }, [showToast]);

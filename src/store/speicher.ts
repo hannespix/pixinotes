@@ -181,9 +181,9 @@ export const speicherVoll = (): boolean => letzterFehler === 'voll';
  * (Vorher hieß es immer „Browser-Speicher voll?", auch wenn der Grund ein anderer war.)
  */
 export function speicherFehlerText(): string {
-  if (letzterFehler === 'voll') return t('Der Stand aus dem Konto konnte nicht gespeichert werden: Der Browser-Speicher ist voll. Bitte dieses Fenster offen lassen, unter Einstellungen → Daten „Alles sichern“ wählen und danach große Bilder oder nicht mehr gebrauchte Boards löschen.');
-  if (letzterFehler === 'anderer') return t('Der Stand aus dem Konto konnte nicht gespeichert werden: Der Browser lässt gerade nicht in seinen Speicher schreiben (privates Fenster oder gesperrter Speicher?).');
-  return t('Der Stand aus dem Konto konnte nicht eingearbeitet werden. Der Abgleich versucht es gleich noch einmal.');
+  if (letzterFehler === 'voll') return t('Konto-Stand nicht gespeichert: Browser-Speicher voll. Bitte unter Einstellungen → Daten „Alles sichern“.');
+  if (letzterFehler === 'anderer') return t('Konto-Stand nicht gespeichert: Der Browser lässt gerade nicht in seinen Speicher schreiben.');
+  return t('Konto-Stand konnte nicht eingearbeitet werden – der Abgleich versucht es gleich noch einmal.');
 }
 /** Meldung des Prüfbetriebs (kein Oberflächentext — Nutzer sehen sie nie) */
 const ABWEICHUNG = 'M525: gemerkter Speichertext weicht vom Stand ab';
@@ -276,7 +276,7 @@ function nachDemLaden(roh: string): void {
     bereit = import('./ablageIdb').then(async ({ inhalteLaden, verweiseEinsetzen }) => {
       const inhalte = await inhalteLaden(verweise);
       if (inhalte.size === 0) return;
-      for (const v of inhalte.keys()) alsGesichertMerken(v);
+      for (const [v, x] of inhalte) alsGesichertMerken(v, x);
       const s = useBoard.getState();
       const teil: Record<string, unknown> = {};
       for (const [k, alt] of Object.entries(inhaltsFelder(s))) {
@@ -317,7 +317,7 @@ export function adoptPersistedState(): boolean {
     if (!verweise.size) { uebernehmen(st.boards); return true; }
     void import('./ablageIdb').then(async ({ inhalteLaden, verweiseEinsetzen }) => {
       const inhalte = await inhalteLaden(verweise);
-      for (const v of inhalte.keys()) alsGesichertMerken(v);
+      for (const [v, x] of inhalte) alsGesichertMerken(v, x);
       uebernehmen(verweiseEinsetzen(st.boards!, inhalte));
     }).catch(() => uebernehmen(st.boards!));
     return true;

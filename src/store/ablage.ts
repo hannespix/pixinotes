@@ -44,7 +44,7 @@ const verweise = new Map<string, string>();
 export function verweisVon(daten: string): string {
   let v = verweise.get(daten);
   if (v === undefined) {
-    if (verweise.size > 400) verweise.clear();
+    if (verweise.size > 2000) verweise.clear();
     v = `${PRAEFIX}${streu(daten, 1).toString(36)}-${streu(daten, 7).toString(36)}-${daten.length}`;
     verweise.set(daten, v);
   }
@@ -59,7 +59,11 @@ let geplant = false;
 /** Meldet der Speicherschicht: Es liegt Neues sicher in der Ablage — den Stand jetzt mit Verweisen schreiben */
 let nachSichern: () => void = () => {};
 export const beimSichern = (fn: () => void): void => { nachSichern = fn; };
-export const alsGesichertMerken = (v: string): void => { gesichert.add(v); };
+/** Aus der Ablage geladen: Der Inhalt liegt sicher, und sein Verweis ist bekannt (kein erneutes Durchrechnen) */
+export const alsGesichertMerken = (v: string, daten?: string): void => {
+  gesichert.add(v);
+  if (daten !== undefined && verweise.size < 2000) verweise.set(daten, v);
+};
 /** Zähler für Prüfreihen und Fehlersuche */
 export const ablageZaehler = { gesichert: 0, fehler: 0, geladen: 0, fehlt: 0 };
 

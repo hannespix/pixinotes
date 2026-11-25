@@ -3855,7 +3855,7 @@
 "Schriftart und Textgröße dieser Karte zurück auf Standard":"Reset font and text size of this card to default",
 "Schriftart und Textgröße dieser Karten zurück auf Standard":"Reset font and text size of these cards to default",
 "{0} · in {1} T.":"{0} · in {1} d",
-"Speicher voll – Änderungen werden gerade nicht gesichert. Bitte unter Einstellungen → Daten „Alles sichern“ wählen und danach nicht mehr gebrauchte Boards löschen.":"Storage full – changes are currently not being saved. Please choose “Back up everything” under Settings → Data, then delete boards you no longer need.",
-"Der Stand aus dem Konto konnte nicht gespeichert werden: Der Browser-Speicher ist voll. Bitte dieses Fenster offen lassen, unter Einstellungen → Daten „Alles sichern“ wählen und danach große Bilder oder nicht mehr gebrauchte Boards löschen.":"The version from the account couldn’t be saved: the browser storage is full. Please keep this window open, choose “Back up everything” under Settings → Data, then delete large images or boards you no longer need.",
-"Der Stand aus dem Konto konnte nicht gespeichert werden: Der Browser lässt gerade nicht in seinen Speicher schreiben (privates Fenster oder gesperrter Speicher?).":"The version from the account couldn’t be saved: the browser doesn’t allow writing to its storage right now (private window or blocked storage?).",
-"Der Stand aus dem Konto konnte nicht eingearbeitet werden. Der Abgleich versucht es gleich noch einmal.":"The version from the account couldn’t be merged in. Sync will try again shortly."}
+"Speicher voll – Änderungen werden nicht gesichert. Bitte unter Einstellungen → Daten „Alles sichern“.":"Storage full – changes are not being saved. Please use “Back up everything” under Settings → Data.",
+"Konto-Stand nicht gespeichert: Browser-Speicher voll. Bitte unter Einstellungen → Daten „Alles sichern“.":"Account version not saved: browser storage full. Please use “Back up everything” under Settings → Data.",
+"Konto-Stand nicht gespeichert: Der Browser lässt gerade nicht in seinen Speicher schreiben.":"Account version not saved: the browser doesn’t allow writing to its storage right now.",
+"Konto-Stand konnte nicht eingearbeitet werden – der Abgleich versucht es gleich noch einmal.":"Couldn’t merge in the account version – sync will try again shortly."}
