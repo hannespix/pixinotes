@@ -64,7 +64,40 @@ Texterkennung in Bildern läuft je Bild einmal im Hintergrund-Thread und ist nac
   Änderung dieses Meilensteins.
 
 ## Vorher / nachher
-TABELLE
+Alter und neuer Build im Wechsel auf derselben Maschine, je drei Runden, Median; je Messung 30 Mausbewegungen Ziehen.
+Zähler (oben in jeder Gruppe) sind lastunabhängig, Millisekunden nur im Vergleich zu lesen.
+
+| Board | Messgröße | vorher | nachher |
+|---|---|---|---|
+| Gemeldetes Board (0,66 Mio. Zeichen), Kanban ziehen | JSON je Zug | 22,6 Mio. Zeichen | 0,7 Mio. |
+| | Layout-Rechnungen | 43 | 25 |
+| | Renders der Karten (äußere Hülle) | 34 | 4 |
+| — mit Flüssiger Schrift im Bild | JS-Zeit / Haupt-Thread | 8 590 / 9 970 ms | 2 530 / 4 160 ms |
+| | lange Aufgaben (> 50 ms) | 98, zusammen 8,9 s | 29, zusammen 2,1 s |
+| — ohne Flüssige Schrift | JS-Zeit / Haupt-Thread | 400 / 1 990 ms | 262 / 1 800 ms |
+| Nachbau 3,9 Mio. Zeichen (35 Karten, große Bilder), Kanban ziehen | JSON je Zug | 133,9 Mio. Zeichen | 0,02 Mio. |
+| | Layout-Rechnungen | 64 | 40 |
+| | JS-Zeit / Haupt-Thread | 910 / 3 110 ms | 499 / 2 550 ms |
+| | lange Aufgaben | 17, zusammen 1 190 ms | 3, zusammen 194 ms |
+| — Notiz ziehen | JSON je Zug | 129,9 Mio. Zeichen | 0,02 Mio. |
+| | JS-Zeit / lange Aufgaben | 791 ms / 8 (589 ms) | 488 ms / 4 (231 ms) |
+| Board der Prüfreihe (Gestalt des gemeldeten, Kanban mit 60 Tickets) | Komponenten je Mausbewegung | 560 | 39 |
+| | Renders in der gezogenen Karte, 20 Bewegungen | 9 220 | 0 |
+| | Renders im anderen Kanban | 940 | 0 |
+| | Board-Schreibvorgänge bei „Einstellungen auf/zu" | 2 | 0 |
+| | Rechenschritte der Flüssigen Schrift während eines Zugs | 73 | 0 |
+| 300 gemischte Karten (1,03 Mio. Zeichen), zwei Runden | JSON je Zug | 35,6 Mio. Zeichen | 0,6 Mio. |
+| | JS-Zeit, Kanban / Notiz ziehen | 6,4 s / 10,1 s | 3,7 s / 5,0 s |
+| | Haupt-Thread, Kanban / Notiz ziehen | 28,9 s / 24,6 s | 23,4 s / 19,2 s |
+
+Die Zeilen zum 300-Karten-Board fallen in die Zeit kurz nach dem Öffnen, in der der Browser noch Diagramme aufbaut
+(siehe „Grenzen", erster Punkt) — sie zeigen, dass ein solches Board hier weiter zäh ist.
+
+Einordnung: Auf dem gemeldeten Board selbst ist der Stand klein (0,66 Mio. Zeichen) — dort bringen Speichern und
+Renders rund ein Drittel weniger JavaScript beim Ziehen, der Haupt-Thread bleibt zu neun Zehnteln beim Zeichnen des
+Browsers (animierte Bilder, Striche, Karten). Der große Sprung in der Zeile „mit Flüssiger Schrift" kommt vom
+Anhalten der Flüssigkeit im Zug und ist auf dieser Maschine überzeichnet (Software-Grafik). Je größer der Stand
+(eingebettete Bilder, lange Notizen) und je schwerer die Karten (lange Kanbans), desto größer der Gewinn aus 1 und 2.
 
 ## Wie (Architektur)
 - **`store/speicher.ts`** — `speicherAblage.setItem(name, { state, version })` bekommt das Objekt von zustand
@@ -83,8 +116,8 @@ TABELLE
   Prüfbetrieb: `localStorage['pixinotes-speicher-pruefen'] = '1'` (oder ein Build mit `VITE_SPEICHER_PRUEFEN=1`)
   vergleicht bei **jedem** Schreiben mit `JSON.stringify` und zählt in `window.pixinotesSpeicher.abweichungen`
   (dazu `vorgemerkt`, `uebersprungen`, `geschrieben`); `VITE_SPEICHER_PRUEFEN=2` lässt die Seite bei einer
-  Abweichung sichtbar scheitern — damit lief vor dem Merge eine breite Auswahl bestehender Prüfreihen (0
-  Abweichungen). Die Prüfreihe m525 läuft im Prüfbetrieb (S9).
+  Abweichung sichtbar scheitern — damit lief vor dem Merge eine breite Auswahl bestehender Prüfreihen (47 Reihen quer durch
+  Karten, Board, Abgleich und Gruppenarbeit: 0 Abweichungen). Die Prüfreihe m525 läuft im Prüfbetrieb (S9).
 - **`components/Board.tsx`** — `guard(C, mitLage)`: `memo(Guarded, ohneLageGleich)` vergleicht alle Props außer
   `positionAbsoluteX/Y`. `AuswahlLeiste` ist `memo` (das Board zeichnet beim Ziehen je Mausbewegung neu).
 - **`lib/imZugFest.ts`** — `useImZugFest(wahl, schluessel?)`: Auswahl aus dem Store, die während `zugLaeuft()` den
@@ -116,6 +149,14 @@ verschiebt eine Karte:
   rund 1 ms je Mausbewegung).
 
 ## Grenzen / offen
+- **Großes Board, viele Diagramme: das Öffnen.** Im Trace des 300-Karten-Boards (neun Mermaid-Karten, rund 27 000
+  Elemente im Dokument) erzwingt der Aufbau der Diagramme 180 Stil-Rechnungen über das **ganze** Dokument (je rund
+  160 ms, zusammen 28,8 s Thread-Zeit; Aufrufer `insertEdge`/`paintLayoutData` in Mermaid: einhängen, messen,
+  einhängen …), und das Einordnen der Ebenen (Layerize) kostet in dieser Phase je Bild rund 150 ms. Das ist
+  derselbe Mechanismus wie in M491 (jedes ins Dokument gehängte Element macht über die `:has()`-Regeln den Stil des
+  ganzen Baums ungültig) — hier beim Zeichnen der Diagramme statt bei den Fanglinien. Abhilfe wäre, Diagramme
+  außerhalb des Board-Dokuments zu zeichnen (eigener Rahmen oder Schattenbaum) und fertig einzusetzen; nicht in
+  diesem Meilenstein (MermaidCard gehört gerade M519). **Größter offener Brocken für Boards mit Hunderten Karten.**
 - **Animierte Bilder** (SVG mit CSS-Animation) rechnen in jedem Bild, solange sie zu sehen sind; von außen lässt
   sich ein `<img>` nicht anhalten. Möglich wäre: beim Ziehen/Zoomen ein Standbild zeigen oder Animationen nur an der
   gewählten Karte laufen lassen — beides ändert das Aussehen und braucht eine Entscheidung.

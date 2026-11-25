@@ -297,10 +297,20 @@ if (NUR.includes('F')) {
     const s0 = (await fl()).schritte ?? (await fl()).takte; await P.waitForTimeout(1500);
     const s1 = (await fl()).schritte ?? (await fl()).takte;
     pruefe('F1 unberührt rechnet die lebendige Flüssigkeit weiter (sichtbar im Bild)', s1 > s0 + 3, { s0, s1 });
-    const r = await ziehen(P, 'k2', 25, { pause: 40, dabei: async () => { const f = await fl(); return { schritte: f.schritte ?? f.takte, takte: f.takte }; } });
+    // Der Zug zählt nur, wenn die Flüssigkeit währenddessen rechnen WOLLTE (Takte laufen) — sie kann sich zwischendurch
+    // schlafen legen (Qualitätsregler tastet neu ab); dann wecken und noch einmal ziehen.
+    const wecken = async () => { for (let i = 0; i <= 10; i += 1) { await P.mouse.move(rf.x + rf.w * (0.2 + 0.06 * i), rf.y + rf.h / 2); await P.waitForTimeout(30); } const f = await freierPunkt(P); await P.mouse.move(f.x, f.y); await P.waitForTimeout(400); };
+    let r = null;
+    for (let versuch = 0; versuch < 4; versuch += 1) {
+      r = await ziehen(P, 'k2', 25, { pause: 40, dx: versuch % 2 ? -3 : 3, dabei: async () => { const f = await fl(); return { schritte: f.schritte ?? f.takte, takte: f.takte }; } });
+      if (r.nach.takte - r.vor.takte > 5) break;
+      await wecken();
+    }
     console.log(`  (während des Zugs: ${r.nach.schritte - r.vor.schritte} Rechenschritte in ${r.nach.takte - r.vor.takte} Takten)`);
-    pruefe('F2 während eine Karte gezogen wird, rechnet sie nicht (vorher: jedes Bild)', r.nach.schritte - r.vor.schritte <= 1, { schritte: r.nach.schritte - r.vor.schritte, takte: r.nach.takte - r.vor.takte });
+    pruefe('F2 während eine Karte gezogen wird, rechnet sie nicht, obwohl sie laufen will (vorher: jedes Bild)', r.nach.takte - r.vor.takte > 5 && r.nach.schritte - r.vor.schritte <= 1, { schritte: r.nach.schritte - r.vor.schritte, takte: r.nach.takte - r.vor.takte });
+    // nach dem Ablegen ist sie nicht eingefroren: ein Zeiger über der Schrift bewegt sie wieder
     const s2 = (await fl()).schritte ?? 0;
+    await wecken();
     const weiter = await warteBis(P, async () => ((await fl()).schritte ?? 0) > s2 + 5, 8000);
     pruefe('F3 nach dem Ablegen fließt sie weiter', weiter);
     // aus dem Bild schwenken: nichts rechnet mehr
