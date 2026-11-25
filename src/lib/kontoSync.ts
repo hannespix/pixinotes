@@ -15,7 +15,9 @@
 //   Mini-Abruf (eTag / Version von umgebung.json); erst eine Änderung lädt.
 import { boardVonAussen } from './sicher';
 import './sicherGestalt';   // M522: hängt die Gestalt-Prüfung in lib/sicher.ts ein
-import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, speicherFehlerText, useBoard, type BoardDoc, type Space } from '../store';
+import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc, type Space } from '../store';
+import { speicherFehlerArt } from '../store/speicher';
+import { t } from './sprache';
 import {
   alsBase64, anhangKarte, base64AlsBlob, basisLesen, basisMerken, basisVergessen, buildSyncPayloadMitDateien, DATEI_BUDGET_MB,
   emitSyncStatus, fremdStandEinarbeiten, idbDel, idbGet, idbHat, idbSet, KONTO_DIRTY_KEY, merkeUngesichert, notiereAenderung, SYNC_DIRTY_KEY,
@@ -1058,6 +1060,17 @@ export async function kontoWrite(): Promise<string> {
   window.dispatchEvent(new CustomEvent('pixinotes:konto-geschrieben'));
   return r;
 }
+/**
+ * M532: Die Meldung, wenn ein Abgleich seinen Stand nicht speichern konnte — „voll" mit Ausweg, sonst ohne Raten.
+ * (Vorher hieß es immer „Browser-Speicher voll?", auch wenn der Grund ein anderer war.)
+ */
+function speicherFehlerText(): string {
+  const art = speicherFehlerArt();
+  if (art === 'voll') return t('Konto-Stand nicht gespeichert: Browser-Speicher voll. Bitte unter Einstellungen → Daten „Alles sichern“.');
+  if (art === 'anderer') return t('Konto-Stand nicht gespeichert: Der Browser lässt gerade nicht in seinen Speicher schreiben.');
+  return t('Konto-Stand konnte nicht eingearbeitet werden – der Abgleich versucht es gleich noch einmal.');
+}
+
 async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<string> {
   const lw = laufwerk();
   const vorab = await kennLesen();

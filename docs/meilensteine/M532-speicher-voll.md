@@ -13,8 +13,10 @@ Neuladen ist alles seit dem letzten gelungenen Speichern weg. Der Abgleich brich
 Nachgestellt (Prüfreihe gegen den Build vor M532, localStorage-Attrappe mit kleiner Grenze): A9 „nach dem Neuladen
 fehlen die zuletzt eingefügten Bilder" (9 statt 11), C2 genau die gemeldete Meldung „Abgebrochen: Der Stand aus dem
 Konto konnte nicht gespeichert werden (Browser-Speicher voll?)", B1 „von drei eingelesenen Boards steht eins im
-Speicher". Mit dem echten Board des Besitzers (nur lokal, nicht im Repository) mehrfach eingelesen ergab sich in
-Chromium dasselbe Bild.
+Speicher". Mit dem Export des gemeldeten Boards (nur lokal, nicht im Repository; acht SVG-Bilder, zusammen
+0,64 Mio. Zeichen) neunmal eingelesen, mit der echten Grenze von Chromium: vorher standen nach dem Neuladen 7 von 9
+Boards da (Stand 4,66 Mio. Zeichen, Hinweis „Speicher voll"), mit M532 alle 9 mit allen 72 Bildern (Stand
+0,26 Mio. Zeichen, kein Hinweis).
 
 ## Was der Nutzer merkt
 - Bilder (und jede andere große eingebettete `data:`-URL ab 10 000 Zeichen, auch Bilder in Notizen und kleine

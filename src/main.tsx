@@ -23,7 +23,8 @@ import { initKopfmass } from './lib/kopfmass';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { initUebersetzung } from './lib/uebersetzung';
 import { initSprache, sprache } from './lib/sprache';
-import { alteNamenOhneEmoji, standBereit, startNamenAufEnglisch } from './store';
+import { alteNamenOhneEmoji, startNamenAufEnglisch } from './store';
+import { standBereit } from './store/speicher';
 import { fensterFokusStarten } from './lib/fensterFokus';
 import { appInstallierenStarten } from './lib/appInstallieren';
 

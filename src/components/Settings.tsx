@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { sprache, spracheSetzen, zahlWort } from '../lib/sprache';
 import { brainStatus, rebuildBrainIndex, syncBrainIndex } from '../lib/brain';
-import { ablageVorab, useBoard } from '../store';
+import { useBoard } from '../store';
+import { ablageVorab } from '../store/ablage';
 import { fensterDarueber } from '../lib/overlay';
 import { eigenerLook, eigenerLookSetzen, lookAusRoh, lookRohVon, lookWort } from '../lib/boardLook';
 import {

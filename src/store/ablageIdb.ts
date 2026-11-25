@@ -5,7 +5,7 @@
  * bewusst ohne lib/syncFolder, damit die Speicherschicht nicht am ganzen Abgleich hängt. Datenbankname, Version und
  * Tabelle müssen mit lib/syncFolder.ts übereinstimmen.
  */
-import { VERWEIS_MUSTER, ablageZaehler } from './ablage';
+import { A, AUSLAGERN_AB, VERWEIS_MUSTER, ablageErsetzer, abarbeiten as planeLauf, planen } from './ablage';
 
 let offen: Promise<IDBDatabase> | null = null;
 function db(): Promise<IDBDatabase> {
@@ -53,7 +53,7 @@ export async function inhalteLaden(verweise: Iterable<string>): Promise<Map<stri
       const req = kv.get(v);
       req.onsuccess = () => {
         const x = req.result as unknown;
-        if (typeof x === 'string' && x.startsWith('data:')) { aus.set(v, x); ablageZaehler.geladen += 1; } else ablageZaehler.fehlt += 1;
+        if (typeof x === 'string' && x.startsWith('data:')) { aus.set(v, x); A.zaehler.geladen += 1; } else A.zaehler.fehlt += 1;
       };
     }
     tx.oncomplete = () => resolve();
@@ -87,4 +87,48 @@ export function verweiseEinsetzen<T>(wert: T, inhalte: Map<string, string>): T {
     return v;
   };
   return tausch(wert) as T;
+}
+
+let dauerhaftGefragt = false;
+/** Alles Offene sichern, eins nach dem anderen (ein großer Schub würde die IndexedDB für Sekunden belegen). Läuft als A.lauf. */
+export async function abarbeiten(): Promise<void> {
+  let neu = 0;
+  try {
+    for (;;) {
+      const naechster = A.offen.entries().next();
+      if (naechster.done) break;
+      const [r, daten] = naechster.value;
+      A.offen.delete(r);
+      if (A.gesichert.has(r)) continue;
+      if (await inhaltSichern(r, daten)) { A.gesichert.add(r); neu += 1; A.zaehler.gesichert += 1; } else A.zaehler.fehler += 1;
+    }
+  } catch {
+    // keine IndexedDB (privates Fenster, gesperrt): die data-URLs bleiben im Text — wie bisher
+    A.zaehler.fehler += 1;
+    A.offen.clear();
+  } finally {
+    A.lauf = null;
+    if (A.offen.size) planen();   // kam während des Laufs noch etwas dazu
+  }
+  if (neu > 0) {
+    // Den Browser bitten, die Ablage nicht bei Platzmangel zu räumen (einmal; er entscheidet selbst)
+    if (!dauerhaftGefragt) { dauerhaftGefragt = true; void navigator.storage?.persist?.().catch(() => false); }
+    A.nachSichern();
+  }
+}
+
+/** Alle großen data-URLs in einem Wert zum Sichern vormerken (ohne Text zu bauen) */
+export function vormerken(wert: unknown): void {
+  const gehe = (v: unknown): void => {
+    if (typeof v === 'string') { if (v.length >= AUSLAGERN_AB) ablageErsetzer('', v); return; }
+    if (Array.isArray(v)) { for (const x of v) gehe(x); return; }
+    if (v && typeof v === 'object') for (const k of Object.keys(v)) gehe((v as Record<string, unknown>)[k]);
+  };
+  gehe(wert);
+}
+
+/** Vormerken und warten, bis alles gesichert ist (siehe ablage.ts → ablageVorab) */
+export async function vorab(wert: unknown): Promise<void> {
+  vormerken(wert);
+  for (let i = 0; i < 50 && (A.offen.size || A.lauf); i++) await (A.lauf ?? planeLauf());
 }

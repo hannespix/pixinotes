@@ -11,9 +11,7 @@ import type { BoardDoc, Space, BoardState } from './typen';
 import { persistHaken } from './schutz';
 import { defaultHierarchy } from './start';
 import { useBoard } from '../store';
-import { t } from '../lib/sprache';
-import { ablageErsetzer, alsGesichertMerken, AUSLAGERN_AB, beimSichern, VERWEIS_IM_TEXT, vormerken } from './ablage';
-export { ablageVorab } from './ablage';
+import { ablageErsetzer, alsGesichertMerken, AUSLAGERN_AB, beimSichern, VERWEIS_IM_TEXT } from './ablage';
 
 /**
  * K1+M5-Schutz: localStorage-Writes werden gedrosselt (max. alle 400 ms statt
@@ -175,16 +173,8 @@ export function flushPersist(gruendlich?: boolean): boolean {
 }
 /** M532: Warum das letzte Schreiben scheiterte (null = es gelang) */
 let letzterFehler: 'voll' | 'anderer' | null = null;
-export const speicherVoll = (): boolean => letzterFehler === 'voll';
-/**
- * M532: Die Meldung, wenn ein Abgleich seinen Stand nicht speichern konnte — „voll" mit Ausweg, sonst ohne Raten.
- * (Vorher hieß es immer „Browser-Speicher voll?", auch wenn der Grund ein anderer war.)
- */
-export function speicherFehlerText(): string {
-  if (letzterFehler === 'voll') return t('Konto-Stand nicht gespeichert: Browser-Speicher voll. Bitte unter Einstellungen → Daten „Alles sichern“.');
-  if (letzterFehler === 'anderer') return t('Konto-Stand nicht gespeichert: Der Browser lässt gerade nicht in seinen Speicher schreiben.');
-  return t('Konto-Stand konnte nicht eingearbeitet werden – der Abgleich versucht es gleich noch einmal.');
-}
+/** M532: Grund des letzten gescheiterten Schreibens — die Meldung dazu baut lib/syncFolder.ts (speicherFehlerText) */
+export const speicherFehlerArt = (): 'voll' | 'anderer' | null => letzterFehler;
 /** Meldung des Prüfbetriebs (kein Oberflächentext — Nutzer sehen sie nie) */
 const ABWEICHUNG = 'M525: gemerkter Speichertext weicht vom Stand ab';
 /** Der zuletzt MIT Gedächtnis geschriebene Stand — beim Verlassen der Seite einmal ohne Gedächtnis gegengeprüft */
@@ -289,7 +279,7 @@ function nachDemLaden(roh: string): void {
   }
   if (mitGrossenDaten(roh)) {
     // alter Stand mit eingebetteten Bildern: im Leerlauf in die Ablage umziehen (ablage.ts sichert einzeln)
-    const umziehen = () => { void bereit.then(() => { vormerken(inhaltsFelder(useBoard.getState())); }); };
+    const umziehen = () => { void bereit.then(() => import('./ablageIdb')).then((m) => m.vormerken(inhaltsFelder(useBoard.getState()))).catch(() => {}); };
     if (typeof requestIdleCallback === 'function') requestIdleCallback(umziehen, { timeout: 4000 }); else setTimeout(umziehen, 1500);
   }
 }

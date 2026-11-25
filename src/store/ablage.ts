@@ -51,88 +51,46 @@ export function verweisVon(daten: string): string {
   return v;
 }
 
-/** Verweise, deren Inhalt auf diesem Gerät nachweislich in der IndexedDB liegt */
-const gesichert = new Set<string>();
-/** Noch zu sichern: Verweis → data-URL */
-const offen = new Map<string, string>();
+/** Gemeinsamer Zustand mit ablageIdb.ts (dort liegt das Sichern selbst — es lädt nach, das Start-Paket bleibt klein) */
+export const A = {
+  /** Verweise, deren Inhalt auf diesem Gerät nachweislich in der IndexedDB liegt */
+  gesichert: new Set<string>(),
+  /** Noch zu sichern: Verweis → data-URL */
+  offen: new Map<string, string>(),
+  lauf: null as Promise<void> | null,
+  /** Meldet der Speicherschicht: Es liegt Neues sicher in der Ablage — den Stand jetzt mit Verweisen schreiben */
+  nachSichern: () => {},
+  /** Zähler für Prüfreihen und Fehlersuche */
+  zaehler: { gesichert: 0, fehler: 0, geladen: 0, fehlt: 0 },
+};
 let geplant = false;
-/** Meldet der Speicherschicht: Es liegt Neues sicher in der Ablage — den Stand jetzt mit Verweisen schreiben */
-let nachSichern: () => void = () => {};
-export const beimSichern = (fn: () => void): void => { nachSichern = fn; };
+export const beimSichern = (fn: () => void): void => { A.nachSichern = fn; };
 /** Aus der Ablage geladen: Der Inhalt liegt sicher, und sein Verweis ist bekannt (kein erneutes Durchrechnen) */
 export const alsGesichertMerken = (v: string, daten?: string): void => {
-  gesichert.add(v);
+  A.gesichert.add(v);
   if (daten !== undefined && verweise.size < 2000) verweise.set(daten, v);
 };
-/** Zähler für Prüfreihen und Fehlersuche */
-export const ablageZaehler = { gesichert: 0, fehler: 0, geladen: 0, fehlt: 0 };
 
 /** Ersetzer für JSON.stringify: große data-URLs werden zu Verweisen — aber nur, wenn ihr Inhalt schon sicher liegt */
 export function ablageErsetzer(_k: string, v: unknown): unknown {
   if (typeof v !== 'string' || v.length < AUSLAGERN_AB || !v.startsWith('data:')) return v;
   const r = verweisVon(v);
-  if (gesichert.has(r)) return r;
-  if (!offen.has(r)) { offen.set(r, v); planen(); }
+  if (A.gesichert.has(r)) return r;
+  if (!A.offen.has(r)) { A.offen.set(r, v); planen(); }
   return v;
 }
 
-let lauf: Promise<void> | null = null;
-let dauerhaftGefragt = false;
-function planen(): void {
-  if (geplant || lauf) return;
+export function planen(): void {
+  if (geplant || A.lauf) return;
   geplant = true;
   // Im Leerlauf: Sichern darf weder den Start noch ein Ziehen bremsen
   const los = () => { geplant = false; void abarbeiten(); };
   if (typeof requestIdleCallback === 'function') requestIdleCallback(los, { timeout: 1500 }); else setTimeout(los, 200);
 }
-
-/** Alles Offene sichern, eins nach dem anderen (ein großer Schub würde die IndexedDB für Sekunden belegen) */
-function abarbeiten(): Promise<void> {
-  lauf ??= (async () => {
-    let neu = 0;
-    try {
-      const { inhaltSichern } = await import('./ablageIdb');
-      for (;;) {
-        const naechster = offen.entries().next();
-        if (naechster.done) break;
-        const [r, daten] = naechster.value;
-        offen.delete(r);
-        if (gesichert.has(r)) continue;
-        if (await inhaltSichern(r, daten)) { gesichert.add(r); neu += 1; ablageZaehler.gesichert += 1; } else ablageZaehler.fehler += 1;
-      }
-    } catch {
-      // keine IndexedDB (privates Fenster, gesperrt): die data-URLs bleiben im Text — wie bisher
-      ablageZaehler.fehler += 1;
-      offen.clear();
-    } finally {
-      lauf = null;
-      if (offen.size) planen();   // kam während des Laufs noch etwas dazu
-    }
-    if (neu > 0) {
-      // Den Browser bitten, die Ablage nicht bei Platzmangel zu räumen (einmal; er entscheidet selbst)
-      if (!dauerhaftGefragt) { dauerhaftGefragt = true; void navigator.storage?.persist?.().catch(() => false); }
-      nachSichern();
-    }
-  })();
-  return lauf;
-}
-
-/** Alle großen data-URLs in einem Wert zum Sichern vormerken (ohne Text zu bauen) */
-export function vormerken(wert: unknown): void {
-  const gehe = (v: unknown): void => {
-    if (typeof v === 'string') { if (v.length >= AUSLAGERN_AB) ablageErsetzer('', v); return; }
-    if (Array.isArray(v)) { for (const x of v) gehe(x); return; }
-    if (v && typeof v === 'object') for (const k of Object.keys(v)) gehe((v as Record<string, unknown>)[k]);
-  };
-  gehe(wert);
-}
-
+/** Alles Offene sichern, eins nach dem anderen (ablageIdb.ts) */
+export const abarbeiten = (): Promise<void> => (A.lauf ??= import('./ablageIdb').then((m) => m.abarbeiten(), () => { A.offen.clear(); A.lauf = null; }));
 /**
  * Einen Stand von außen (Konto, Ordner, WebDAV) VOR dem Übernehmen in die Ablage legen: Dann trägt schon das erste
- * Speichern nach dem Einarbeiten Verweise statt der Bilder — und scheitert nicht am vollen localStorage. (Ohne das
- * käme das Bild erst im Leerlauf in die Ablage; bis dahin wäre der Abgleich mit „Speicher voll" abgebrochen.)
+ * Speichern nach dem Einarbeiten Verweise statt der Bilder — und scheitert nicht am vollen localStorage.
  */
-export async function ablageVorab(wert: unknown): Promise<void> {
-  vormerken(wert);
-  for (let i = 0; i < 50 && (offen.size || lauf); i++) await (lauf ?? abarbeiten());
-}
+export const ablageVorab = (wert: unknown): Promise<void> => import('./ablageIdb').then((m) => m.vorab(wert), () => {});
