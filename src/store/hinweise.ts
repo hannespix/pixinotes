@@ -5,6 +5,7 @@
  */
 import type { BoardState, Setzen, Holen } from './typen';
 import { useBoard } from '../store';
+import { schutzVerworfen } from './schutz';
 
 /** M476: Aktion zum Knopf im Hinweis (Sicherung: „Rückgängig", „Jetzt sichern") — eine Funktion hat im Store-Zustand nichts verloren */
 let hinweisKnopfAktion: (() => void) | null = null;
@@ -46,6 +47,10 @@ export function hinweiseScheibe(set: Setzen, get: Holen) {
       s0.restoreDeleted();
     },
     showToast: (message, undo, durationMs, abbruch) => {
+      // M522: Hat der Schutz (nur lesen, Karte gehalten, Rechte der Gäste) die Änderung dieses Handgriffs verworfen, sagt
+      // der Hinweis das — nicht den Erfolg, den die Karte melden wollte (und kein „Rückgängig" für nichts)
+      const grund = schutzVerworfen();
+      if (grund && message !== grund) { message = grund; undo = undefined; abbruch = undefined; durationMs = 5000; }
       if (toastTimer) clearTimeout(toastTimer);
       hinweisKnopfAktion = null;
       hinweisEintrag = undo && undo !== 'ebene' && !abbruch ? (get().past[get().past.length - 1] ?? null) : null;

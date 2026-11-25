@@ -7,6 +7,7 @@ import type { PartialBlock } from '@blocknote/core';
 import { de as blockNoteDe, en as blockNoteEn } from '@blocknote/core/locales';
 import { sprache, t, zahlWort } from '../../lib/sprache';
 import { mutedHistory, useBoard, useNurLesen } from '../../store';
+import { useKartenAnsicht } from '../../lib/kartenAnsicht';
 import { STICKY_COLORS, uid, type MinutesData, type MinutesEntry, type MinutesNode } from '../../types';
 import {
   anwesenheit, aufgabenStand, currentEntry, entryLabel, fristText, kurzDatum, langDatum,
@@ -107,9 +108,10 @@ function useProtokollLive(schluessel: string | null): ProtokollLive | null {
 }
 
 /** M380: Der Inhalt ohne Kartenhülle — derselbe auf dem Board und als Folie in der Präsentation */
-export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
-  const m = data as MinutesData;
-  const updateNodeData = useBoard((s) => s.updateNodeData);
+/** M520: nur Ansicht (welche Sitzung offen ist) — gilt in einem Board, das man nicht ändern darf, lokal (lib/kartenAnsicht.ts) */
+const PROTOKOLL_ANSICHT = ['current'] as const;
+export function MinutesBody({ id, data: daten }: { id: string; data: MinutesData }) {
+  const [m, updateNodeData] = useKartenAnsicht(id, daten as MinutesData, PROTOKOLL_ANSICHT);
   const showToast = useBoard((s) => s.showToast);
   const nurLesen = useNurLesen();
   const [ansicht, setAnsicht] = useState<Ansicht>('sitzung');
@@ -664,7 +666,8 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
                 value={entry.date}
                 title="Datum der Sitzung"
                 aria-label="Datum der Sitzung"
-                onChange={(e) => patchEntry(entry.id, { date: e.target.value })}
+                // M520: Ein geleertes Datumsfeld ändert nichts — ohne Datum hieß die Sitzung „—" und rutschte ans Ende der Reihe
+                onChange={(e) => { if (e.target.value) patchEntry(entry.id, { date: e.target.value }); }}
               />
               <input
                 type="text"

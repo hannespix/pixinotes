@@ -6,7 +6,7 @@
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc, type Space } from '../store';
 import { berichtAlsSatz, dreiWegeMerge, nurAuswahlAnders, ohneAuswahl, type SyncStand } from './syncMerge';
 import { grabsteineFuer, grabsteineVereinigen } from './grabsteine';
-import { zeitenVonAussen } from './sicher';
+import { standGeprueft } from './sicher';
 
 /** Dateiname im Sync-Ordner — auch der Dateien-App-Weg (M190) schreibt GENAU
  *  diese Datei, damit ein iPad und ein Desktop denselben Nextcloud-Ordner
@@ -223,7 +223,7 @@ export async function readSync(handle: SyncDirHandle): Promise<SyncPayload | nul
     const text = await (await fh.getFile()).text();
     const p = JSON.parse(text) as SyncPayload;
     if (p?.app !== 'pixinotes' || !Array.isArray(p.boards) || p.boards.length === 0 || !Array.isArray(p.spaces)) return null;
-    return p;
+    return await standGeprueft(p);   // M522: Gestalt prüfen — null, wenn kein gültiges Board darin ist
   } catch {
     return null; // Datei existiert (noch) nicht oder ist unlesbar
   }
@@ -519,7 +519,12 @@ const tippt = (): boolean => Date.now() - letzteAenderung < 2500;
  */
 export async function fremdStandEinarbeiten(remote0: SyncPayload, weg: SyncWeg, nebenkopie = false): Promise<EinarbeitenErgebnis> {
   // M470: Zeitpunkte von außen säubern (Karten, Ticket-Spaltenzeit) – gestempelt wird dabei nichts
-  const remote: SyncPayload = Array.isArray(remote0?.boards) ? { ...remote0, boards: zeitenVonAussen(remote0.boards) } : remote0;
+  // M522: … und die Gestalt: Boards ohne Kartenliste, Karten ohne Lage oder mit kaputtem Inhalt (lib/sicherGestalt.ts,
+  // standVonAussen). Vorher brach daran der Abgleich ab (für immer, die Datei bleibt ja liegen) oder die App fiel aus.
+  // Was die Prüfung herausnimmt, gilt nicht als „drüben gelöscht" (sie gibt dem Stand dann eine Grabstein-Liste mit) —
+  // es bleibt hier bestehen, und der nächste Schreibvorgang heilt die Datei.
+  const remote = await standGeprueft(remote0);
+  if (!remote) return 'fehler';
   const basis = await basisLesen(weg.source);
   grabsteineVereinigen(remote.geloescht); // M351: Löschungen reisen über mehrere Geräte weiter
   if (!basis) {

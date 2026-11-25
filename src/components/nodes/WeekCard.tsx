@@ -79,7 +79,9 @@ export function WeekBody({ id, data, selected, folie }: { id: string; data: Week
   const from = axis === 'slots' ? 0 : (typeof data.from === 'number' ? data.from : 480);
   const to = axis === 'slots' ? slots.length * 60 : (typeof data.to === 'number' && data.to > from ? data.to : from + 540);
   const span = to - from;
-  const entries = (data.entries ?? []).filter((e) => e.day < cols.length && e.start < to);
+  // M520: Gezeigt wird, was ins Raster fällt — auch am Anfang. Vorher zählte nur das Ende: Ein Block um 9 Uhr stand
+  // bei einem Raster ab 10 Uhr ÜBER dem Raster, quer über Wochentag und Titel der Karte (siehe auch oben/unten unten).
+  const entries = (data.entries ?? []).filter((e) => e.day < cols.length && e.start < to && e.start + e.dur > from);
 
   useEffect(() => {
     if (!pop) return;
@@ -274,13 +276,16 @@ export function WeekBody({ id, data, selected, folie }: { id: string; data: Week
                     ? [`${en.colorHex}40`, en.colorHex]
                     : ENTRY_COLORS[(en.color ?? 0) % ENTRY_COLORS.length];
                   const schrift = en.colorHex ? blockSchrift(en.colorHex, strong, 0.25) : blockSchrift(bg, strong, 1);
+                  // M520: ragt ein Block über Beginn oder Ende des Rasters, wird er dort abgeschnitten gezeichnet
+                  const oben = Math.max(en.start, from);
+                  const unten = Math.min(en.start + en.dur, to);
                   return (
                     <button
                       key={en.id}
                       className={`week-entry${istHell(schrift) ? ' schrift-hell' : ''}`}
                       style={{
-                        top: `${((en.start - from) / span) * 100}%`,
-                        height: `${(en.dur / span) * 100}%`,
+                        top: `${((oben - from) / span) * 100}%`,
+                        height: `${((unten - oben) / span) * 100}%`,
                         left: `${(l.lane / l.lanes) * 100}%`,
                         width: `${100 / l.lanes}%`,
                         background: bg,

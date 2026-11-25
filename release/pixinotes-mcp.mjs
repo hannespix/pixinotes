@@ -7336,6 +7336,250 @@ var require_dist = __commonJS({
   }
 });
 
+// src/types.ts
+function kanbanCols(data) {
+  return data.cols && data.cols.length >= 2 ? data.cols : [...KANBAN_COLS];
+}
+function doneCol(data) {
+  return kanbanCols(data).length - 1;
+}
+function mitSpalte(it, col, data, now = /* @__PURE__ */ new Date()) {
+  const dc = doneCol(data);
+  if (col >= dc) {
+    return { ...it, col, erledigtAm: it.col >= dc && it.erledigtAm ? it.erledigtAm : now.toISOString() };
+  }
+  if (it.erledigtAm === void 0) return { ...it, col };
+  const { erledigtAm: _weg, ...rest } = it;
+  return { ...rest, col };
+}
+function uid() {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+}
+var STICKY_COLORS, KANBAN_COLS;
+var init_types = __esm({
+  "src/types.ts"() {
+    "use strict";
+    init_define_import_meta_env();
+    STICKY_COLORS = ["yellow", "pink", "mint", "sky", "white"];
+    KANBAN_COLS = ["To Do", "Doing", "Done"];
+  }
+});
+
+// src/lib/sprache.ts
+function schlageNach(kern) {
+  const bekannt = merk.get(kern);
+  if (bekannt !== void 0) return bekannt;
+  let en = exakt.get(kern) ?? null;
+  if (en === null) {
+    for (const m of muster) {
+      const t2 = m.re.exec(kern);
+      if (!t2) continue;
+      en = m.en.replace(/\u0001(\d+)\u0002/g, (_, i) => {
+        const teil = t2[Number(i) + 1] ?? "";
+        if (m.endung.has(Number(i)) && (teil === "" || ENDUNG.test(teil) || EINZAHL.test(teil))) return ENDUNG.test(teil) ? "s" : "";
+        const r = /^(\s*)([\s\S]*?)(\s*)$/.exec(teil);
+        const innen = r ? exakt.get(r[2]) : void 0;
+        return innen !== void 0 && r ? r[1] + innen + r[3] : teil;
+      });
+      break;
+    }
+  }
+  if (en === null && TASTE.test(kern) && /^[^a-zäöü]*([A-ZÄÖÜ][A-Za-zäöü0-9↑↓]*|[^A-Za-zäöü])([+ /,·–-]+([A-ZÄÖÜ][A-Za-zäöü0-9↑↓]*|[^A-Za-zäöü]))*$/.test(kern)) {
+    en = kern.replace(/Strg|Umschalt|Entf|Leertaste|Eingabe|Rücktaste|Pos1|Ende|Bild↑|Bild↓|Einfg|Pfeiltasten|Pfeil/g, (w) => TASTEN[w] ?? w);
+  }
+  if (merk.size > 6e3) merk.clear();
+  merk.set(kern, en);
+  if (en !== null) eigene.add(en);
+  return en;
+}
+function t(text3) {
+  if (aktiv !== "en" || !text3) return text3;
+  const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(text3);
+  if (!m) return text3;
+  const kern = m[2].replace(/\s+/g, " ");
+  if (!HAT_BUCHSTABEN.test(kern)) return text3;
+  const en = schlageNach(kern);
+  if (en === null) {
+    if (!eigene.has(kern) && !nurZahlWorte(kern)) luecken.add(kern);
+    return text3;
+  }
+  return m[1] + en + m[3];
+}
+function nurZahlWorte(kern) {
+  if (!zahlWorte.size) return false;
+  let rest = kern;
+  for (const z2 of zahlWorte) if (rest.includes(z2)) rest = rest.split(z2).join(" ");
+  return rest !== kern && !HAT_BUCHSTABEN.test(rest);
+}
+var aktiv, exakt, ENDUNG, EINZAHL, muster, eigene, merk, luecken, TASTEN, TASTE, HAT_BUCHSTABEN, REGEL_DE, REGEL_EN, zahlWorte;
+var init_sprache = __esm({
+  "src/lib/sprache.ts"() {
+    "use strict";
+    init_define_import_meta_env();
+    aktiv = "de";
+    exakt = /* @__PURE__ */ new Map();
+    ENDUNG = /^(e|en|n|er|ern|s|se|änge|öcke|üsse)$/;
+    EINZAHL = /^(ang|ock|uss)$/;
+    muster = [];
+    eigene = /* @__PURE__ */ new Set();
+    merk = /* @__PURE__ */ new Map();
+    luecken = /* @__PURE__ */ new Set();
+    TASTEN = { Strg: "Ctrl", Umschalt: "Shift", Entf: "Del", Leertaste: "Space", Eingabe: "Enter", R\u00FCcktaste: "Backspace", Pos1: "Home", Ende: "End", "Bild\u2191": "PgUp", "Bild\u2193": "PgDn", Einfg: "Ins", Pfeiltasten: "Arrow keys", Pfeil: "Arrow" };
+    TASTE = /Strg|Umschalt|Entf|Leertaste|Eingabe|Rücktaste|Pos1|Bild[↑↓]|Einfg|Pfeil/;
+    HAT_BUCHSTABEN = /[A-Za-zÄÖÜäöüß]{2}/;
+    REGEL_DE = new Intl.PluralRules("de-DE");
+    REGEL_EN = new Intl.PluralRules("en-GB");
+    zahlWorte = /* @__PURE__ */ new Set();
+  }
+});
+
+// src/lib/abgleichZeiten.ts
+var init_abgleichZeiten = __esm({
+  "src/lib/abgleichZeiten.ts"() {
+    "use strict";
+    init_define_import_meta_env();
+  }
+});
+
+// src/lib/kartenZeit.ts
+function inhaltGeaendert(alt, patch) {
+  for (const [k, v] of Object.entries(patch)) {
+    if (ANSICHT.has(k)) continue;
+    const a = alt[k];
+    if (a === v) continue;
+    if (a && v && typeof a === "object" && typeof v === "object" && JSON.stringify(a) === JSON.stringify(v)) continue;
+    if (a === void 0 && v === void 0) continue;
+    return true;
+  }
+  return false;
+}
+function nachPatch(neu, alt, patch, jetzt = Date.now()) {
+  if (!inhaltGeaendert(alt.data, patch)) return neu;
+  let aus = { ...neu, geaendert: jetzt };
+  if (alt.type === "kanban" && Array.isArray(patch.items)) {
+    const items = spaltenStempeln(alt.data, neu.data, jetzt);
+    if (items) aus = { ...aus, data: { ...aus.data, items } };
+  }
+  return aus;
+}
+function spaltenStempeln(alt, neu, jetzt = Date.now()) {
+  if (!Array.isArray(neu.items)) return null;
+  const vorher = new Map((Array.isArray(alt.items) ? alt.items : []).map((it) => [it.id, it]));
+  const altCols = kanbanCols(alt);
+  const neuCols = kanbanCols(neu);
+  const gleicheSpalten = JSON.stringify(altCols) === JSON.stringify(neuCols);
+  let anders = false;
+  const items = neu.items.map((it) => {
+    const a = vorher.get(it.id);
+    let seit;
+    if (!a) seit = jetzt;
+    else if (a.col !== it.col && (gleicheSpalten || altCols[a.col] !== neuCols[it.col])) seit = jetzt;
+    else seit = a.spalteSeit;
+    if (seit === it.spalteSeit) return it;
+    anders = true;
+    if (seit === void 0) {
+      const { spalteSeit: _w, ...rest } = it;
+      return rest;
+    }
+    return { ...it, spalteSeit: seit };
+  });
+  return anders ? items : null;
+}
+function frisch(n, jetzt = Date.now()) {
+  return { ...n, angelegt: jetzt, geaendert: jetzt };
+}
+var ANSICHT, FRUEHESTENS;
+var init_kartenZeit = __esm({
+  "src/lib/kartenZeit.ts"() {
+    "use strict";
+    init_define_import_meta_env();
+    init_types();
+    init_sprache();
+    init_abgleichZeiten();
+    ANSICHT = /* @__PURE__ */ new Set([
+      "extEpoch",
+      "month",
+      "view",
+      "current",
+      "dayWidth",
+      "filter",
+      "filterAn",
+      "sort",
+      "kompakt",
+      "groupBy",
+      "colW",
+      "rahmen",
+      "color",
+      "hex",
+      "look",
+      "show",
+      "fitOnLoad",
+      "icsEvents",
+      "lokal",
+      "ref",
+      // M463: Merker an der Mail, dass ein Destillat daneben liegt (M451) – die Mail selbst bleibt unverändert
+      "destillat"
+    ]);
+    FRUEHESTENS = Date.UTC(2020, 0, 1);
+  }
+});
+
+// mcp/storeShim.ts
+function standSetzen(z2) {
+  zustand = { ...z2 };
+}
+function standHolen() {
+  return { boards: zustand.boards, spaces: zustand.spaces, activeId: zustand.activeId };
+}
+var zustand, neueId, aendern, aktionen, lesen, useBoard, selectActiveBoard;
+var init_storeShim = __esm({
+  "mcp/storeShim.ts"() {
+    "use strict";
+    init_define_import_meta_env();
+    init_kartenZeit();
+    zustand = { boards: [], spaces: [], activeId: "" };
+    neueId = () => Math.random().toString(36).slice(2, 10);
+    aendern = (fn) => {
+      zustand.boards = zustand.boards.map((b) => b.id === zustand.activeId ? { ...b, ...fn(b) } : b);
+    };
+    aktionen = {
+      addNode: (node2) => aendern((b) => ({ nodes: [...b.nodes, frisch(node2)] })),
+      updateNodeData: (id, data) => aendern((b) => ({
+        nodes: b.nodes.map((n) => n.id === id ? nachPatch({ ...n, data: { ...n.data, ...data } }, n, data) : n)
+      })),
+      addLabeledEdge: (source, target, label, kind = "arrow") => aendern((b) => b.edges.some((e) => e.source === source && e.target === target) ? {} : { edges: [...b.edges, { id: `e-${neueId()}`, source, target, type: "labeled", data: { label, kind } }] }),
+      removeNodes: (ids) => {
+        const weg = new Set(ids);
+        aendern((b) => ({
+          nodes: b.nodes.filter((n) => !weg.has(n.id)),
+          edges: b.edges.filter((e) => !weg.has(e.source) && !weg.has(e.target)),
+          drawings: (b.drawings ?? []).filter((s) => !s.anchor || !weg.has(s.anchor)),
+          comments: (b.comments ?? []).filter((c) => !weg.has(c.nodeId))
+        }));
+      },
+      resizeNode: (id, width, height) => aendern((b) => ({ nodes: b.nodes.map((n) => n.id === id ? { ...n, width, height } : n) })),
+      pushHistory: () => {
+      },
+      showToast: () => {
+      }
+    };
+    lesen = () => ({ ...zustand, ...aktionen });
+    useBoard = Object.assign(
+      (sel) => sel ? sel(lesen()) : lesen(),
+      {
+        getState: lesen,
+        setState: (teil) => {
+          const neu = typeof teil === "function" ? teil(lesen()) : teil;
+          zustand = { ...zustand, ...neu };
+        },
+        subscribe: () => () => {
+        }
+      }
+    );
+    selectActiveBoard = (s) => s.boards.find((b) => b.id === s.activeId) ?? s.boards[0];
+  }
+});
+
 // node_modules/react/cjs/react.production.min.js
 var require_react_production_min = __commonJS({
   "node_modules/react/cjs/react.production.min.js"(exports) {
@@ -9495,6 +9739,29 @@ var require_react = __commonJS({
     } else {
       module.exports = require_react_development();
     }
+  }
+});
+
+// src/lib/boardLook.ts
+var init_boardLook = __esm({
+  "src/lib/boardLook.ts"() {
+    "use strict";
+    init_define_import_meta_env();
+    init_sprache();
+  }
+});
+
+// src/lib/sicher.ts
+function kontaktBild(roh) {
+  if (typeof roh !== "string" || roh.length > 15e5) return null;
+  return /^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$/i.test(roh) ? roh : null;
+}
+var init_sicher = __esm({
+  "src/lib/sicher.ts"() {
+    "use strict";
+    init_define_import_meta_env();
+    init_kartenZeit();
+    init_boardLook();
   }
 });
 
@@ -39134,220 +39401,8 @@ function tagLokal(d = /* @__PURE__ */ new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-// mcp/storeShim.ts
-init_define_import_meta_env();
-
-// src/lib/kartenZeit.ts
-init_define_import_meta_env();
-
-// src/types.ts
-init_define_import_meta_env();
-var STICKY_COLORS = ["yellow", "pink", "mint", "sky", "white"];
-var KANBAN_COLS = ["To Do", "Doing", "Done"];
-function kanbanCols(data) {
-  return data.cols && data.cols.length >= 2 ? data.cols : [...KANBAN_COLS];
-}
-function doneCol(data) {
-  return kanbanCols(data).length - 1;
-}
-function mitSpalte(it, col, data, now = /* @__PURE__ */ new Date()) {
-  const dc = doneCol(data);
-  if (col >= dc) {
-    return { ...it, col, erledigtAm: it.col >= dc && it.erledigtAm ? it.erledigtAm : now.toISOString() };
-  }
-  if (it.erledigtAm === void 0) return { ...it, col };
-  const { erledigtAm: _weg, ...rest } = it;
-  return { ...rest, col };
-}
-function uid() {
-  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
-}
-
-// src/lib/sprache.ts
-init_define_import_meta_env();
-var aktiv = "de";
-var exakt = /* @__PURE__ */ new Map();
-var ENDUNG = /^(e|en|n|er|ern|s|se|änge|öcke|üsse)$/;
-var EINZAHL = /^(ang|ock|uss)$/;
-var muster = [];
-var eigene = /* @__PURE__ */ new Set();
-var merk = /* @__PURE__ */ new Map();
-var luecken = /* @__PURE__ */ new Set();
-var TASTEN = { Strg: "Ctrl", Umschalt: "Shift", Entf: "Del", Leertaste: "Space", Eingabe: "Enter", R\u00FCcktaste: "Backspace", Pos1: "Home", Ende: "End", "Bild\u2191": "PgUp", "Bild\u2193": "PgDn", Einfg: "Ins", Pfeiltasten: "Arrow keys", Pfeil: "Arrow" };
-var TASTE = /Strg|Umschalt|Entf|Leertaste|Eingabe|Rücktaste|Pos1|Bild[↑↓]|Einfg|Pfeil/;
-function schlageNach(kern) {
-  const bekannt = merk.get(kern);
-  if (bekannt !== void 0) return bekannt;
-  let en = exakt.get(kern) ?? null;
-  if (en === null) {
-    for (const m of muster) {
-      const t2 = m.re.exec(kern);
-      if (!t2) continue;
-      en = m.en.replace(/\u0001(\d+)\u0002/g, (_, i) => {
-        const teil = t2[Number(i) + 1] ?? "";
-        if (m.endung.has(Number(i)) && (teil === "" || ENDUNG.test(teil) || EINZAHL.test(teil))) return ENDUNG.test(teil) ? "s" : "";
-        const r = /^(\s*)([\s\S]*?)(\s*)$/.exec(teil);
-        const innen = r ? exakt.get(r[2]) : void 0;
-        return innen !== void 0 && r ? r[1] + innen + r[3] : teil;
-      });
-      break;
-    }
-  }
-  if (en === null && TASTE.test(kern) && /^[^a-zäöü]*([A-ZÄÖÜ][A-Za-zäöü0-9↑↓]*|[^A-Za-zäöü])([+ /,·–-]+([A-ZÄÖÜ][A-Za-zäöü0-9↑↓]*|[^A-Za-zäöü]))*$/.test(kern)) {
-    en = kern.replace(/Strg|Umschalt|Entf|Leertaste|Eingabe|Rücktaste|Pos1|Ende|Bild↑|Bild↓|Einfg|Pfeiltasten|Pfeil/g, (w) => TASTEN[w] ?? w);
-  }
-  if (merk.size > 6e3) merk.clear();
-  merk.set(kern, en);
-  if (en !== null) eigene.add(en);
-  return en;
-}
-var HAT_BUCHSTABEN = /[A-Za-zÄÖÜäöüß]{2}/;
-function t(text3) {
-  if (aktiv !== "en" || !text3) return text3;
-  const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(text3);
-  if (!m) return text3;
-  const kern = m[2].replace(/\s+/g, " ");
-  if (!HAT_BUCHSTABEN.test(kern)) return text3;
-  const en = schlageNach(kern);
-  if (en === null) {
-    if (!eigene.has(kern) && !nurZahlWorte(kern)) luecken.add(kern);
-    return text3;
-  }
-  return m[1] + en + m[3];
-}
-var REGEL_DE = new Intl.PluralRules("de-DE");
-var REGEL_EN = new Intl.PluralRules("en-GB");
-var zahlWorte = /* @__PURE__ */ new Set();
-function nurZahlWorte(kern) {
-  if (!zahlWorte.size) return false;
-  let rest = kern;
-  for (const z2 of zahlWorte) if (rest.includes(z2)) rest = rest.split(z2).join(" ");
-  return rest !== kern && !HAT_BUCHSTABEN.test(rest);
-}
-
-// src/lib/abgleichZeiten.ts
-init_define_import_meta_env();
-
-// src/lib/kartenZeit.ts
-var ANSICHT = /* @__PURE__ */ new Set([
-  "extEpoch",
-  "month",
-  "view",
-  "current",
-  "dayWidth",
-  "filter",
-  "filterAn",
-  "sort",
-  "kompakt",
-  "groupBy",
-  "colW",
-  "rahmen",
-  "color",
-  "hex",
-  "look",
-  "show",
-  "fitOnLoad",
-  "icsEvents",
-  "lokal",
-  "ref",
-  // M463: Merker an der Mail, dass ein Destillat daneben liegt (M451) – die Mail selbst bleibt unverändert
-  "destillat"
-]);
-var FRUEHESTENS = Date.UTC(2020, 0, 1);
-function inhaltGeaendert(alt, patch) {
-  for (const [k, v] of Object.entries(patch)) {
-    if (ANSICHT.has(k)) continue;
-    const a = alt[k];
-    if (a === v) continue;
-    if (a && v && typeof a === "object" && typeof v === "object" && JSON.stringify(a) === JSON.stringify(v)) continue;
-    if (a === void 0 && v === void 0) continue;
-    return true;
-  }
-  return false;
-}
-function nachPatch(neu, alt, patch, jetzt = Date.now()) {
-  if (!inhaltGeaendert(alt.data, patch)) return neu;
-  let aus = { ...neu, geaendert: jetzt };
-  if (alt.type === "kanban" && Array.isArray(patch.items)) {
-    const items = spaltenStempeln(alt.data, neu.data, jetzt);
-    if (items) aus = { ...aus, data: { ...aus.data, items } };
-  }
-  return aus;
-}
-function spaltenStempeln(alt, neu, jetzt = Date.now()) {
-  if (!Array.isArray(neu.items)) return null;
-  const vorher = new Map((Array.isArray(alt.items) ? alt.items : []).map((it) => [it.id, it]));
-  const altCols = kanbanCols(alt);
-  const neuCols = kanbanCols(neu);
-  const gleicheSpalten = JSON.stringify(altCols) === JSON.stringify(neuCols);
-  let anders = false;
-  const items = neu.items.map((it) => {
-    const a = vorher.get(it.id);
-    let seit;
-    if (!a) seit = jetzt;
-    else if (a.col !== it.col && (gleicheSpalten || altCols[a.col] !== neuCols[it.col])) seit = jetzt;
-    else seit = a.spalteSeit;
-    if (seit === it.spalteSeit) return it;
-    anders = true;
-    if (seit === void 0) {
-      const { spalteSeit: _w, ...rest } = it;
-      return rest;
-    }
-    return { ...it, spalteSeit: seit };
-  });
-  return anders ? items : null;
-}
-function frisch(n, jetzt = Date.now()) {
-  return { ...n, angelegt: jetzt, geaendert: jetzt };
-}
-
-// mcp/storeShim.ts
-var zustand = { boards: [], spaces: [], activeId: "" };
-var neueId = () => Math.random().toString(36).slice(2, 10);
-var aendern = (fn) => {
-  zustand.boards = zustand.boards.map((b) => b.id === zustand.activeId ? { ...b, ...fn(b) } : b);
-};
-var aktionen = {
-  addNode: (node2) => aendern((b) => ({ nodes: [...b.nodes, frisch(node2)] })),
-  updateNodeData: (id, data) => aendern((b) => ({
-    nodes: b.nodes.map((n) => n.id === id ? nachPatch({ ...n, data: { ...n.data, ...data } }, n, data) : n)
-  })),
-  addLabeledEdge: (source, target, label, kind = "arrow") => aendern((b) => b.edges.some((e) => e.source === source && e.target === target) ? {} : { edges: [...b.edges, { id: `e-${neueId()}`, source, target, type: "labeled", data: { label, kind } }] }),
-  removeNodes: (ids) => {
-    const weg = new Set(ids);
-    aendern((b) => ({
-      nodes: b.nodes.filter((n) => !weg.has(n.id)),
-      edges: b.edges.filter((e) => !weg.has(e.source) && !weg.has(e.target)),
-      drawings: (b.drawings ?? []).filter((s) => !s.anchor || !weg.has(s.anchor)),
-      comments: (b.comments ?? []).filter((c) => !weg.has(c.nodeId))
-    }));
-  },
-  resizeNode: (id, width, height) => aendern((b) => ({ nodes: b.nodes.map((n) => n.id === id ? { ...n, width, height } : n) })),
-  pushHistory: () => {
-  },
-  showToast: () => {
-  }
-};
-var lesen = () => ({ ...zustand, ...aktionen });
-var useBoard = Object.assign(
-  (sel) => sel ? sel(lesen()) : lesen(),
-  {
-    getState: lesen,
-    setState: (teil) => {
-      const neu = typeof teil === "function" ? teil(lesen()) : teil;
-      zustand = { ...zustand, ...neu };
-    },
-    subscribe: () => () => {
-    }
-  }
-);
-var selectActiveBoard = (s) => s.boards.find((b) => b.id === s.activeId) ?? s.boards[0];
-function standSetzen(z2) {
-  zustand = { ...z2 };
-}
-function standHolen() {
-  return { boards: zustand.boards, spaces: zustand.spaces, activeId: zustand.activeId };
-}
+// src/lib/nodes.ts
+init_storeShim();
 
 // src/lib/bubbles.ts
 init_define_import_meta_env();
@@ -39448,6 +39503,8 @@ var MERMAID_TEMPLATES = {
 };
 
 // src/lib/nodes.ts
+init_sprache();
+init_types();
 var CARD_WIDTHS = {
   note: 270,
   email: 320,
@@ -39601,6 +39658,7 @@ function makeMermaid(position) {
 }
 
 // src/lib/kiPlan.ts
+init_types();
 var STICKY = /* @__PURE__ */ new Set(["yellow", "pink", "mint", "sky", "white"]);
 var SHAPES = /* @__PURE__ */ new Set(["process", "decision", "terminator"]);
 var GRUND_OPS = `{"op":"note","title":"...","text":"Markdown: '## ' \xDCberschriften, **fett**, '- ' Punkte, '- [ ] ' Checklisten","color":"yellow|pink|mint|sky|white","from":"<optional: id der Quell-Karte>"}
@@ -39783,6 +39841,7 @@ init_define_import_meta_env();
 
 // src/lib/serialize.ts
 init_define_import_meta_env();
+init_types();
 
 // src/lib/editorFarben.ts
 init_define_import_meta_env();
@@ -40160,7 +40219,7 @@ function vergleich(l) {
   const rv = einzel(rechts);
   const a = zuZahl(lv);
   const b = zuZahl(rv);
-  const [x, y] = a !== null && b !== null ? [a, b] : [String(lv ?? ""), String(rv ?? "")];
+  const [x, y] = a !== null && b !== null ? [a, b] : [String(lv ?? "").toLowerCase(), String(rv ?? "").toLowerCase()];
   switch (op) {
     case "=":
       return x === y;
@@ -40482,9 +40541,11 @@ function ersteZeile(zellen, zeilen) {
 
 // src/lib/minutes.ts
 init_define_import_meta_env();
+init_types();
 
 // src/lib/tasks.ts
 init_define_import_meta_env();
+init_types();
 
 // src/lib/dates.ts
 init_define_import_meta_env();
@@ -40500,6 +40561,7 @@ init_define_import_meta_env();
 init_define_import_meta_env();
 
 // src/lib/minutes.ts
+init_sprache();
 function sortEntries(entries) {
   return [...entries].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "") || a.id.localeCompare(b.id));
 }
@@ -40511,19 +40573,8 @@ init_define_import_meta_env();
 init_define_import_meta_env();
 var import_react2 = __toESM(require_react(), 1);
 
-// src/lib/sicher.ts
-init_define_import_meta_env();
-
-// src/lib/boardLook.ts
-init_define_import_meta_env();
-
-// src/lib/sicher.ts
-function kontaktBild(roh) {
-  if (typeof roh !== "string" || roh.length > 15e5) return null;
-  return /^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$/i.test(roh) ? roh : null;
-}
-
 // src/lib/vcard.ts
+init_sicher();
 function kontaktDaten(d) {
   const text3 = (v) => typeof v === "string" ? v : "";
   const telefone = (Array.isArray(d?.telefone) ? d.telefone : []).filter((t2) => !!t2 && typeof t2 === "object" && typeof t2.nummer === "string").map((t2) => ({ nummer: t2.nummer, ...typeof t2.art === "string" && t2.art ? { art: t2.art } : {} }));
@@ -40543,6 +40594,8 @@ function kontaktDaten(d) {
 }
 
 // src/lib/kiModule.ts
+init_storeShim();
+init_types();
 var KARTE_MAX = 6e3;
 var ISO = /^\d{4}-\d{2}-\d{2}$/;
 var hm = (m) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
@@ -41489,6 +41542,8 @@ function textZuBloecken(text3) {
 }
 
 // mcp/motor.ts
+init_types();
+init_storeShim();
 var ALLE_MODULE = /* @__PURE__ */ new Set(["note", "sheet", "kanban", "gantt", "week", "minutes", "time", "bubbles", "mermaid", "kontakt"]);
 function boardFinden(stand, wer) {
   const w = wer.trim();

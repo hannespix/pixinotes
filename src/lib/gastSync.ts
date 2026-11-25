@@ -37,6 +37,7 @@ import { initGruppenraum } from './gruppenraum';
 import { notizSchutz } from '../store/schutz';
 import { istPatch, patchAnwenden, patchAus, patchSaeubern, type Patch } from './gastPatch';
 import { boardVonAussen, karteEntschaerfen, karteGueltig } from './sicher';
+import './sicherGestalt';   // M522: hängt die Gestalt-Prüfung in lib/sicher.ts ein
 import { anhangKarte, idbDel, idbGet, idbSet, liveHaken } from './syncFolder';
 import { anhangGroesse, anhangLokal, loadHtml, saveHtml } from './htmlStore';
 import { berichtAlsSatz, dreiWegeMerge, ohneAuswahl } from './syncMerge';
