@@ -145,18 +145,27 @@ export function SheetBody({ id, data: daten }: { id: string; data: SheetData }) 
   /** M528: Die Auswahl (Anker → anderes Ende, Spalte/Zeile ab 0); beim Bearbeiten ist sie die bearbeitete Zelle */
   const [auswahl, setAuswahl] = useState<{ a: Punkt; b: Punkt } | null>(null);
   const r = auswahl ? rechteck(auswahl.a, auswahl.b) : null;
+  const bereichText = r ? `${indexZuAdresse(r.s0, r.z0)}${r.s1 > r.s0 || r.z1 > r.z0 ? `:${indexZuAdresse(r.s1, r.z1)}` : ''}` : '';
   const [schnitt, setSchnitt] = useState<Rechteck | null>(null);
   const [menue, setMenue] = useState<{ art: 'z' | 's' | 'zelle'; x: number; y: number } | null>(null);
   const ablage = useRef<HTMLTextAreaElement | null>(null);
   /** Wurde gerade gezogen oder mit Umschalt erweitert, öffnet der Klick danach keine Zelle */
   const gezogen = useRef(false);
-  const ablageFokus = () => requestAnimationFrame(() => {
-    const t = ablage.current;
-    if (!t) return;
-    t.value = ' ';
-    t.focus({ preventScroll: true });
-    t.select();
-  });
+  /** Sofort (sonst ginge ein schnelles Strg+V nach Esc noch ans Board) und nach dem Zeichnen noch einmal, falls ein
+   *  Mausklick den Fokus inzwischen weggenommen hat */
+  const ablageFokus = () => {
+    const setze = () => {
+      const t = ablage.current;
+      if (!t || document.activeElement === t) return;
+      t.value = ' ';
+      t.focus({ preventScroll: true });
+      t.select();
+    };
+    setze();
+    requestAnimationFrame(setze);
+  };
+  /** Esc im Bearbeiten verwirft — das Verlassen des Felds darf dann nichts übernehmen */
+  const verwerfen = useRef(false);
 
   const oeffne = (adr: string, anfang?: string) => {
     setEdit(adr);
@@ -295,7 +304,7 @@ export function SheetBody({ id, data: daten }: { id: string; data: SheetData }) 
     if (a === 's' && n > 0 && cols + n > maxSpalten) {
       // Platz nur, wenn die Spalten, die hinten hinausfielen, leer sind
       const frei = Object.keys(cells).every((k) => (adresseZuIndex(k)?.spalte ?? 0) < maxSpalten - n);
-      if (!frei) { showToast(`Mehr als ${maxSpalten} Spalten (A bis ${indexZuAdresse(maxSpalten - 1, 0).replace(/\d+/g, '')}) fasst die Tabelle nicht.`); return; }
+      if (!frei) { showToast(maxSpalten === SPALTEN_GRENZE ? 'Mehr als 26 Spalten (A bis Z) fasst die Tabelle nicht.' : `Mehr als ${maxSpalten} Spalten fasst die Tabelle nicht.`); return; }
     }
     const inhalt = n < 0 && Object.keys(cells).some((k) => {
       const p = adresseZuIndex(k);
@@ -310,7 +319,7 @@ export function SheetBody({ id, data: daten }: { id: string; data: SheetData }) 
     const lo = Math.min(bei, ende), hi = Math.min(bei + Math.max(n, 1) - 1, ende);
     setAuswahl(a === 'z' ? { a: [0, lo], b: [(patch.cols ?? cols) - 1, hi] } : { a: [lo, 0], b: [hi, (patch.rows ?? rows) - 1] });
     setSchnitt(null);
-    if (inhalt) showToast(a === 'z' ? `${zahlWort(-n, 'Zeile', 'Zeilen')} gelöscht.` : `${zahlWort(-n, 'Spalte', 'Spalten')} gelöscht.`, 'schritt');
+    if (inhalt) showToast(`Gelöscht: ${a === 'z' ? zahlWort(-n, 'Zeile', 'Zeilen') : zahlWort(-n, 'Spalte', 'Spalten')}.`, 'schritt');
     ablageFokus();
   };
 
@@ -619,7 +628,7 @@ export function SheetBody({ id, data: daten }: { id: string; data: SheetData }) 
         {/* M409: Spalten behalten eine lesbare Breite – passt nicht alles in die Karte, rollt die Tabelle seitwärts
             (statt jede Spalte auf wenige Zeichen zu quetschen) */}
         {/* M528: hält den Fokus, solange Zellen ausgewählt sind — Tasten und Zwischenablage der Auswahl */}
-        <textarea ref={ablage} className="sheet-ablage" aria-label={r ? `Auswahl ${indexZuAdresse(r.s0, r.z0)}${r.s1 > r.s0 || r.z1 > r.z0 ? `:${indexZuAdresse(r.s1, r.z1)}` : ''}` : 'Auswahl'}
+        <textarea ref={ablage} className="sheet-ablage" aria-label={`Auswahl ${bereichText}`}
           tabIndex={-1} inputMode="none" spellCheck={false} data-rechtschreibung="aus" autoComplete="off" readOnly={false}
           onKeyDown={ablageTaste} onKeyUp={(e) => e.stopPropagation()}
           onCopy={(e) => { e.preventDefault(); kopieren(e.clipboardData, false); }}
@@ -703,11 +712,11 @@ export function SheetBody({ id, data: daten }: { id: string; data: SheetData }) 
                           data-rechtschreibung="formel"
                           value={entwurf}
                           onChange={(e) => setEntwurf(e.target.value)}
-                          onBlur={(e) => { if (!(e.relatedTarget as HTMLElement | null)?.closest?.('.sheet-link-feld')) uebernimm(); }}
+                          onBlur={(e) => { if (verwerfen.current) { verwerfen.current = false; return; } if (!(e.relatedTarget as HTMLElement | null)?.closest?.('.sheet-link-feld')) uebernimm(); }}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') { e.preventDefault(); uebernimm('runter'); }
                             else if (e.key === 'Tab') { e.preventDefault(); uebernimm('rechts'); }
-                            else if (e.key === 'Escape') { e.preventDefault(); setEdit(null); ablageFokus(); }
+                            else if (e.key === 'Escape') { e.preventDefault(); verwerfen.current = true; setEdit(null); ablageFokus(); verwerfen.current = false; }
                           }}
                           // Eigene Tastenkürzel der App sollen beim Tippen ruhen
                           onKeyUp={(e) => e.stopPropagation()}
@@ -762,7 +771,7 @@ export function SheetBody({ id, data: daten }: { id: string; data: SheetData }) 
             <button className="sheet-filter-weg nodrag" data-taste="sheet-filter-weg" onClick={() => updateNodeData(id, { filter: undefined, sort: undefined })}>Filter aufheben</button>
           </>
         ) : r ? (
-          <span className="sheet-fuss-text" data-taste="sheet-auswahl-stand">{`${indexZuAdresse(r.s0, r.z0)}${r.s1 > r.s0 || r.z1 > r.z0 ? `:${indexZuAdresse(r.s1, r.z1)}` : ''} · Strg+C, Strg+X, Strg+V · Rechtsklick: Zeilen und Spalten`}</span>
+          <span className="sheet-fuss-text" data-taste="sheet-auswahl-stand">{`${bereichText} · Strg+C, Strg+X, Strg+V · Rechtsklick: Zeilen und Spalten`}</span>
         ) : <>Zelle antippen zum Bearbeiten · <code>=</code> beginnt eine Formel · Σ setzt Summen</>}
       </div>
       {menue && r && createPortal(
