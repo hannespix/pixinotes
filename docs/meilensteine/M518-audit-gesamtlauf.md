@@ -12,9 +12,9 @@ Hauptzweig; jede rote Reihe wird allein wiederholt und eingestuft: (a) Fehler de
 |---|---|---|---|---|---|---|---|
 | 1 (Ausgangslage) | Hauptzweig `8272a97`, sechs Agenten zugleich (Last 10–25 auf vier Kernen) | 239 | 231 | 7 | 1 (`m485` L2, danach allein 3 von 3 grün) | 6 382 gezählt (zwölf Reihen ohne lesbare Schlusszeile fehlen in der Zahl) | 94,5 min bei 2 Bahnen |
 | 2 (nach den Fixes) | Hauptzweig `a0998a2` (mit M520–M523) + dieser Zweig, zwei bis vier Agenten zugleich (Last 5–19) | 243 | 241 | 2 (`m304` wacklig, `m332` veraltet – beide unten) | 0 | 7 047 grün, 0 rot | 90,0 min bei 2 Bahnen |
-| 3 (Schluss) | @@STAND@@ | @@REIHEN@@ | @@ERST@@ | @@ZWEIT@@ | @@ROT@@ | @@PUNKTE@@ | @@DAUER@@ |
+| 3 (Schluss) | Hauptzweig `0f13e2b` (alle sechs Audit-Meilensteine M518–M523 samt M519) + dieser Zweig, Last 1–13 | 244 | 240 | 4 (`m333`, `m373`, `m377`, `m463` – unten) | 0 | 7 081 grün, 0 rot | 87,4 min bei 2 Bahnen |
 
-Kein Prüfpunkt war wegen eines Fehlers der App rot, der sich allein und ohne Last zeigt. Eine Reihe war veraltet
+**Schluss-Aussage: 244 von 244 Reihen grün, 7 081 Prüfpunkte, kein roter.** Kein Prüfpunkt war wegen eines Fehlers der App rot, der sich allein und ohne Last zeigt. Eine Reihe war veraltet
 (b: `m332` H1, durch M523). Alle übrigen Auffälligkeiten waren Reihen, die unter Last anders messen als allein (c) —
 und eine davon (`m377`) belegt einen echten Fehler der App, der nur unter Last auftritt (unten, „Für andere
 Bereiche“). Die drei Datenbank-Reihen (`m383b`, `m388b`, `m391b`) liefen gegen das lokale Postgres mit, nicht
@@ -46,10 +46,13 @@ Agenten bzw. neben acht bis zehn rechnenden Prozessen (`node -e "for(;;);"`).
 | `m425` B3/C1/C2 + Abbruch | im Gesamtlauf rot, danach 5 von 5 | c · Rahmen an `frame.url()` erkannt; Playwright meldet für `srcdoc` unter Last zeitweise `""` (Regel aus M484) | Rahmen am Inhalt (`#edit`) erkennen, 30 s Geduld; ebenso `m427` (gleiches Muster, noch nicht aufgefallen) | 9 von 9 |
 | `m440` B1 Neigung beim schnellen Zug | im Gesamtlauf rot, danach 5 von 5 | c · 14 Schritte mit je einer Abfrage: unter Last war der „schnelle“ Zug langsam (1,18° statt > 1,2°) | Strecke in festen 300 ms (Ort folgt der Uhr), Neigung schreibt die Seite je Bild mit | 9 von 9 |
 | `m389` C4 Schließen-Kreuz 44 Punkte | gemeldet (44 × 43,99999), hier nicht nachgestellt | c · mitten im Öffnen des Fensters gemessen, Vergleich ohne Rundung | warten, bis das Maß steht; auf Hundertstel runden | 3 von 3 |
-| `m377` C3/C9 „Gerds Text ist bei allen angekommen“ | 2 von 3 | **a · Fehler der App unter Last** (unten) | nicht behoben (fremder Bereich, kein kleiner Fix) | unverändert |
+| `m377` C3/C9 „Gerds Text ist bei allen angekommen“ | 2 von 3; in Lauf 3 bei mäßiger Last rot | **a · Fehler der App unter Last** (unten) | hier nicht behoben (fremder Bereich, kein kleiner Fix); nach dem Einmischen von M524 nicht wieder aufgetreten | 8 von 9 mit M524 (der eine rote Lauf zeigte ein anderes Bild: Gerd kam neben zehn rechnenden Prozessen gar nicht in die Notiz) |
 | `m304` B5 „am Finger liegt es in der Arbeit“ | in Lauf 2 rot, allein grün | c · nach „Alles einpassen“ federte das Netz unter Last länger als die festen 4,5 s; die Maus drückte neben den gewanderten Punkt, nichts wurde gezogen | greifen erst, wenn der Punkt steht, und prüfen, dass er am Finger hängt (sonst noch einmal, höchstens dreimal) | 4 von 4 |
 | `m304` A3b/A8/A9 Ruhe, Bereichsname, Neuladen | 2 von 4 (neben acht rechnenden Prozessen) | c · feste Pausen (4,5 s + 1,5 s, 6 s), danach „muss ruhen“ – unter Last rechnet die Physik langsamer | `zurRuhe`: mindestens so lange wie bisher, dann bis sich nichts mehr rührt (höchstens 30 s); ob Ruhe eintrat, prüft weiter A3b | 4 von 4 |
 | `m332` H1 Meldung „… passten nicht mehr in den Kontext“ | in Lauf 2 rot, auch allein | **b · veraltet:** M523 nennt die Zahl mit richtigem Wort („3 Karten“, `zahlWort`, Regel M461); die Prüfung verlangte noch „Karte(n)“ | H1 verlangt „n Karten passten …“ und dass „Karte(n)“ nicht zurückkommt (Gegenprobe: der alte Wortlaut fällt durch) | 4 von 4 |
+| `m333` B1 „Stift-Strich im Fokus“ | in Lauf 3 rot (`[]`), allein grün | c · 500 ms nach dem Strich einmal den gespeicherten Stand gelesen – der Speicher schreibt verzögert | auf den Strich im gespeicherten Stand warten (bis 8 s) | 4 von 4 |
+| `m463` C4 „ersetztes Bild stempelt die Karte“ | in Lauf 3 rot, allein grün | c · 0,9 s nach dem Schließen des Bild-Editors gelesen; das neue Bild wird erst gerechnet, dann gespeichert | auf den gespeicherten Stempel warten (bis 10 s) | 4 von 4 |
+| `m373` G2 „beides gilt bei beiden – binnen Sekunden“ | in Lauf 3 einmal rot, allein grün | c · Zeitgrenze 11 s, die bewusst den Live-Kanal (Sekunden) vom Kontrollblick (~15 s) trennt | unverändert gelassen (eine längere Frist nähme der Prüfung ihre Aussage); nicht wieder aufgetreten | 4 von 4 |
 | `m312`, `m402`, `m505` | von anderen Agenten je einmal rot gemeldet | nicht nachgestellt (vier Läufe auf ruhiger Maschine, drei unter Last: alle grün) | – | 7 von 7 |
 
 ### Gegenprobe (wie M517): Die geänderten Prüfpunkte werden weiter rot, wenn das Verhalten fehlt
@@ -78,12 +81,15 @@ Zwei absichtlich fehlerhafte Builds (Quellen kopiert, nur dort geändert; die Re
 ## Für andere Bereiche
 | Nr. | Schwere | Was der Nutzer merkt | Beleg | Bereich |
 |---|---|---|---|---|
-| 1 | hoch (Datenverlust, nur unter Last nachgestellt) | In einer gemeinsamen Runde tippt ein Gast in eine Notiz; alle sehen den Text, er ist auf allen Geräten und dem Server gespeichert – Sekunden nachdem er die Notiz verlassen hat, steht überall wieder der alte Text. | `m377` C3/C9: 1 von 3 Läufen neben acht rechnenden Prozessen, 2 von 2 neben zehn. Mitschrift (Sicht, Speicher je Gerät, Server): erst überall „Mehr Fenster und Licht bitte“, danach überall „Mehr Fenster“. Vermutung, nicht belegt: Eine Sitzung des gemeinsamen Tippens mit älterem Y-Dokument „heilt“ den Speicher zurück (`lib/notizGemeinsamKern.ts`, `anbinden`). | M522 (gemeinsames Tippen, Abgleich) |
+| 1 | hoch (Datenverlust, nur unter Last nachgestellt) | In einer gemeinsamen Runde tippt ein Gast in eine Notiz; alle sehen den Text, er ist auf allen Geräten und dem Server gespeichert – Sekunden nachdem er die Notiz verlassen hat, steht überall wieder der alte Text. | `m377` C3/C9: 1 von 3 Läufen neben acht rechnenden Prozessen, 2 von 2 neben zehn. Mitschrift (Sicht, Speicher je Gerät, Server): erst überall „Mehr Fenster und Licht bitte“, danach überall „Mehr Fenster“. Vermutung, nicht belegt: Eine Sitzung des gemeinsamen Tippens mit älterem Y-Dokument „heilt“ den Speicher zurück (`lib/notizGemeinsamKern.ts`, `anbinden`). | M522 (gemeinsames Tippen, Abgleich). **Stand nach M524** (#215, „Ein älterer Stand setzt die eigene Arbeit nicht mehr zurück“, nach dem Schlusslauf gemergt): in 9 Läufen unter derselben Last trat das Muster nicht mehr auf – bitte dort bestätigen, dass M524 genau diesen Weg schließt. Nachstellen: `m377` neben acht `node -e "for(;;);"`; Mitschrift je Schritt mit der Diagnose-Fassung der Reihe (Scratch `m518/zz-m377-diag.mjs`). |
 | 2 | niedrig | Steht die Maus still über einer flüssigen Schrift, rechnet die Karte dauerhaft weiter (60 Takte/s), bis die Maus sie verlässt – der Magnet hält die Teilchen von ihrem Platz, die Ruhe-Bedingung „alles an seinem Platz“ tritt nie ein. | Nachgestellt: an drei von fünf Stellen über der Schrift keine Ruhe binnen 8 s (Takte 214 → 417), nach dem Wegnehmen der Maus Ruhe nach 1,3 s. `lib/fluessig/motor.ts` `schritt()` | M519 (Flüssige Schrift) – Entscheidung, ob das so gewollt ist |
 | 3 | niedrig | Folgt auf die letzte Mausbewegung ohne ein Bild Abstand das Loslassen, landet die Karte an der vorletzten Stelle. Mit einer echten Maus nicht zu merken. | `m504` mit `Promise.all([mouse.move, mouse.up])`: Karte 48 Punkte neben dem Zeiger | M521 (Board) – nur zur Kenntnis |
 
 ## Grenzen / offen
-- `m377` bleibt unter starker Last wacklig, bis Befund 1 behoben ist – die Reihe misst dort richtig.
+- `m377` war bis M524 unter Last wacklig, weil die App dort wirklich Text verlor (Befund 1) – die Reihe misst richtig
+  und blieb unverändert.
+- Der Schlusslauf steht auf `0f13e2b`. Danach kamen M524, M525 und M526 auf den Hauptzweig; sie sind eingemischt und
+  mit den betroffenen Reihen und den Wächtern geprüft (`--geaendert`), aber nicht mit einem weiteren Gesamtlauf.
 - Unter starker Fremdlast prüfen `m485` L2, `m481` I2, `m491` L1/L2, `m500` F2 und `m419` B4 mit umgerechneter
   Grenze; die volle Schärfe haben sie auf ruhiger Maschine (allein, Nachtlauf).
 - `m312`, `m402`, `m505`: gemeldete Einzelfälle, hier nicht nachgestellt – ohne Ausgabe des roten Laufs keine Ursache.
