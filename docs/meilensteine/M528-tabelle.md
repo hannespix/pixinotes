@@ -1,5 +1,5 @@
 # M528 — Rechen-Tabelle wie Excel: Zeilen/Spalten einfügen und löschen, Bereiche kopieren, Datumsrechnung, ganze Spalten
-PR: #… · Prüfreihe: `pruefungen/m528-tabelle.mjs` (Port 5528) · Datum: 2026-11-25
+PR: #220 · Prüfreihe: `pruefungen/m528-tabelle.mjs` (Port 5528) · Datum: 2026-11-25
 
 ## Warum
 Offene Punkte aus dem Audit M520 („Rechen-Tabelle: Zeilen/Spalten lassen sich nur anhängen, Bereiche nicht
