@@ -15,7 +15,7 @@
 //   Mini-Abruf (eTag / Version von umgebung.json); erst eine Änderung lädt.
 import { boardVonAussen } from './sicher';
 import './sicherGestalt';   // M522: hängt die Gestalt-Prüfung in lib/sicher.ts ein
-import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc, type Space } from '../store';
+import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, speicherFehlerText, useBoard, type BoardDoc, type Space } from '../store';
 import {
   alsBase64, anhangKarte, base64AlsBlob, basisLesen, basisMerken, basisVergessen, buildSyncPayloadMitDateien, DATEI_BUDGET_MB,
   emitSyncStatus, fremdStandEinarbeiten, idbDel, idbGet, idbHat, idbSet, KONTO_DIRTY_KEY, merkeUngesichert, notiereAenderung, SYNC_DIRTY_KEY,
@@ -1069,7 +1069,7 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
       const erg = await einarbeiten(r.payload);
       if (erg === 'spaeter') throw new SpaeterFehler();
       if (erg === 'konflikt') { emitSyncStatus('konto', 'conflict'); throw new Error(`${kontoLabel()} und lokaler Stand weichen ab, nichts überschrieben. Unter Einstellungen → Daten → Synchronisation wählen.`); }
-      if (erg === 'fehler') throw new Error('Der Stand aus dem Konto konnte nicht gespeichert werden (Browser-Speicher voll?).');
+      if (erg === 'fehler') throw new Error(speicherFehlerText());
       // zusammengeführt/geschrieben: die Zusammenführung hat selbst geschrieben; gleich/übernommen: jetzt der eigene Anteil
       if (erg === 'zusammengefuehrt' || erg === 'geschrieben') return kontoStamp() ?? new Date().toISOString();
     } else {
@@ -1276,7 +1276,7 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
         const erg = await einarbeiten(r.payload);
         if (erg === 'spaeter') throw new SpaeterFehler();
         if (erg === 'konflikt') { emitSyncStatus('konto', 'conflict'); throw new Error(`${kontoLabel()} und lokaler Stand weichen ab, nichts überschrieben. Unter Einstellungen → Daten → Synchronisation wählen.`); }
-        if (erg === 'fehler') throw new Error('Der Stand aus dem Konto konnte nicht gespeichert werden (Browser-Speicher voll?).');
+        if (erg === 'fehler') throw new Error(speicherFehlerText());
         return kontoStamp() ?? payload.savedAt;
       }
       return kontoWriteRoh(false);
@@ -1381,7 +1381,7 @@ function kontoVerbindenRoh(): Promise<VerbindenErgebnis> {
     }
     const e = await einarbeiten(r.payload);
     if (e === 'konflikt') { emitSyncStatus('konto', 'conflict'); return 'konflikt'; }
-    if (e === 'fehler') throw new Error('Der Stand aus dem Konto konnte nicht gespeichert werden (Browser-Speicher voll?).');
+    if (e === 'fehler') throw new Error(speicherFehlerText());
     if (e === 'uebernommen') return 'uebernommen';
     if (e === 'zusammengefuehrt' || e === 'geschrieben' || e === 'spaeter') return 'zusammengefuehrt';
     return 'gleich';

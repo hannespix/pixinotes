@@ -11,6 +11,9 @@ import type { BoardDoc, Space, BoardState } from './typen';
 import { persistHaken } from './schutz';
 import { defaultHierarchy } from './start';
 import { useBoard } from '../store';
+import { t } from '../lib/sprache';
+import { ablageErsetzer, alsGesichertMerken, AUSLAGERN_AB, beimSichern, VERWEIS_IM_TEXT, vormerken } from './ablage';
+export { ablageVorab } from './ablage';
 
 /**
  * K1+M5-Schutz: localStorage-Writes werden gedrosselt (max. alle 400 ms statt
@@ -44,9 +47,9 @@ type Gespeichert = { state: Record<string, unknown>; version?: number };
 let textVon = new WeakMap<object, string>();
 const istObjekt = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
 const einzeln = (v: unknown): string => {
-  if (v === null || typeof v !== 'object') return JSON.stringify(v) ?? 'null';
+  if (v === null || typeof v !== 'object') return JSON.stringify(v, ablageErsetzer) ?? 'null';
   let t = textVon.get(v);
-  if (t === undefined) { t = JSON.stringify(v) ?? 'null'; textVon.set(v, t); }
+  if (t === undefined) { t = JSON.stringify(v, ablageErsetzer) ?? 'null'; textVon.set(v, t); }
   return t;
 };
 /** Objekt wie JSON.stringify — `eigen` liefert für ausgewählte Felder einen eigenen Text (sonst undefined) */
@@ -54,7 +57,7 @@ const objektText = (o: Record<string, unknown>, eigen: (k: string, v: unknown) =
   let aus = '{'; let erster = true;
   for (const k of Object.keys(o)) {
     const v = o[k];
-    const t = eigen(k, v) ?? JSON.stringify(v);
+    const t = eigen(k, v) ?? JSON.stringify(v, ablageErsetzer);
     if (t === undefined) continue;   // undefined/Funktion: lässt JSON.stringify ebenfalls aus
     aus += `${erster ? '' : ','}${JSON.stringify(k)}:${t}`; erster = false;
   }
@@ -66,9 +69,9 @@ const liste = (v: unknown, eintrag: (e: unknown) => string): string | undefined 
  *  (Rückgängig) viele Lagen derselben Karte hält. */
 const karteText = (n: unknown): string => (istObjekt(n) && istObjekt(n.data)
   ? objektText(n, (k, v) => (k === 'data' ? einzeln(v) : undefined))
-  : JSON.stringify(n) ?? 'null');
+  : JSON.stringify(n, ablageErsetzer) ?? 'null');
 const boardText = (b: unknown): string => {
-  if (!istObjekt(b)) return JSON.stringify(b) ?? 'null';
+  if (!istObjekt(b)) return JSON.stringify(b, ablageErsetzer) ?? 'null';
   let t = textVon.get(b);
   if (t === undefined) {
     t = objektText(b, (k, v) => (k === 'nodes' ? liste(v, karteText) : k === 'edges' || k === 'drawings' || k === 'comments' ? liste(v, einzeln) : undefined));
@@ -76,9 +79,10 @@ const boardText = (b: unknown): string => {
   }
   return t;
 };
-/** Der Text, der in localStorage geht — gleich JSON.stringify(wert) */
+/** Der Text, der in localStorage geht — gleich JSON.stringify(wert, ablageErsetzer): M532 große data-URLs als Verweis */
+export const vollText = (wert: unknown): string => JSON.stringify(wert, ablageErsetzer);
 export function speicherText(wert: Gespeichert, ohneGedaechtnis = false): string {
-  if (ohneGedaechtnis) return JSON.stringify(wert);
+  if (ohneGedaechtnis) return vollText(wert);
   return objektText(wert as unknown as Record<string, unknown>, (k, v) => (k === 'state' && istObjekt(v)
     ? objektText(v, (k2, v2) => (k2 === 'boards' ? liste(v2, boardText) : undefined))
     : undefined));
@@ -147,7 +151,7 @@ export function flushPersist(gruendlich?: boolean): boolean {
     const wert = pendingWrite.wert;
     let text = speicherText(wert, gruendlich === true);
     if (gruendlich !== true && pruefenAn()) {
-      const soll = JSON.stringify(wert);
+      const soll = vollText(wert);
       if (soll !== text) { abweichung(); text = soll; }
     }
     localStorage.setItem(pendingWrite.key, text);
@@ -155,15 +159,31 @@ export function flushPersist(gruendlich?: boolean): boolean {
     ungeprueft = gruendlich === true ? null : { key: pendingWrite.key, wert };
     pendingWrite = null;
     quotaWarned = false;
+    letzterFehler = null;
     speicherZaehler.geschrieben += 1;
     return true;
-  } catch {
+  } catch (e) {
+    // M532: voll oder anders gesperrt? — der Abgleich nennt es beim Namen statt zu raten
+    const name = (e as { name?: string })?.name ?? '';
+    letzterFehler = /quota/i.test(name) || (e as { code?: number })?.code === 22 ? 'voll' : 'anderer';
     if (!quotaWarned) {
       quotaWarned = true;
       window.dispatchEvent(new CustomEvent('pixinotes:quota'));
     }
     return false;
   }
+}
+/** M532: Warum das letzte Schreiben scheiterte (null = es gelang) */
+let letzterFehler: 'voll' | 'anderer' | null = null;
+export const speicherVoll = (): boolean => letzterFehler === 'voll';
+/**
+ * M532: Die Meldung, wenn ein Abgleich seinen Stand nicht speichern konnte — „voll" mit Ausweg, sonst ohne Raten.
+ * (Vorher hieß es immer „Browser-Speicher voll?", auch wenn der Grund ein anderer war.)
+ */
+export function speicherFehlerText(): string {
+  if (letzterFehler === 'voll') return t('Der Stand aus dem Konto konnte nicht gespeichert werden: Der Browser-Speicher ist voll. Bitte dieses Fenster offen lassen, unter Einstellungen → Daten „Alles sichern“ wählen und danach große Bilder oder nicht mehr gebrauchte Boards löschen.');
+  if (letzterFehler === 'anderer') return t('Der Stand aus dem Konto konnte nicht gespeichert werden: Der Browser lässt gerade nicht in seinen Speicher schreiben (privates Fenster oder gesperrter Speicher?).');
+  return t('Der Stand aus dem Konto konnte nicht eingearbeitet werden. Der Abgleich versucht es gleich noch einmal.');
 }
 /** Meldung des Prüfbetriebs (kein Oberflächentext — Nutzer sehen sie nie) */
 const ABWEICHUNG = 'M525: gemerkter Speichertext weicht vom Stand ab';
@@ -183,7 +203,7 @@ function nachpruefen(): void {
   if (!u || writerRole !== 'writer') return;
   ungeprueft = null;
   try {
-    const soll = JSON.stringify(u.wert);
+    const soll = vollText(u.wert);
     if (soll === speicherText(u.wert)) return;
     abweichung();
     localStorage.setItem(u.key, soll);
@@ -203,8 +223,11 @@ export const speicherAblage = {
   // pendingWrite mitlesen: ein getItem direkt nach setItem darf nie den
   // schon überholten localStorage-Stand liefern
   getItem: (k: string): Gespeichert | null => {
-    const roh = pendingWrite?.key === k ? speicherText(pendingWrite.wert, true) : localStorage.getItem(k);
-    return roh === null ? null : (JSON.parse(roh) as Gespeichert);
+    // (Puffer: der Stand im Arbeitsspeicher — ohne Verweise, M532)
+    const roh = pendingWrite?.key === k ? JSON.stringify(pendingWrite.wert) : localStorage.getItem(k);
+    if (roh === null) return null;
+    nachDemLaden(roh);
+    return JSON.parse(roh) as Gespeichert;
   },
   setItem: (k: string, v: Gespeichert): void => {
     if (writerRole !== 'writer') return; // Mitlese-Fenster schreibt NIE
@@ -229,6 +252,56 @@ export const speicherAblage = {
   },
 };
 
+/* ───── M532: Verweise im gespeicherten Stand wieder durch ihre Inhalte ersetzen ─────
+   Der Stand kommt synchron aus localStorage (wie immer) — mit Verweisen statt großer data-URLs. Ihre Inhalte holt
+   die IndexedDB nach; erst danach zeichnet main.tsx die Oberfläche (standBereit), damit nie eine Karte ohne Bild
+   erscheint und kein Abgleich, Export oder Teilen einen Verweis zu sehen bekommt. Ersetzt wird nur, was ein Verweis
+   ist; alles andere bleibt dasselbe Objekt. */
+let bereit: Promise<void> = Promise.resolve();
+/** Alle gefundenen Verweise eines rohen Speichertexts */
+const verweiseIn = (roh: string): Set<string> => {
+  const aus = new Set<string>();
+  if (!roh.includes('"pixinotes-ablage:')) return aus;
+  for (const m of roh.matchAll(VERWEIS_IM_TEXT)) aus.add(m[1]);
+  return aus;
+};
+/** Liegen im Text noch große data-URLs, die in die Ablage gehören? (alte Stände — einmal im Leerlauf umziehen) */
+const mitGrossenDaten = (roh: string): boolean => roh.length > AUSLAGERN_AB && roh.includes('"data:');
+/** Die gespeicherten Felder, die Inhalte tragen können (alles, was speicherAuswahl schreibt) */
+const inhaltsFelder = (s: BoardState): Record<string, unknown> => ({ ...speicherAuswahl(s), boards: s.boards });
+
+function nachDemLaden(roh: string): void {
+  const verweise = verweiseIn(roh);
+  if (verweise.size) {
+    bereit = import('./ablageIdb').then(async ({ inhalteLaden, verweiseEinsetzen }) => {
+      const inhalte = await inhalteLaden(verweise);
+      if (inhalte.size === 0) return;
+      for (const v of inhalte.keys()) alsGesichertMerken(v);
+      const s = useBoard.getState();
+      const teil: Record<string, unknown> = {};
+      for (const [k, alt] of Object.entries(inhaltsFelder(s))) {
+        const neu = verweiseEinsetzen(alt, inhalte);
+        if (neu !== alt) teil[k] = neu;
+      }
+      // abgeleitet: zählt nicht als eigene Bearbeitung (kein Hochladen, kein Rückgängig-Schritt)
+      if (Object.keys(teil).length) runDerived(() => useBoard.setState(teil as Partial<BoardState>));
+    }).catch(() => { /* keine IndexedDB: die Verweise bleiben stehen, nichts wird überschrieben */ });
+  }
+  if (mitGrossenDaten(roh)) {
+    // alter Stand mit eingebetteten Bildern: im Leerlauf in die Ablage umziehen (ablage.ts sichert einzeln)
+    const umziehen = () => { void bereit.then(() => { vormerken(inhaltsFelder(useBoard.getState())); }); };
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(umziehen, { timeout: 4000 }); else setTimeout(umziehen, 1500);
+  }
+}
+/** Auf die Inhalte des gespeicherten Stands warten (main.tsx: vor dem ersten Zeichnen) */
+export const standBereit = (): Promise<void> => bereit;
+
+// Neues liegt sicher in der Ablage: ab jetzt steht im Text der Verweis — Gedächtnis verwerfen und einmal neu schreiben
+beimSichern(() => {
+  textVon = new WeakMap();
+  if (writerRole === 'writer') reassertPersist();
+});
+
 /** Persistierten Stand aus localStorage in den laufenden Store übernehmen —
  *  Mitleser folgen so dem Schreiber; ein Nachfolger übernimmt vor dem ersten
  *  eigenen Write, was der alte Schreiber zuletzt gesichert hat. */
@@ -238,7 +311,15 @@ export function adoptPersistedState(): boolean {
     if (!raw) return false;
     const st = (JSON.parse(raw) as { state?: { boards?: BoardDoc[]; spaces?: Space[]; activeId?: string } }).state;
     if (!st || !Array.isArray(st.boards) || st.boards.length === 0 || !Array.isArray(st.spaces)) return false;
-    useBoard.getState().importSync(st.boards, st.spaces, st.activeId ?? st.boards[0].id);
+    const uebernehmen = (boards: BoardDoc[]) => useBoard.getState().importSync(boards, st.spaces!, st.activeId ?? boards[0].id);
+    // M532: Verweise auf ausgelagerte Bilder erst durch ihre Inhalte ersetzen — der Store hält nie einen Verweis
+    const verweise = verweiseIn(raw);
+    if (!verweise.size) { uebernehmen(st.boards); return true; }
+    void import('./ablageIdb').then(async ({ inhalteLaden, verweiseEinsetzen }) => {
+      const inhalte = await inhalteLaden(verweise);
+      for (const v of inhalte.keys()) alsGesichertMerken(v);
+      uebernehmen(verweiseEinsetzen(st.boards!, inhalte));
+    }).catch(() => uebernehmen(st.boards!));
     return true;
   } catch {
     return false;

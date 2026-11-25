@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { sprache, spracheSetzen, zahlWort } from '../lib/sprache';
 import { brainStatus, rebuildBrainIndex, syncBrainIndex } from '../lib/brain';
-import { useBoard } from '../store';
+import { ablageVorab, useBoard } from '../store';
 import { fensterDarueber } from '../lib/overlay';
 import { eigenerLook, eigenerLookSetzen, lookAusRoh, lookRohVon, lookWort } from '../lib/boardLook';
 import {
@@ -412,6 +412,7 @@ export function Settings() {
     const p = await webdavRead(davCfg!);
     if (!p) { showToast('Auf dem Server liegt (noch) keine PixiNotes-Datei.'); return; }
     if (!window.confirm(`Stand vom ${new Date(p.savedAt).toLocaleString('de-DE')} laden? Der lokale Stand wird ersetzt (Strg+Z geht danach nicht zurück).`)) return;
+    await ablageVorab(p.boards); // M532: Bilder zuerst in den Datei-Speicher
     if (!applyWebdav(p)) { showToast(QUOTA_IMPORT_MSG); return; }
     showToast('Stand vom WebDAV-Server geladen.');
   });
@@ -539,6 +540,7 @@ export function Settings() {
     if (remote && window.confirm(
       `Im Ordner liegt bereits ein PixiNotes-Stand (${new Date(remote.savedAt).toLocaleString('de-DE')}).\n\nOK = diesen Stand LADEN (ersetzt die lokalen Boards)\nAbbrechen = lokalen Stand in den Ordner schreiben`,
     )) {
+      await ablageVorab(remote.boards); // M532
       if (!applySync(remote)) { showToast(QUOTA_IMPORT_MSG); return; }
       showToast('Stand aus dem Sync-Ordner geladen');
     } else {
@@ -551,6 +553,7 @@ export function Settings() {
     if (!syncHandle || !(await ensurePermission(syncHandle, true))) return;
     const remote = await readSync(syncHandle);
     if (!remote) { showToast('Keine (gültige) pixinotes-daten.json im Ordner gefunden.'); return; }
+    await ablageVorab(remote.boards); // M532
     if (!applySync(remote)) { showToast(QUOTA_IMPORT_MSG); return; }
     showToast('Stand aus dem Sync-Ordner geladen');
   };
@@ -584,6 +587,7 @@ export function Settings() {
     if (!p) { showToast('Im Team-Ordner liegt (noch) kein Paket dieses Projekts.'); return; }
     if (!window.confirm(`Team-Stand von „${projectName}" vom ${new Date(p.savedAt).toLocaleString('de-DE')} laden? Ersetzt die Boards dieses Projekts (andere Projekte bleiben unberührt).`)) return;
     setOpen(true, 'daten'); // Import remountet die App — Reiter beibehalten
+    await ablageVorab(p.boards); // M532
     if (!applyProjectPayload(p)) { showToast(QUOTA_IMPORT_MSG); return; }
     showToast(`Team-Projekt „${p.project.name}" geladen.`);
   }, `psl-${projectId}`);
