@@ -511,7 +511,7 @@ export function NotizEditor({ id, data, startPunkt, sitzung }: {
           onSelectionChange={trackTable}
         >
           {/* M201: Standard-Leiste + A₋/A₊/A₊₊/Aa für den markierten Text */}
-          <NoteToolbar />
+          <NoteToolbar aufDemBoard />
           {/* M283: „/" bietet die rechnende Tabelle an; M302: Bilder und Dateien */}
           <NoteSlashMenu dateienAufsBoard={dateienNebenDieNotiz} />
         </BlockNoteView>

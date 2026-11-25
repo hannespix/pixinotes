@@ -77,6 +77,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
    Die Werte sind die Höhe der Leiste plus Luft — schwebend nach oben,
    angedockt (Telefon) nach oben über die untere Leiste hinweg. */
 body[data-formatierleiste='an'] { --lv-typo: -52px; --lv-typo-dock: 56px; }
+/* M527: Die Ebene der Formatier-Leiste auf dem Board (NoteTypo.tsx) — ohne eigene Fläche, über Karten, Karten-Leiste
+   und Fokus-Kopf, unter Dialogen. Die Leiste darin steht fest am Schirm, in jeder Zoomstufe gleich groß. */
+.pn-format-schicht { position: fixed; top: 0; left: 0; width: 0; height: 0; z-index: 70; }
 
 /* ================= M202: Teilen-Dialog für Karten ================= */
 .share-cards-modal { max-width: 560px; }
