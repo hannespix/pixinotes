@@ -29,7 +29,9 @@ export function fensterFokusStarten(): () => void {
     /* M523: Was zuletzt aufgeht, liegt obenauf. Einstellungen, Hilfe und Suche teilen sich eine Ebene und stehen in
        fester Reihenfolge im Dokument — die Hilfe (Alt+H) öffnete sich deshalb HINTER den offenen Einstellungen, die
        Suche (Strg+K) hinter beiden. Liegt schon ein Fenster darüber, hebt sich das neue genau eine Stufe darüber. */
-    const andere = [...document.querySelectorAll(FENSTER)].filter((x) => x !== w && !x.contains(w) && !w.contains(x));
+    // … auch über einer laufenden Präsentation (z-index 95): Alt+E und Alt+H öffneten Einstellungen und Hilfe sonst
+    // unsichtbar dahinter, und das nächste Esc schloss scheinbar nichts
+    const andere = [...document.querySelectorAll(`${FENSTER}, .presenter`)].filter((x) => x !== w && !x.contains(w) && !w.contains(x));
     const oben = obenauf(andere);
     if (oben && obenauf([oben, w]) === oben && w instanceof HTMLElement) w.style.zIndex = String((Number(getComputedStyle(oben).zIndex) || 0) + 1);
     vorher.set(w, document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null);

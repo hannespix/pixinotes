@@ -147,6 +147,7 @@ await teil(async () => {
   await P.keyboard.press('Alt+p'); await P.waitForSelector('.presenter');
   await P.keyboard.press('Alt+e'); await P.waitForSelector('.modal[aria-label="Einstellungen"]');
   await P.waitForTimeout(400);
+  pruefe('A11a Einstellungen in der Präsentation geöffnet: sie liegen sichtbar darüber (nicht unsichtbar dahinter)', await obenauf(P, '.modal[aria-label="Einstellungen"] .modal-head'));
   await P.keyboard.press('Escape');
   const einstZu = await warteBis(P, () => !document.querySelector('.modal[aria-label="Einstellungen"]'), 5000);
   const vortragNoch = await P.locator('.presenter').count();
