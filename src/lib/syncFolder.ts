@@ -527,31 +527,21 @@ const tippt = (): boolean => Date.now() - letzteAenderung < 2500;
  * Vorher wartete er, sobald IRGENDETWAS auf dem offenen Board anders würde und in den letzten 2,5 s irgendeine eigene
  * Änderung lag. Wer zügig arbeitete (alle ein, zwei Sekunden eine Karte verschob), während ein zweites Gerät etwas
  * schrieb, kam nie an die Reihe: nichts wurde eingearbeitet — und nichts hochgeladen, minutenlang. Seit M364 baut
- * der Abgleich das Board nicht mehr neu auf; er ersetzt nur die geänderten Karten. Stören kann er also nur dort, wo
- * gerade gearbeitet wird:
- *   · in der Karte, in der der Cursor steht (ihr Text ist vielleicht noch nicht im Speicher),
- *   · an einer Karte, die gerade gezogen wird,
- *   · überall, wenn in einem Fenster über dem Board getippt wird (Fokus-Ansicht: welche Karte, ist hier unbekannt),
+ * der Abgleich das Board nicht mehr neu auf; er ersetzt nur die geänderten Karten. Gewartet wird darum nur noch,
+ *   · solange in einem Textfeld geschrieben wird (wie bisher: ein Text ist vielleicht noch nicht im Speicher, und
+ *     eine neue Karte daneben soll nicht mitten ins Wort fallen),
+ *   · wenn eine Karte, die gerade gezogen wird, selbst anders würde,
  *   · wenn das offene Board selbst kommt oder geht (dann wird neu aufgebaut).
+ * Wer Karten verschiebt, anordnet, löscht, bekommt fremde Änderungen sofort — und wird sein Eigenes sofort los.
  */
 function trifftEingabe(hier: BoardDoc | undefined, neu: BoardDoc | undefined): boolean {
   if (!hier || !neu) return true;
-  const inArbeit = new Set<string>();
   const el = typeof document === 'undefined' ? null : document.activeElement;
-  if (el instanceof HTMLElement && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) {
-    const id = el.closest('.react-flow__node')?.getAttribute('data-id');
-    if (!id) return true;
-    inArbeit.add(id);
-  }
-  for (const n of hier.nodes) if ((n as { dragging?: boolean }).dragging) inArbeit.add(n.id);
-  if (inArbeit.size === 0) return false;
+  if (el instanceof HTMLElement && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return true;
+  const gezogen = hier.nodes.filter((n) => (n as { dragging?: boolean }).dragging);
+  if (gezogen.length === 0) return false;
   const N = new Map(neu.nodes.map((n) => [n.id, n]));
-  for (const n of hier.nodes) {
-    if (!inArbeit.has(n.id)) continue;
-    const m = N.get(n.id);
-    if (!m || (m !== n && JSON.stringify(m) !== JSON.stringify(n))) return true;
-  }
-  return false;
+  return gezogen.some((n) => { const m = N.get(n.id); return !m || (m !== n && JSON.stringify(m) !== JSON.stringify(n)); });
 }
 
 /**

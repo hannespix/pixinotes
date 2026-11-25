@@ -371,7 +371,8 @@ const KARTEN = Array.from({ length: SPALTEN * ZEILEN }, (_, i) => note(`k${Strin
 /** Ohne Schwung und Einrasten: Eine gezogene Karte liegt genau dort, wo sie losgelassen wurde, und schiebt keine andere an */
 const RUHIG = { ziehBewegung: false, fangLinien: false, gridSnap: false };
 /** Quelltext eines eigenen Tools (liegt in der Geräte-Ablage, nicht im Board) — zwei Fassungen verschiedener Länge */
-const tool = (fassung, fuell) => `<!doctype html><html><head><title>Rechner</title></head><body><h1 id="fassung">${fassung}</h1><p>${'x'.repeat(fuell)}</p></body></html>`;
+// (mit Umlauten: Die Karte nennt die Länge in Zeichen, die Ablage misst Bytes — daran hing das ständige Neuladen)
+const tool = (fassung, fuell) => `<!doctype html><html><head><meta charset="utf-8"><title>Größenrechner</title></head><body><h1 id="fassung">${fassung}</h1><p>Übersicht für Maße – ${'ä'.repeat(40)}${'x'.repeat(fuell)}</p></body></html>`;
 const TOOL_1 = tool('Fassung eins', 4000);
 const TOOL_2 = tool('Fassung zwei', 9000);
 const TOOL_KARTE = { id: 'h1', type: 'htmlapp', width: 360, height: 280, position: { x: 1180, y: 0 }, data: { name: 'Rechner.html', size: TOOL_1.length } };
@@ -705,59 +706,91 @@ if (will('E3') && !process.env.M524_BOARD) {
 
 // ══ D: Dauerlauf ═══════════════════════════════════════════════════════
 if (will('D')) {
-  console.log(`\n════ D: Dauerlauf – Anna arbeitet, zwei Geräte ruhen und wachen auf (Saat ${SAAT}, ${RUNDEN} Runden) ════`);
+  console.log(`\n════ D: Dauerlauf – Anna arbeitet, das zweite Gerät gelegentlich an eigenen Karten, das dritte ruht und wacht auf (Saat ${SAAT}, ${RUNDEN} Runden) ════`);
   const m0 = protokoll.length;
-  // Antworten kommen unterschiedlich schnell, manche gehen verloren; die ruhenden Geräte hören zeitweise nichts
+  // Die letzten fünf Karten gehören in diesem Lauf dem zweiten Gerät, alle anderen Anna
+  const B_IDS = IDS.filter((id) => id !== 'h1').slice(-5);
+  const A_IDS = IDS.filter((id) => !B_IDS.includes(id));
+  const sollB = {};
+  // Antworten kommen unterschiedlich schnell, manche gehen verloren, manche Schreibvorgänge scheitern
   steuer.verzug = (g, art) => {
     const z = zufall();
     if (art === 'patch' || art === 'stapel') return { vor: z < 0.3 ? wuerfel(900) : 0, nach: z > 0.6 ? wuerfel(1800) : 0 };
     if (art === 'lesen') return { vor: 0, nach: z < 0.4 ? wuerfel(1200) : 0 };
     return { vor: 0, nach: z < 0.2 ? wuerfel(500) : 0 };
   };
-  steuer.fehler = (g, art) => ((art === 'patch' || art === 'stapel') && zufall() < 0.08 ? (zufall() < 0.5 ? 'weg' : 503) : null);
+  steuer.fehler = (g, art) => ((art === 'patch' || art === 'stapel') && zufall() < 0.12 ? (zufall() < 0.5 ? 'weg' : 503) : null);
   steuer.rtVerzug = () => wuerfel(700);
   for (let r = 0; r < RUNDEN; r += 1) {
-    // Die ruhenden Geräte: mal im Hintergrund, mal stumm (Schlaf), mal wieder da
-    for (const g of [B, C]) {
+    // Das ruhende Gerät: mal im Hintergrund, mal stumm (Schlaf, Funkloch), mal wieder da
+    {
       const z = zufall();
-      if (z < 0.15) await sichtbar(g.P, false);
-      else if (z < 0.3) await sichtbar(g.P, true);
-      else if (z < 0.4) steuer.stumm.add(g.name);
-      else if (z < 0.5) steuer.stumm.delete(g.name);
+      if (z < 0.15) await sichtbar(C.P, false);
+      else if (z < 0.3) await sichtbar(C.P, true);
+      else if (z < 0.4) steuer.stumm.add('C');
+      else if (z < 0.5) steuer.stumm.delete('C');
     }
+    if (zufall() < 0.2) { if (steuer.stumm.has('B')) steuer.stumm.delete('B'); else steuer.stumm.add('B'); }
     await pruefeSoll(`vor Runde ${r}`);
     if (LAUT) for (const g of GERAETE) console.log(`    ${zeit()} ${g.name.padEnd(2)} WISSEN    ${await kontoWissen(g.P)}`);
-    const id = IDS[wuerfel(IDS.length)];
+    // Das zweite Gerät arbeitet gelegentlich an seinen Karten
+    if (zufall() < 0.3) {
+      const id = B_IDS[wuerfel(B_IDS.length)];
+      const neu = await ziehen(B.P, id, (wuerfel(3) - 1) * 12 || 12, (wuerfel(3) - 1) * 10);
+      if (neu) sollB[id] = neu;
+      await leerKlick(B.P);
+    }
+    const id = A_IDS[wuerfel(A_IDS.length)];
     const dx = (wuerfel(5) - 2) * 12 || 12; const dy = (wuerfel(5) - 2) * 10;
     const neu = await ziehen(A.P, id, dx, dy, { pauseMs: zufall() < 0.3 ? 300 + wuerfel(900) : 0 });
     if (neu) soll[id] = neu;
     await leerKlick(A.P);
     await warte(zufall() < 0.5 ? wuerfel(400) : 600 + wuerfel(2200));
+    // was das zweite Gerät verschoben hat, kommt bei Anna an — das ist kein Rücksetzer
+    for (const k of B_IDS) delete soll[k];
   }
   await pruefeSoll('nach der letzten Runde');
-  // Ruhe: alles normal, alle Geräte wach
+  // Ruhe: alles normal, alle Geräte wach; wer nach einem Fehler noch Ungesichertes hat, bekommt einen Anstoß
   steuerZurueck();
   for (const g of [B, C]) await sichtbar(g.P, true);
-  await warte(4000);
-  await serverRuhig(6000, 90000);
-  await warte(12000);     // ein Takt der ruhenden Geräte
+  for (const g of [A, B]) await g.P.evaluate(() => window.dispatchEvent(new Event('online')));
+  const ziel = () => ({ ...soll, ...sollB });
+  const abw = (ist) => Object.keys(ziel()).filter((id) => ist[id] !== ziel()[id]);
+  const einig = async () => abw(lagen(serverBoard())).length === 0 && abw(await lagenVon(A.P)).length === 0 && abw(await lagenVon(B.P)).length === 0 && abw(await lagenVon(C.P)).length === 0;
+  await warteBis(A.P, einig, 90000);
   await serverRuhig(4000, 60000);
   await pruefeSoll('nach der Ruhe');
   if (LAUT) for (const g of GERAETE) console.log(`    ${zeit()} ${g.name.padEnd(2)} WISSEN    ${await kontoWissen(g.P)}`);
   pruefe('D1 auf Annas Gerät wurde keine eigene Änderung zurückgesetzt', ruecksetzer.length === 0, `\n      ${ruecksetzer.slice(0, 6).map((x) => `${(x.t / 1000).toFixed(1)} s ${x.wo}: ${x.id} soll ${x.soll}, ist ${x.ist}`).join('\n      ')}`);
+  const zeige = (ist) => abw(ist).map((id) => `${id}: soll ${ziel()[id]}, ist ${ist[id]}`).slice(0, 6).join(' · ');
   const srv = lagen(serverBoard());
-  const abw = (ist) => Object.keys(soll).filter((id) => ist[id] !== soll[id]);
-  pruefe('D2 der Server hat Annas Stand', abw(srv).length === 0, abw(srv).map((id) => `${id}: soll ${soll[id]}, Server ${srv[id]}`).slice(0, 6).join(' · '));
-  for (const g of [B, C]) {
+  pruefe('D2 der Server hat den Stand beider arbeitenden Geräte', abw(srv).length === 0, zeige(srv));
+  for (const g of GERAETE) {
     const ist = await lagenVon(g.P);
-    pruefe(`D3 Gerät ${g.name} hat Annas Stand`, abw(ist).length === 0, abw(ist).map((id) => `${id}: soll ${soll[id]}, hier ${ist[id]}`).slice(0, 6).join(' · '));
+    pruefe(`D3 Gerät ${g.name} zeigt denselben Stand`, abw(ist).length === 0, zeige(ist));
   }
-  // Ein ruhendes Gerät darf höchstens Zeit- und Merkfelder nachreichen (lib/abgleichZeiten.ts) — nie Lage oder Inhalt
-  const nurZeit = (info) => [...info.matchAll(/\[[^:\]]*: ?([^\]]*)\]/g)].every((t) => t[1].split(',').filter(Boolean).every((f) => f === 'data.ocrAm' || f === 'geaendert'));
-  const fremd = seit(m0, (e) => e.geraet !== 'A' && ['patch', 'stapel'].includes(e.art) && e.status === 200 && !(e.art === 'patch' && nurZeit(e.info)));
-  pruefe('D4 die ruhenden Geräte haben weder Lage noch Inhalt geschrieben', fremd.length === 0, `\n${zeigeProtokoll(fremd, 12)}`);
-  pruefe('D5 keine Fehler in den Seiten', GERAETE.every((g) => g.fehler.length === 0), GERAETE.map((g) => g.fehler.join(' | ')).join(' · '));
-  if (bad > 0 && !LAUT) console.log(`    Hinweise auf A: ${A.toasts.map((x) => `${(x.t / 1000).toFixed(1)} s „${x.text}"`).join(' · ')}`);
+  // Wer hat welche Karte geschrieben? Ein Gerät schreibt nur, was es selbst geändert hat — höchstens Zeit- und
+  // Merkfelder (lib/abgleichZeiten.ts) reicht es zu fremden Karten nach, nie Lage oder Inhalt
+  const karten = (info) => [...info.matchAll(/([\w-]+)\[[^:\]]*: ?([^\]]*)\]/g)].map((t) => ({ id: t[1], felder: t[2].split(',').filter(Boolean) }));
+  const inhalt = (k) => k.felder.some((f) => f !== 'data.ocrAm' && f !== 'geaendert');
+  const vonC = seit(m0, (e) => e.geraet === 'C' && e.status === 200 && (e.art === 'stapel' || (e.art === 'patch' && karten(e.info).some(inhalt))));
+  pruefe('D4 das ruhende Gerät hat weder Lage noch Inhalt geschrieben', vonC.length === 0, `\n${zeigeProtokoll(vonC, 8)}`);
+  const vonB = seit(m0, (e) => e.geraet === 'B' && e.status === 200 && e.art === 'patch' && karten(e.info).some((k) => inhalt(k) && !B_IDS.includes(k.id)));
+  pruefe('D5 das zweite Gerät hat nur seine eigenen Karten geschrieben, nie eine von Anna', vonB.length === 0, `\n${zeigeProtokoll(vonB, 8)}`);
+  const vonA = seit(m0, (e) => e.geraet === 'A' && e.status === 200 && e.art === 'patch' && karten(e.info).some((k) => inhalt(k) && B_IDS.includes(k.id)));
+  pruefe('D6 Anna hat nie eine Karte des zweiten Geräts geschrieben', vonA.length === 0, `\n${zeigeProtokoll(vonA, 8)}`);
+  pruefe('D7 keine Fehler in den Seiten', GERAETE.every((g) => g.fehler.length === 0), GERAETE.map((g) => g.fehler.join(' | ')).join(' · '));
+}
+
+// ══ Z: Dateien reisen einmal ═══════════════════════════════════════════
+if (!process.env.M524_BOARD && NUR.length === 0) {
+  console.log('\n════ Z: Über den ganzen Lauf – der Tool-Quelltext wird nicht bei jedem Abgleich neu geladen ════');
+  const ab = (g) => protokoll.filter((e) => e.geraet === g && e.art === 'datei-ab' && e.info.includes('datei-h1')).length;
+  const auf = protokoll.filter((e) => e.art === 'datei-auf' && e.status === 200 && e.info.includes('datei-h1')).length;
+  const lesen = protokoll.filter((e) => e.art === 'lesen' && e.info.startsWith('umgebung')).length;
+  // zwei Fassungen: einmal zu Beginn, einmal nach dem Ersetzen (E3) — bei über hundert Lesevorgängen im ganzen Lauf
+  pruefe(`Z1 jedes Gerät holt den Quelltext höchstens zweimal (bei ${lesen} Lesevorgängen insgesamt)`, ab('A') === 0 && ab('B') <= 2 && ab('C') <= 2, `A ${ab('A')}, B ${ab('B')}, C ${ab('C')}`);
+  pruefe('Z2 hochgeladen wurde er zweimal (beide Fassungen), nicht mit jedem Schreiben', auf === 2, `${auf} Mal`);
 }
 
 await browser.close();

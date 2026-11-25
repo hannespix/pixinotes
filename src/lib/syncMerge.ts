@@ -302,7 +302,8 @@ function karteFeldweise(b: AppNode, l: AppNode, f: AppNode, z: Zaehler): AppNode
  */
 function hiesigeObjekte(w: BoardDoc, l: BoardDoc): BoardDoc {
   if (w === l) return l;
-  const ohneMass = (n: AppNode): string => { const { measured: _m, ...rest } = n as AppNode & { measured?: unknown }; return JSON.stringify(rest); };
+  // Hat dieses Gerät die Karte noch nie gemessen (Board hier nie geöffnet), kommt sie samt Maßen von drüben — wie bisher
+  const ohneMass = (n: AppNode): string => { const { measured: m, ...rest } = n as AppNode & { measured?: unknown }; return JSON.stringify(rest) + (m === undefined ? '∅' : ''); };
   const liste = <T extends { id: string }>(neu: T[] | undefined, alt: T[] | undefined, text: (x: T) => string): T[] | undefined => {
     if (!neu || !alt || neu === alt) return neu;
     const A = new Map(alt.map((x) => [x.id, x]));

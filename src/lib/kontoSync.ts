@@ -25,7 +25,7 @@ import { googleTokenFuer, loadCalAccounts, msAnmeldung, msTokenErneuern, oauthAv
 import { NetzFehler, sbAbmelden, sbCodeTauschen, sbErneuern, sbKontoLoeschen, sbLinkWarErwartet, sbNutzer, sbRealtime, sbRueckkehrCode, sbRueckkehrLesen, supabaseKonfig, type RealtimeEreignis, type RealtimeGriff, type SbSitzung } from './kontoSupabase';
 import { nurAuswahlAnders } from './syncMerge';
 import { patchFuer, type Patch } from './gastPatch';
-import { anhangGroesse, anhangLokal } from './htmlStore';
+import { anhangLokal } from './htmlStore';
 
 // M459: Sitzung und Anzeige liegen in lib/kontoSitzung.ts (ohne den Abgleich, für den Start) — hier weitergereicht
 import { KONTO_LS_KEY, kontoIstEigenes, kontoLabel, loadKonto, type Anbieter, type KontoSitzung } from './kontoSitzung';
@@ -818,11 +818,11 @@ export async function kontoLesen(): Promise<{ payload: SyncPayload; kenn: Kenn }
     // der hiesige Inhalt. Vorher wurde bei JEDEM Lesen der Quelltext jedes Tools dreimal aus der Ablage geladen
     // (bei 16 Tools mit 5 MB dauerte ein einziger Abgleich viele Sekunden, alles andere wartete dahinter), und
     // ein hier gerade ersetzter Quelltext galt als „veraltet": Die alte Fassung aus dem Konto überschrieb ihn.
-    // Nur ein Gerät, das die Größen noch nie gemerkt hat, vergleicht einmal wie früher.
+    // Der alte Vergleich schlug außerdem bei jedem Tool mit Umlauten DAUERHAFT an: Die Karte nennt die Länge in
+    // Zeichen, die Ablage misst Bytes — solche Tools wurden bei jedem Lesen auf jedem Gerät neu heruntergeladen
+    // (mehrere Megabyte je Abgleich). Ein Gerät, das die Größen noch nie gemerkt hat, holt deshalb nichts nach.
     const gesehen = alt.groessen?.[id];
-    const veraltet = meta.mime === 'text/html' && !!meta.groesse && alt.dateien.includes(id) && (gesehen !== undefined
-      ? gesehen !== meta.groesse
-      : !alt.groessen && (await idbHat(`happ:${id}`)) && (await anhangGroesse(id)) !== meta.groesse);
+    const veraltet = meta.mime === 'text/html' && !!meta.groesse && alt.dateien.includes(id) && gesehen !== undefined && gesehen !== meta.groesse;
     if (!veraltet && await dateiLokal(id)) continue;
     // M329: Große Anhänge holt die Karte beim Öffnen (kontoDateiNachladen) — nicht jeder Abgleich
     if ((meta.groesse ?? 0) > DATEI_SOFORT_BYTES) continue;
@@ -1216,7 +1216,9 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
     for (const id of kenn.dateien) {
       if (dateienMeta[id]) continue;
       const meta = kartenMeta.get(id);
-      if (meta) { dateienMeta[id] = meta; continue; }
+      // M524: … mit der Größe, die beim Hochladen galt (Bytes). Die Karte nennt bei Tools die Länge in Zeichen —
+      // stand mal die eine, mal die andere Zahl in der Umgebung, hielten die anderen Geräte die Datei für ersetzt
+      if (meta) { dateienMeta[id] = kenn.groessen?.[id] ? { ...meta, groesse: kenn.groessen[id] } : meta; continue; }
       plan.loeschen.push(`${DATEI_PREFIX}${id}`);
     }
     // 4) Die Umgebung zuletzt — sie macht den neuen Stand gültig
