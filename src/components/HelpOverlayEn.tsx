@@ -433,7 +433,8 @@ export function HilfeEn() {
               <h4>Install as an app</h4>
               <ul>
                 <li><b>⋯ in the bar at the bottom → “Install as app …”</b> or Ctrl+K “Install as app”: PixiNotes gets its own window, an entry in the Start menu or on the home screen, and works offline.</li>
-                <li>If the browser doesn’t offer it, the window shows why and where to find it: <b>Chrome</b> ⋮ → “Save and share” → “Install page as app …” · <b>Edge</b> … → “Apps” → “Install this site as an app” · <b>Safari (Mac)</b> File → “Add to Dock” · <b>iPhone/iPad</b> Share → “Add to Home Screen” · <b>Android</b> ⋮ → “Install app” · <b>Firefox (Windows, newer versions)</b> “Add to taskbar”. Firefox on Mac and Linux does not install web apps.</li>
+                <li>If the browser doesn’t offer it, the window shows why and where to find it: <b>Chrome</b> ⋮ → “Save and share” → “Install page as app …” · <b>Edge</b> … → “Apps” → “Install this site as an app” · <b>Safari (Mac)</b> File → “Add to Dock” · <b>iPhone/iPad</b> Share → “Add to Home Screen” · <b>Android</b> ⋮ → “Install app”.</li>
+                <li><b>Firefox:</b> Newer versions on Windows offer “Add to taskbar” (its own window). On Mac and Linux, Firefox does not install web apps.</li>
                 <li><b>Already installed?</b> Then the browser offers “Open in app” instead of “Install”; all apps under chrome://apps or edge://apps.</li>
                 <li><b>Work computer:</b> If the menu says “Managed by your organization” at the bottom and “Install page as app” is missing, IT has switched installing off (chrome://policy). Way out: “Save and share” → “Create shortcut …” with the “Open as window” tick – PixiNotes then starts from the desktop in its own window.</li>
                 <li>The portable file (<code>pixinotes.html</code>) and private windows cannot be installed.</li>
