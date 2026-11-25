@@ -60,26 +60,26 @@ html[data-alles-zeigen] .react-flow__node.selectable.selected:focus-visible { ou
 /* Anschlusspunkte nur an der gewählten Karte — an jeder Karte unter dem Zeiger wären sie im Weg */
 [data-weit] .react-flow__node:not(.selected) .pn-handle { visibility: hidden !important; }
 [data-weit] .react-flow__node.selected .pn-handle { opacity: 1; visibility: visible; }
-/* M527: … und sie stehen VOR der Kante statt auf ihr. Die Karte ist hier nur noch 40–100 Bildpunkte groß; mittig auf
+/* M527: … und sie stehen VOR der Kante statt auf ihr (an Karten — der Rahmen ist innen ohnehin durchlässig, oben sitzt sein Titel). Die Karte ist hier nur noch 40–100 Bildpunkte groß; mittig auf
    der Kante deckten die vier Punkte einen guten Teil davon zu — wer die gewählte Karte dort anfasste, zog einen Pfeil
    statt der Karte. So bleibt die ganze Karte der Griff, und der Pfeil beginnt gleich daneben. */
-[data-weit] .pn-handle.react-flow__handle-top { translate: 0 -50%; }
-[data-weit] .pn-handle.react-flow__handle-bottom { translate: 0 50%; }
-[data-weit] .pn-handle.react-flow__handle-left { translate: -50% 0; }
-[data-weit] .pn-handle.react-flow__handle-right { translate: 50% 0; }
+[data-weit] .react-flow__node:not(.react-flow__node-frame) .pn-handle.react-flow__handle-top { translate: 0 -50%; }
+[data-weit] .react-flow__node:not(.react-flow__node-frame) .pn-handle.react-flow__handle-bottom { translate: 0 50%; }
+[data-weit] .react-flow__node:not(.react-flow__node-frame) .pn-handle.react-flow__handle-left { translate: -50% 0; }
+[data-weit] .react-flow__node:not(.react-flow__node-frame) .pn-handle.react-flow__handle-right { translate: 50% 0; }
 /* Dasselbe für die Größen-Kanten und -Ecken: auf der Kante (je 5 Bildpunkte innen) blieben von einer 24 Bildpunkte
    hohen Karte bei 15 % nur 4 zum Verschieben — der Zug änderte meist die Größe. */
-[data-weit] .react-flow__resize-control.top:not(.left, .right) { translate: 0 -50%; }
-[data-weit] .react-flow__resize-control.bottom:not(.left, .right) { translate: 0 50%; }
-[data-weit] .react-flow__resize-control.left:not(.top, .bottom) { translate: -50% 0; }
-[data-weit] .react-flow__resize-control.right:not(.top, .bottom) { translate: 50% 0; }
+[data-weit] .react-flow__node:not(.react-flow__node-frame) .react-flow__resize-control.top:not(.left, .right) { translate: 0 -50%; }
+[data-weit] .react-flow__node:not(.react-flow__node-frame) .react-flow__resize-control.bottom:not(.left, .right) { translate: 0 50%; }
+[data-weit] .react-flow__node:not(.react-flow__node-frame) .react-flow__resize-control.left:not(.top, .bottom) { translate: -50% 0; }
+[data-weit] .react-flow__node:not(.react-flow__node-frame) .react-flow__resize-control.right:not(.top, .bottom) { translate: 50% 0; }
 /* Die Ecken skaliert React Flow selbst (`scale`), ihr `translate` rechnet in Flächenpunkten: eine halbe Ecke nach außen */
-[data-weit] .react-flow__resize-control.handle { --pn-eck: calc(5px * var(--pn-inv, 1)); }
-[data-weit] .react-flow__resize-control.top.left { translate: calc(-50% - var(--pn-eck)) calc(-50% - var(--pn-eck)); }
-[data-weit] .react-flow__resize-control.top.right { translate: calc(-50% + var(--pn-eck)) calc(-50% - var(--pn-eck)); }
-[data-weit] .react-flow__resize-control.bottom.left { translate: calc(-50% - var(--pn-eck)) calc(-50% + var(--pn-eck)); }
-[data-weit] .react-flow__resize-control.bottom.right { translate: calc(-50% + var(--pn-eck)) calc(-50% + var(--pn-eck)); }
-@media (pointer: coarse) { [data-weit] .react-flow__resize-control.handle { --pn-eck: calc(8px * var(--pn-inv, 1)); } }
+[data-weit] .react-flow__node:not(.react-flow__node-frame) .react-flow__resize-control.handle { --pn-eck: calc(5px * var(--pn-inv, 1)); }
+[data-weit] .react-flow__node:not(.react-flow__node-frame) .react-flow__resize-control.top.left { translate: calc(-50% - var(--pn-eck)) calc(-50% - var(--pn-eck)); }
+[data-weit] .react-flow__node:not(.react-flow__node-frame) .react-flow__resize-control.top.right { translate: calc(-50% + var(--pn-eck)) calc(-50% - var(--pn-eck)); }
+[data-weit] .react-flow__node:not(.react-flow__node-frame) .react-flow__resize-control.bottom.left { translate: calc(-50% - var(--pn-eck)) calc(-50% + var(--pn-eck)); }
+[data-weit] .react-flow__node:not(.react-flow__node-frame) .react-flow__resize-control.bottom.right { translate: calc(-50% + var(--pn-eck)) calc(-50% + var(--pn-eck)); }
+@media (pointer: coarse) { [data-weit] .react-flow__node:not(.react-flow__node-frame) .react-flow__resize-control.handle { --pn-eck: calc(8px * var(--pn-inv, 1)); } }
 @media (hover: hover) and (pointer: fine) {
   /* „Die kann ich greifen": ein dünner Rahmen unter dem Zeiger */
   [data-weit] .react-flow__node:hover:not(.selected):not(.dragging) {

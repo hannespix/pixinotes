@@ -320,6 +320,17 @@ for (const z of [0.15, 0.25, 1, 3]) {
   const kopf = await kasten(P, '.react-flow__node[data-id="F"] .frame-head');
   matrix.push(`E Zoom ${z}: Rahmentitel ${Math.round(kopf.w)}×${Math.round(kopf.h)}`);
   pruefe(`E1 ${z * 100} %: der Rahmentitel ist 24–40 Bildpunkte hoch`, kopf.h >= 24 && kopf.h <= 40, kopf);
+  // Gewählt: Die Karten-Leiste steht über dem Titel, nicht auf ihm (er ist jetzt in jeder Stufe ~30 Bildpunkte hoch).
+  // Bei 300 % liegt der Titel des großen Rahmens über dem Bildrand — dort nur die Größe.
+  if (z <= 1) {
+  await P.mouse.click(kopf.x + 10, kopf.cy);
+  await warteBis(P, () => document.querySelector('.react-flow__node[data-id="F"]')?.classList.contains('selected'));
+  await warteBis(P, () => !!document.querySelector('.sel-toolbar'));
+  await P.waitForTimeout(300);
+  const k2 = await kasten(P, '.react-flow__node[data-id="F"] .frame-head');
+  const frei = await P.evaluate((k) => [[0.15, 0.5], [0.5, 0.5], [0.85, 0.5], [0.5, 0.15]].every(([fx, fy]) => !!document.elementFromPoint(k.x + k.w * fx, k.y + k.h * fy)?.closest('.frame-head')), k2);
+  pruefe(`E3 ${z * 100} %: am gewählten Rahmen ist der Titel frei (Karten-Leiste und Anschlusspunkte liegen nicht darauf)`, frei, k2);
+  }
   if (z <= 0.25) {
     const vF = await lage(P, 'F'); const vC = await lage(P, 'C');
     await zug(P, kopf.x + Math.min(30, kopf.w / 2), kopf.cy, 50, 30);

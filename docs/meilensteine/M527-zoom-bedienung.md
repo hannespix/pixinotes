@@ -10,7 +10,7 @@ Vorgehen: ein Messskript (playwright-core gegen `dist/`) stellt den Zoom genau e
 Kneifen am Trackpad), holt die Karte in die Bildmitte und prüft je Bedienelement: sichtbar, obenauf (`elementFromPoint`),
 Größe in Bildschirm-Punkten, Wirkung des Klicks/Zugs. Stufen 15 % (Minimum, 10 % gibt es nicht), 25, 35, 50, 75, 100,
 150, 200, 300 % und 600 % (Maximum), hell/dunkel, Anzeige 130 %, Karten-Fokus. Die Prüfreihe ist diese Matrix; gegen
-den Build von vorher sind 40 ihrer 91 Prüfpunkte rot, jetzt alle grün.
+den Build von vorher sind gut 40 ihrer Prüfpunkte rot, jetzt alle grün.
 
 ## Gefundene Ausfälle (vorher → nachher)
 | Nr | Zoom | Was der Nutzer merkte | Ursache | Stand |
@@ -26,6 +26,7 @@ den Build von vorher sind 40 ihrer 91 Prüfpunkte rot, jetzt alle grün.
 | 9 | unter 100 % | **Verbindung kaum zu treffen:** 6 Bildpunkte neben der Linie verfehlt bei 50 %, 25 %. Bei 300 % war die Klickzone 60 Bildpunkte breit. | Klickzone 20 Flächenpunkte. | ✅ 20 Bildpunkte |
 | 10 | alle außer 100 % | Knöpfe der gewählten Verbindung (Spitzen, Stärke, Farbe) bei 25 % winzig, bei 300 % 57 Bildpunkte. | mitgezoomt | ✅ 19–29 |
 | 11 | unter 100 % | **Rahmen schwer zu greifen:** sein einziger Griff, der Titel, war bei 25 % 7, bei 15 % 4 Bildpunkte hoch; bei 300 % 78. | mitgezoomt | ✅ 26 (bis 39 bei 300 %) |
+| 13 | alle | Am **gewählten Rahmen** lag die Karten-Leiste („1 ausgewählt") halb auf dem Titel — dem einzigen Griff (bei 100 % schon vorher, nach dem Bildschirm-Titel aus Nr. 11 auch im weiten Zoom). | Die Leiste hängt 12 Punkte über dem Kasten des Rahmens; der Titel ragt ~30 darüber. | ✅ Leiste über dem Titel |
 | 12 | alle außer 100 % | Drehknopf bei 25 % 5 Bildpunkte groß und auf der Größen-Ecke, bei 300 % 66. | mitgezoomt | ✅ |
 
 Ohne Befund (in jeder Stufe gleich): Karten-Griff (46 × 17), Anschlusspunkte (22, über 250 % gedeckelt), Größen-Ecken
@@ -69,6 +70,9 @@ Ohne Befund (in jeder Stufe gleich): Karten-Griff (46 × 17), Anschlusspunkte (2
 - `src/styles/40-verbinden-attribute.css`: `.pn-handle-body` während des Verbindens `z-index: 3` (über dem Kartenkörper).
 - `src/styles/30-zeichnen-rahmen-zeit.css`: `.frame-head { scale: var(--pn-inv); transform-origin: 0 100% }`, Breite
   geteilt durch `--pn-inv` (Name kürzt sich auf die Rahmenbreite); im Export (`data-alles-zeigen`) ohne.
+- `src/components/SelectionToolbar.tsx`: `titelUeber` (wie weit der Titel gewählter Rahmen über ihren Kasten ragt, im
+  Platz-Effekt gemessen) kommt zum `offset` der `NodeToolbar` und zur Platzrechnung oben. Die Griffe vor der Kante gelten
+  nur für Karten (`.react-flow__node:not(.react-flow__node-frame)`), am Rahmen säße der obere Anschluss sonst im Titel.
 - `src/styles/68-vorlagen-folien-datentabelle.css`: `.dreh-knopf` mit `scale: var(--pn-inv)` um seine äußere Ecke,
   Abstand × `--pn-inv`.
 - Angepasst: `pruefungen/m267-typo.mjs` T6b misst den Überstand gegen die Notiz, deren Text markiert ist (die Leiste liegt
