@@ -42,49 +42,55 @@ type Gespeichert = { state: Record<string, unknown>; version?: number };
    ohne Gedächtnis — sollte je ein Objekt an Ort und Stelle verändert worden sein, steht spätestens dann das Richtige
    im Speicher. */
 let textVon = new WeakMap<object, string>();
+const istObjekt = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
 const einzeln = (v: unknown): string => {
   if (v === null || typeof v !== 'object') return JSON.stringify(v) ?? 'null';
   let t = textVon.get(v);
   if (t === undefined) { t = JSON.stringify(v) ?? 'null'; textVon.set(v, t); }
   return t;
 };
-/** Objekt wie JSON.stringify, aber die Listen unter `listen` Eintrag für Eintrag über das Gedächtnis */
-const mitListen = (o: Record<string, unknown>, listen: ReadonlySet<string>, eintrag: (v: unknown) => string): string => {
+/** Objekt wie JSON.stringify — `eigen` liefert für ausgewählte Felder einen eigenen Text (sonst undefined) */
+const objektText = (o: Record<string, unknown>, eigen: (k: string, v: unknown) => string | undefined): string => {
   let aus = '{'; let erster = true;
   for (const k of Object.keys(o)) {
     const v = o[k];
-    const t = listen.has(k) && Array.isArray(v) ? `[${v.map(eintrag).join(',')}]` : JSON.stringify(v);
+    const t = eigen(k, v) ?? JSON.stringify(v);
     if (t === undefined) continue;   // undefined/Funktion: lässt JSON.stringify ebenfalls aus
     aus += `${erster ? '' : ','}${JSON.stringify(k)}:${t}`; erster = false;
   }
   return `${aus}}`;
 };
-const BOARD_LISTEN: ReadonlySet<string> = new Set(['nodes', 'edges', 'drawings', 'comments']);
-const STAND_LISTEN: ReadonlySet<string> = new Set(['boards']);
+const liste = (v: unknown, eintrag: (e: unknown) => string): string | undefined => (Array.isArray(v) ? `[${v.map(eintrag).join(',')}]` : undefined);
+/** Karte: die kleinen Felder (Lage, Größe, Auswahl) frisch, der Inhalt (`data`) über das Gedächtnis. Eine verschobene
+ *  Karte schreibt so ihren Inhalt nicht neu, und je Inhalt bleibt nur EIN Text im Speicher — auch wenn der Verlauf
+ *  (Rückgängig) viele Lagen derselben Karte hält. */
+const karteText = (n: unknown): string => (istObjekt(n) && istObjekt(n.data)
+  ? objektText(n, (k, v) => (k === 'data' ? einzeln(v) : undefined))
+  : JSON.stringify(n) ?? 'null');
 const boardText = (b: unknown): string => {
-  if (b === null || typeof b !== 'object' || Array.isArray(b)) return JSON.stringify(b) ?? 'null';
+  if (!istObjekt(b)) return JSON.stringify(b) ?? 'null';
   let t = textVon.get(b);
-  if (t === undefined) { t = mitListen(b as Record<string, unknown>, BOARD_LISTEN, einzeln); textVon.set(b, t); }
+  if (t === undefined) {
+    t = objektText(b, (k, v) => (k === 'nodes' ? liste(v, karteText) : k === 'edges' || k === 'drawings' || k === 'comments' ? liste(v, einzeln) : undefined));
+    textVon.set(b, t);
+  }
   return t;
 };
 /** Der Text, der in localStorage geht — gleich JSON.stringify(wert) */
 export function speicherText(wert: Gespeichert, ohneGedaechtnis = false): string {
   if (ohneGedaechtnis) return JSON.stringify(wert);
-  const o = wert as unknown as Record<string, unknown>;
-  let aus = '{'; let erster = true;
-  for (const k of Object.keys(o)) {
-    const v = o[k];
-    const t = k === 'state' && v && typeof v === 'object' && !Array.isArray(v) ? mitListen(v as Record<string, unknown>, STAND_LISTEN, boardText) : JSON.stringify(v);
-    if (t === undefined) continue;
-    aus += `${erster ? '' : ','}${JSON.stringify(k)}:${t}`; erster = false;
-  }
-  return `${aus}}`;
+  return objektText(wert as unknown as Record<string, unknown>, (k, v) => (k === 'state' && istObjekt(v)
+    ? objektText(v, (k2, v2) => (k2 === 'boards' ? liste(v2, boardText) : undefined))
+    : undefined));
 }
 /** Prüfreihen (und wer es wissen will) schalten mit diesem Schlüssel den Vergleich bei JEDEM Schreiben ein */
 const PRUEF_KEY = 'pixinotes-speicher-pruefen';
+/** Prüf-Build: VITE_SPEICHER_PRUEFEN=1 prüft immer; =2 lässt bei einer Abweichung zusätzlich die Seite sichtbar scheitern (damit jede Prüfreihe rot wird) */
+// (`env` kann fehlen: die Prüfreihen bündeln den Speicher auch ohne Vite — m522, „Labor")
+const PRUEF_BAU = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_SPEICHER_PRUEFEN ?? '';
 let pruefen: boolean | null = null;
 const pruefenAn = (): boolean => {
-  if (pruefen === null) { try { pruefen = (import.meta.env as Record<string, string | undefined>).VITE_SPEICHER_PRUEFEN === '1' || localStorage.getItem(PRUEF_KEY) === '1'; } catch { pruefen = false; } }
+  if (pruefen === null) { try { pruefen = !!PRUEF_BAU || localStorage.getItem(PRUEF_KEY) === '1'; } catch { pruefen = false; } }
   return pruefen;
 };
 /** Zähler für Prüfreihen und Fehlersuche; `abweichungen` (gemerkter Text ≠ Stand) muss 0 bleiben */
@@ -159,6 +165,8 @@ export function flushPersist(gruendlich?: boolean): boolean {
     return false;
   }
 }
+/** Meldung des Prüfbetriebs (kein Oberflächentext — Nutzer sehen sie nie) */
+const ABWEICHUNG = 'M525: gemerkter Speichertext weicht vom Stand ab';
 /** Der zuletzt MIT Gedächtnis geschriebene Stand — beim Verlassen der Seite einmal ohne Gedächtnis gegengeprüft */
 let ungeprueft: { key: string; wert: Gespeichert } | null = null;
 function abweichung(): void {
@@ -166,7 +174,8 @@ function abweichung(): void {
   textVon = new WeakMap();   // dem Gedächtnis ist nicht mehr zu trauen
   console.error('PixiNotes: Der gemerkte Speichertext wich vom Stand ab (M525) – der Stand wurde vollständig neu geschrieben.');
   // Im Prüfbetrieb laut scheitern (die Prüfreihen sammeln Seitenfehler) — geschrieben ist der richtige Stand trotzdem
-  if (pruefenAn()) setTimeout(() => { throw new Error('M525: gemerkter Speichertext weicht vom Stand ab'); }, 0);
+  if (pruefenAn()) setTimeout(() => { throw new Error(ABWEICHUNG); }, 0);
+  if (PRUEF_BAU === '2') document.documentElement.textContent = ABWEICHUNG;
 }
 /** Sicherheitsnetz: Stimmt, was mit Gedächtnis geschrieben wurde, mit dem Stand überein? Sonst jetzt richtig schreiben. */
 function nachpruefen(): void {
@@ -200,7 +209,12 @@ export const speicherAblage = {
   setItem: (k: string, v: Gespeichert): void => {
     if (writerRole !== 'writer') return; // Mitlese-Fenster schreibt NIE
     // M525: Nichts geändert, das gespeichert wird (Toast, Dialog auf/zu, Schwebezustände) → kein Schreiben
-    if (!erzwingen && standGleich(letzterStand, v.state)) { speicherZaehler.uebersprungen += 1; return; }
+    if (!erzwingen && standGleich(letzterStand, v.state)) {
+      speicherZaehler.uebersprungen += 1;
+      // Wartet noch ein Schreiben (der Speicher war voll), wird es wie bisher mit jeder Änderung neu versucht
+      if (pendingWrite) { clearTimeout(writeTimer); writeTimer = setTimeout(flushPersist, 400); }
+      return;
+    }
     letzterStand = v.state;
     pendingWrite = { key: k, wert: v };
     speicherZaehler.vorgemerkt += 1;

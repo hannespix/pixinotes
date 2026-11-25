@@ -44,7 +44,7 @@ const fehler = [];
 
 /* ═══════════════════════ Das Board (erfunden, Gestalt wie gemeldet) ═══════════════════════ */
 const zufall = (() => { let a = 525; return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; })();
-const WORTE = 'Lager Feuer Holz Karte Plan Runde Idee Schritt Frage Antwort Liste Notiz Termin Probe Entwurf'.split(' ');
+const WORTE = 'Werkstatt Bauteil Muster Karte Plan Runde Idee Schritt Frage Antwort Liste Notiz Termin Probe Entwurf'.split(' ');
 const satz = (n) => Array.from({ length: n }, () => WORTE[Math.floor(zufall() * WORTE.length)]).join(' ');
 /** Animiertes SVG (CSS-Keyframes), rund 60 KB — wie die Bilder des gemeldeten Boards */
 const svgBild = (i) => {
@@ -70,7 +70,7 @@ function boardBauen() {
   }
   lege({ id: 'k1', type: 'kanban', width: 1100, height: 560, autoFit: false, data: { title: 'Aufgaben', cols: ['Offen', 'In Arbeit', 'Erledigt'], items: Array.from({ length: 60 }, (_, k) => ({ id: `t${k}`, text: satz(4), col: k % 3 })) } }, 60, 120);
   lege({ id: 'k2', type: 'kanban', width: 560, height: 400, autoFit: false, data: { title: 'Kleines Kanban', cols: ['Offen', 'Erledigt'], items: Array.from({ length: 12 }, (_, k) => ({ id: `s${k}`, text: satz(3), col: k % 2 })) } }, 1240, 120);
-  lege({ id: 'fl', type: 'fluessig', width: 1500, height: 380, data: { text: 'Lager am Feuer', zaeh: 'mittel', farbe: 'schrift', lebendig: true } }, 3230, 120);
+  lege({ id: 'fl', type: 'fluessig', width: 1500, height: 380, data: { text: 'Guten Morgen', zaeh: 'mittel', farbe: 'schrift', lebendig: true } }, 3230, 120);
   const kante = (i, s, t) => ({ id: `v${i}`, source: s, target: t, type: 'labeled', data: { label: '', kind: 'arrow' } });
   const edges = Array.from({ length: 22 }, (_, i) => kante(i, i < 8 ? `h${i + 1}` : `i${(i % 8) + 1}`, i < 8 ? `i${i + 1}` : `u${(i % 4) + 1}`));
   const drawings = Array.from({ length: 158 }, (_, i) => { const x = 60 + (i % 40) * 160; const y = 620 + Math.floor(i / 40) * 12; return { id: `st${i}`, tool: 'pen', color: '#b45309', width: 14, points: [[x, y], [x + 120, y]] }; });
@@ -161,18 +161,19 @@ async function ziehen(P, id, schritte, { dx = 3, dy = 2, dabei = null, pause = 2
 /* ═══════════════════════ S: Speichern ═══════════════════════ */
 if (NUR.includes('S')) {
   console.log(`\n════ S: Speichern (Stand ${(STAND_ZEICHEN / 1e6).toFixed(2)} Mio. Zeichen) ════`);
-  const { ctx, P } = await seite();
+  // S1–S5 ohne Prüfbetrieb (so läuft die App bei Nutzern); S6–S11 danach im Prüfbetrieb (jedes Schreiben gegengeprüft)
+  let { ctx, P } = await seite({ pruefbetrieb: false });
   const n0 = await P.locator('.react-flow__node').count();
   pruefe('S0 das Board steht: 31 Karten', n0 === 31, n0);
   const pruefbar = await P.evaluate(() => typeof window.pixinotesSpeicher === 'object');
-  pruefe('S0b der Speicher zählt mit (Prüfbetrieb)', pruefbar);
+  pruefe('S0b der Speicher zählt mit', pruefbar);
   // S1: 30 Mausbewegungen ziehen — wie viel JSON entsteht?
   await P.evaluate(() => { window.__m525.strZeichen = 0; window.__m525.strGross = 0; });
   const lage0 = await lageVon(P, 'k2');
   await ziehen(P, 'k2', 30);
   const z1 = await zaehler(P);
   console.log(`  (30 Mausbewegungen: ${(z1.strZeichen / 1e6).toFixed(2)} Mio. Zeichen JSON, davon ${z1.strGross} große Texte; ein Stand = ${(STAND_ZEICHEN / 1e6).toFixed(2)} Mio.)`);
-  pruefe('S1 Ziehen schreibt nicht je Mausbewegung den ganzen Stand als JSON (vorher ≥ 30 Stände, jetzt < 2)', z1.strZeichen < 2 * STAND_ZEICHEN, { zeichen: z1.strZeichen, staende: (z1.strZeichen / STAND_ZEICHEN).toFixed(1) });
+  pruefe('S1 Ziehen schreibt nicht je Mausbewegung den ganzen Stand als JSON (vorher ≥ 30 Stände, jetzt < 1)', z1.strZeichen < STAND_ZEICHEN, { zeichen: z1.strZeichen, staende: (z1.strZeichen / STAND_ZEICHEN).toFixed(1) });
   const da = await warteBis(P, async () => (await lageVon(P, 'k2')) !== lage0, 8000);
   pruefe('S2 die neue Lage steht kurz nach dem Ablegen im Speicher', da, `${lage0} → ${await lageVon(P, 'k2')}`);
   // S3: reine Oberfläche — Einstellungen auf und zu, Hinweis: kein Schreiben des Boards
@@ -204,7 +205,8 @@ if (NUR.includes('S')) {
   await P.waitForSelector('.react-flow__node', { timeout: 30000 });
   const lage3 = await lageVon(P, 'u1');
   pruefe('S5 Neuladen direkt nach dem Ablegen verliert nichts', lage3 !== lage2, `${lage2} → ${lage3}`);
-  await P.waitForTimeout(2500);
+  await ctx.close();
+  ({ ctx, P } = await seite({ pruefbetrieb: true }));
   // S6: Der gespeicherte Text ist der Stand — nach Ziehen, Anlegen, Tippen, Löschen, Rückgängig, Wiederholen
   const fp = await freierPunkt(P);
   const vorKarten = await P.locator('.react-flow__node').count();
