@@ -722,10 +722,11 @@ export async function dateienNachreichen(erzwingen = false, nurUngenannte = fals
     }
   }
   if (!hoch.length) return 0;
-  // Als „nicht im Konto" verbuchen: Das nächste Schreiben nimmt sie in den Beipack und lädt sie hoch
+  // Als „nicht im Konto" verbuchen: Das nächste Schreiben nimmt sie in den Beipack und lädt sie hoch. Wie ein hier
+  // ersetztes Tool (M524 `ersetzt`) — sonst machte das nächste Lesen sie wieder zu „bekannt", ehe sie hinausgingen.
   await exklusiv(async () => {
     const k = await kennLesen();
-    await idbSet(KENN_KEY, { ...k, dateien: k.dateien.filter((id) => !hoch.includes(id)) } satisfies Kenn);
+    await idbSet(KENN_KEY, { ...k, dateien: k.dateien.filter((id) => !hoch.includes(id)), ersetzt: [...new Set([...(k.ersetzt ?? []), ...hoch])] } satisfies Kenn);
   });
   try { localStorage.setItem(KONTO_DIRTY_KEY, '1'); } catch { /* voll */ }
   void autoPush();
@@ -817,11 +818,18 @@ const fingerabdruck = (b: BoardDoc): string => stempel(JSON.stringify(ohneMasse(
  * Ein Board, das sich nicht geändert hat, ist dasselbe Objekt (M524) — es wird nicht noch einmal geschrieben, der neue
  * Stand nennt nur seinen Schlüssel. Was kein Stand mehr nennt, wird gelöscht.
  */
-interface BasisVerzeichnis { etag: string; marke?: string; drin?: boolean; boards: string[]; spaces: Space[] }
+interface BasisVerzeichnis {
+  etag: string; marke?: string; drin?: boolean; boards: string[]; spaces: Space[];
+  /** Fingerabdruck je Board-Schlüssel (gleiche Reihenfolge) — nach einem Neustart findet ein unverändertes Board so
+   *  seine schon abgelegte Fassung wieder, statt noch einmal geschrieben zu werden */
+  fp?: string[];
+}
 const BB = 'konto:bb:';
 /** Board-Objekt → Schlüssel, unter dem genau diese Fassung liegt (nur solange er im Verzeichnis steht: `bbLebt`) */
 const bbSchluessel = new WeakMap<BoardDoc, string>();
 const bbLebt = new Set<string>();
+/** Schlüssel → Fingerabdruck der abgelegten Fassung */
+const bbFp = new Map<string, string>();
 let bbZaehler = Date.now();
 /** Messwerte für die Prüfreihe (window.pixinotesKontoBasen): wie viele Board-Fassungen geschrieben wurden */
 const basenZaehler = { boardsGeschrieben: 0, verzeichnisGeschrieben: 0 };
@@ -833,22 +841,28 @@ async function verzeichnisLesen(): Promise<BasisVerzeichnis[]> {
     const neu: BasisVerzeichnis[] = [];
     for (const e of roh) {
       const boards = await Promise.all((e.boards as Array<BoardDoc | string>).map((b) => (typeof b === 'string' ? b : boardAblegen(b))));
-      neu.push({ etag: e.etag, marke: e.marke, drin: e.drin, boards, spaces: e.spaces ?? [] });
+      neu.push({ etag: e.etag, marke: e.marke, drin: e.drin, boards, fp: boards.map((k) => bbFp.get(k) ?? ''), spaces: e.spaces ?? [] });
     }
     await idbSet(BASEN_KEY, neu);
     return neu;
   }
   const v = roh as BasisVerzeichnis[];
-  for (const e of v) for (const k of e.boards) bbLebt.add(k);
+  for (const e of v) e.boards.forEach((k, i) => { bbLebt.add(k); if (e.fp?.[i]) bbFp.set(k, e.fp[i]); });
   return v;
 }
 async function boardAblegen(b: BoardDoc): Promise<string> {
   const k = bbSchluessel.get(b);
   if (k && bbLebt.has(k)) return k;
-  const neu = `${BB}${b.id}:${(bbZaehler++).toString(36)}`;
+  // Ein anderes Objekt, aber vielleicht derselbe Inhalt (nach einem Neustart, frisch gelesen): einmal je Sitzung vergleichen
+  const fp = stempel(JSON.stringify(b));
+  const praefix = `${BB}${b.id}:`;
+  for (const l of bbLebt) {
+    if (l.startsWith(praefix) && bbFp.get(l) === fp) { bbSchluessel.set(b, l); return l; }
+  }
+  const neu = `${praefix}${(bbZaehler++).toString(36)}`;
   await idbSet(neu, b);
   basenZaehler.boardsGeschrieben += 1;
-  bbSchluessel.set(b, neu); bbLebt.add(neu);
+  bbSchluessel.set(b, neu); bbLebt.add(neu); bbFp.set(neu, fp);
   return neu;
 }
 async function verzeichnisSchreiben(v: BasisVerzeichnis[], vorher: BasisVerzeichnis[]): Promise<void> {
@@ -867,7 +881,7 @@ async function basenMerken(etag: string, stand: { boards: BoardDoc[]; spaces: Sp
   const boards: string[] = [];
   for (const b of stand.boards) boards.push(await boardAblegen(b));
   // derselbe Stand noch einmal gelesen: Was schon eingearbeitet war, bleibt es
-  const eintrag: BasisVerzeichnis = { etag, boards, spaces: stand.spaces, marke, drin: drin || (vorher?.drin === true && vorher.marke === marke) };
+  const eintrag: BasisVerzeichnis = { etag, boards, fp: boards.map((k) => bbFp.get(k) ?? ''), spaces: stand.spaces, marke, drin: drin || (vorher?.drin === true && vorher.marke === marke) };
   if (vorher && vorher.marke === eintrag.marke && vorher.drin === eintrag.drin && vorher.spaces === eintrag.spaces
     && vorher.boards.length === boards.length && vorher.boards.every((k, i) => k === boards[i]) && alle[alle.length - 1] === vorher) return;
   await verzeichnisSchreiben([...alle.filter((b) => b.etag !== etag), eintrag].slice(-6), alle);
@@ -1536,6 +1550,8 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
       for (const name of plan.loeschen) await lw.loeschen(name);
       etag = await lw.schreiben(UMGEBUNG, JSON.stringify(u), 'application/json', kenn.etag);
     }
+    // M529: was eben hinaufging, fehlt nicht mehr
+    for (const d of plan.schreiben) if (d.name.startsWith(DATEI_PREFIX)) await fehltVergessen(d.name.slice(DATEI_PREFIX.length));
     const groessen = Object.fromEntries(Object.entries(dateienMeta).filter(([, m]) => !!m.groesse).map(([id, m]) => [id, m.groesse as number]));
     await idbSet(KENN_KEY, { boards: stempelNeu, dateien: Object.keys(dateienMeta), etag, savedAt: payload.savedAt, kern, fremd: fremdNeu, groessen, ...(Object.keys(aliasBleibt).length ? { alias: aliasBleibt } : {}) } satisfies Kenn);
     angewandt = kennMarke({ etag, fremd: fremdNeu });
