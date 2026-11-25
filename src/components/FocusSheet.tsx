@@ -129,49 +129,7 @@ function runAction(node: AppNode, key: string) {
   }
 }
 
-/**
- * M519: Schonfrist nach dem Öffnen. Am Telefon öffnet EIN Tipp auf die (verkleinerte) Karte den Fokus. Wer aus
- * Gewohnheit doppelt tippt, traf mit dem zweiten Tipp, was inzwischen unter dem Finger lag: Die Karte ist sofort
- * bedienbar, die Kamera fährt, die Leisten des Fokus erscheinen. So wurde eine Kanban-Spalte gelöscht, ein Haken
- * gesetzt, eine Rufnummer gewählt, die Karte über die Auswahl-Leiste gelöscht, der Fokus gleich wieder geschlossen
- * oder daneben eine neue Notiz angelegt. In dieser kurzen Zeit nimmt die Ansicht deshalb keinen Druck und keinen
- * Klick an — außer in der Kopfzeile (Zurück, Darstellung): Sie liegt, wo vorher die Kopfleiste des Boards lag, dort
- * kann der zweite Tipp nicht hinfallen. Blättern von Karte zu Karte setzt die Frist nicht neu.
- */
-const FOKUS_SCHONFRIST = 450;
-let fokusOffenSeit = -Infinity;
-const fokusFrisch = () => performance.now() - fokusOffenSeit < FOKUS_SCHONFRIST;
-function useFokusSchonfrist() {
-  useEffect(() => {
-    // am Speicher abgelesen (nicht erst beim Zeichnen): Der zweite Tipp kann schneller sein als das nächste Bild
-    const ab = useBoard.subscribe((s, alt) => { if (s.focusCard && !alt.focusCard) fokusOffenSeit = performance.now(); });
-    // Zeitpunkt des geschluckten Drucks — sein Klick gehört dazu, auch wenn er erst nach der Frist ankommt
-    let geschlucktAm = -Infinity;
-    const geschluckt = () => performance.now() - geschlucktAm < 1000;
-    const gilt = (t: EventTarget | null) => !(t instanceof Element && t.closest('.focus-head'));
-    const runter = (e: Event) => {
-      geschlucktAm = fokusFrisch() && gilt(e.target) ? performance.now() : -Infinity;
-      if (geschluckt()) e.stopPropagation();
-    };
-    // Maus-Ereignisse, die der Browser nach einem Tipp nachreicht: ohne preventDefault bekäme ein Feld trotzdem den Cursor
-    const maus = (e: Event) => { if (geschluckt()) { e.stopPropagation(); e.preventDefault(); } };
-    const klick = (e: Event) => { if (geschluckt() || (fokusFrisch() && gilt(e.target))) { e.stopPropagation(); e.preventDefault(); } };
-    window.addEventListener('pointerdown', runter, true);
-    window.addEventListener('mousedown', maus, true);
-    window.addEventListener('click', klick, true);
-    window.addEventListener('dblclick', klick, true);
-    return () => {
-      ab();
-      window.removeEventListener('pointerdown', runter, true);
-      window.removeEventListener('mousedown', maus, true);
-      window.removeEventListener('click', klick, true);
-      window.removeEventListener('dblclick', klick, true);
-    };
-  }, []);
-}
-
 export function FocusSheet() {
-  useFokusSchonfrist();
   const focusCard = useBoard((s) => s.focusCard);
   const setFocusCard = useBoard((s) => s.setFocusCard);
   const boards = useBoard((s) => s.boards);
@@ -289,9 +247,13 @@ export function FocusSheet() {
     // M333: Nur ein kurzer TIPP neben die Karte schließt. Ein Stift-Strich, ein
     // Schwenken oder ein Pinch auf der Fläche gehört zum Arbeiten im Zoom.
     let start: { x: number; y: number; t: number } | null = null;
+    // M519: Der zweite Tipp eines Doppeltipps am Telefon gehört eine halbe Sekunde lang niemandem (M521, Board.tsx).
+    // Dessen Sperre hält ihn vom Inhalt fern, aber nicht von diesem Lauscher am selben Fenster: Lag unter dem Finger
+    // inzwischen freie Fläche, ging die eben geöffnete Karte sofort wieder zu. Gemessen an der Zeit des Ereignisses.
+    const offenSeit = performance.now();
     const onDown = (e: PointerEvent) => {
       start = null;
-      if (fokusFrisch()) return;   // M519: der zweite Tipp eines Doppeltipps schließt nicht gleich wieder
+      if (e.timeStamp - offenSeit < 500) return;
       const t = e.target as HTMLElement | null;
       if (!t || t.closest('.pn-focused, .focus-head, .focus-nav')) return;
       if (!t.closest('.react-flow__pane')) return;

@@ -21,7 +21,11 @@
  *      vom Vorlagen-Diagramm nur die Kopfzeile.)
  *   H  Telefon, Doppeltipp auf eine verkleinerte Karte (Notiz, Kontakt, Mail; 8 Stellen, 90 und 250 ms Abstand): Der
  *      Fokus ist offen, sonst ist nichts passiert — kein Haken, kein gewählter Verweis, keine neue Notiz, kein Fenster,
- *      kein Cursor im Text. Danach nimmt die Karte Tipps an, „Zurück" wirkt sofort.
+ *      kein Cursor im Text. Danach nimmt die Karte Tipps an. Und: Ein Tipp auf die Telefonnummer einer Karte auf dem
+ *      Board öffnet die Karte, wählt aber nicht; erst in der offenen Karte wählt der Tipp.
+ *   I  Alte Stände: Form ohne Farbe, Mail nur mit Betreff, Datei ohne Namen, Diagramm ohne Code – keine Karte fällt
+ *      aus, die markierte Form meldet keine Warnung des Farbfelds in der Konsole.
+ *   J  Telefon: Die offene Karte hat keine Größen-Anfasser; ein Wisch vom unteren Kartenrand ändert ihre Größe nicht.
  * Bilder nach PN_BILDER (Standard pruefungen/ablage/).
  */
 // Läuft aus dem Repository: `node pruefungen/m519-audit-karten-a.mjs`
@@ -340,25 +344,87 @@ if (laufe('H')) {
   const b = await knoten(P, 'k').boundingBox();
   await P.touchscreen.tap(b.x + b.width / 2, b.y + 8);
   await warteBis(P, () => !!document.querySelector('.focus-head'), 8000);
-  await P.waitForTimeout(700);   // Schonfrist (450 ms) und Kamerafahrt vorbei
+  await P.waitForTimeout(700);   // halbe Sekunde Schonfrist (M521, Board.tsx) und Kamerafahrt vorbei
   await knoten(P, 'k').locator('input[type=checkbox]').first().tap();
   const gehakt = await warteBis(P, () => JSON.parse(localStorage.getItem('pixinotes-board')).state.boards[0].nodes[0].data.blocks[1]?.props?.checked === true, 8000);
   pruefe('H nach der Schonfrist nimmt die Karte Tipps an (Haken setzen)', gehakt);
-  // Zurück führt sofort hinaus — die Kopfzeile ist von der Schonfrist ausgenommen
-  await P.locator('.focus-x').tap();
-  await warteBis(P, () => !document.querySelector('.focus-head'), 8000);
-  // warten, bis die Kamera zurück ist (die Karte liegt wieder still), dann erneut öffnen
-  let lage = null; let still = 0;
-  for (let i = 0; i < 50 && still < 4; i++) {
-    await P.waitForTimeout(120);
-    const r = await knoten(P, 'k').boundingBox();
-    still = lage && r && Math.abs(r.x - lage.x) + Math.abs(r.y - lage.y) + Math.abs(r.width - lage.width) < 0.5 ? still + 1 : 0;
-    lage = r;
+  await ctx.close();
+  // Der Tipp, der öffnet, öffnet nur: Steht die Karte lesbar groß auf dem Board (allein, also nicht verkleinert) und trifft der Tipp
+  // ihre Telefonnummer, geht nicht zugleich der Wähldialog auf
+  {
+    const { ctx, P } = await seite([karten.kontakt], { viewport: { width: 390, height: 780 }, telefon: true });
+    await P.evaluate(() => { window.__ausgeloest = []; document.addEventListener('click', (e) => { const a = e.target.closest?.('a[href]'); if (a && !e.defaultPrevented) { window.__ausgeloest.push(a.getAttribute('href')); e.preventDefault(); } }); });
+    const nummer = knoten(P, 'k').locator('a[href^="tel:"]').first();
+    await nummer.waitFor({ state: 'visible', timeout: 20000 });
+    await P.waitForTimeout(600);
+    const r = await nummer.boundingBox();
+    await P.touchscreen.tap(r.x + r.width / 2, r.y + r.height / 2);
+    const offen = await warteBis(P, () => !!document.querySelector('.focus-head'), 8000);
+    await P.waitForTimeout(300);
+    const gewaehlt = await P.evaluate(() => window.__ausgeloest);
+    pruefe('H ein Tipp auf die Telefonnummer einer Karte auf dem Board öffnet die Karte, wählt aber nicht', offen && gewaehlt.length === 0, gewaehlt);
+    // … in der offenen Karte wählt der Tipp auf die Nummer dann wie gewohnt
+    await P.waitForTimeout(900);
+    const r2 = await nummer.boundingBox();
+    await P.touchscreen.tap(r2.x + r2.width / 2, r2.y + r2.height / 2);
+    const danach = await warteBis(P, () => window.__ausgeloest.length === 1, 5000);
+    pruefe('H in der offenen Karte wählt der Tipp auf die Nummer', danach, await P.evaluate(() => window.__ausgeloest));
+    await ctx.close();
   }
-  await P.touchscreen.tap(lage.x + lage.width / 2, lage.y + 8);
-  const wiederOffen = await warteBis(P, () => !!document.querySelector('.focus-head'), 8000);
-  await P.locator('.focus-x').tap({ timeout: 3000 }).catch(() => {});
-  pruefe('H „Zurück" in der Kopfzeile wirkt auch gleich nach dem Öffnen', wiederOffen && await warteBis(P, () => !document.querySelector('.focus-head'), 3000));
+}
+
+// ───────────────────────────── J · Telefon: im Fokus keine Größen-Anfasser, ein Wisch vom Kartenrand ändert nichts
+if (laufe('J')) {
+  console.log('J  Telefon: die offene Karte hat keine Größen-Anfasser');
+  const kontakt = { id: 'k', type: 'kontakt', width: 300, position: { x: 0, y: 0 }, data: { name: 'Anna Müller', firma: 'Amt', emails: ['anna@example.de'] } };
+  const { ctx, P } = await seite([kontakt], { viewport: { width: 390, height: 780 }, telefon: true });
+  await knoten(P, 'k').waitFor({ state: 'visible', timeout: 20000 });
+  await P.waitForTimeout(700);
+  const b = await knoten(P, 'k').boundingBox();
+  await P.touchscreen.tap(b.x + b.width / 2, b.y + 10);
+  await warteBis(P, () => !!document.querySelector('.focus-head'), 8000);
+  await P.waitForTimeout(1200);
+  const mass = () => P.evaluate(() => { const n = JSON.parse(localStorage.getItem('pixinotes-board')).state.boards[0].nodes[0]; return `${Math.round(n.width ?? 0)}×${Math.round(n.height ?? 0)}`; });
+  const vorher = await mass();
+  // sichtbar = hat eine Fläche auf dem Schirm
+  const griffe = await P.evaluate(() => [...document.querySelectorAll('.react-flow__node[data-id="k"] .react-flow__resize-control')].filter((g) => { const r = g.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(g).visibility !== 'hidden'; }).length);
+  pruefe('J1 an der offenen Karte liegt kein Größen-Anfasser', griffe === 0, `${griffe} Anfasser`);
+  // Wisch nach oben, Start auf der Unterkante der Karte (dort lag die Griff-Linie)
+  const f = await knoten(P, 'k').boundingBox();
+  const cdp = await ctx.newCDPSession(P);
+  const x = f.x + f.width / 2; let y = f.y + f.height - 2;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  for (let i = 0; i < 8; i++) { y -= 6; await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y }] }); await P.waitForTimeout(16); }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await P.waitForTimeout(1300);
+  const danach = await mass();
+  pruefe('J2 ein Wisch vom unteren Kartenrand lässt die Größe der Karte, wie sie war', danach === vorher, `${vorher} → ${danach}`);
+  await ctx.close();
+}
+
+// ───────────────────────────── I · alte Stände: Karten ohne einzelne Felder
+if (laufe('I')) {
+  console.log('I  Karten ohne einzelne Felder (alte Stände) rechnen mit Vorgaben');
+  const { ctx, P, fehler } = await seite([
+    { id: 'form', type: 'shape', width: 150, height: 70, position: { x: 0, y: 0 }, data: { shape: 'process', text: 'ohne Farbe' } },
+    { id: 'mail', type: 'email', width: 300, position: { x: 200, y: 0 }, data: { subject: 'Nur Betreff' } },
+    { id: 'datei', type: 'file', width: 260, position: { x: 540, y: 0 }, data: { size: 5 } },
+    { id: 'diagramm', type: 'mermaid', width: 300, height: 200, position: { x: 840, y: 0 }, data: {} },
+  ]);
+  const meldungen = [];
+  P.on('console', (m) => { if (m.type() === 'warning' || m.type() === 'error') meldungen.push(m.text()); });
+  await warteBis(P, () => document.querySelectorAll('.react-flow__node').length === 4 && !!document.querySelector('.react-flow__node-shape .shape-body'), 20000);
+  const ausgefallen = await P.evaluate(() => [...document.querySelectorAll('.react-flow__node')].filter((e) => /lässt sich gerade nicht anzeigen/.test(e.textContent)).map((e) => e.getAttribute('data-id')));
+  pruefe('I1 keine Karte fällt aus („lässt sich gerade nicht anzeigen")', ausgefallen.length === 0, ausgefallen);
+  // jede anklicken: Auswahl-Leiste und Werkzeuge der Karte lesen die Daten ebenfalls
+  for (const id of ['form', 'mail', 'datei', 'diagramm']) {
+    await knoten(P, id).click({ position: { x: 5, y: 5 }, force: true });
+    await warteBis(P, (k) => document.querySelector(`.react-flow__node[data-id="${k}"]`)?.classList.contains('selected'), 5000, id);
+  }
+  await P.waitForTimeout(400);
+  const farbfeld = meldungen.filter((t) => /does not conform to the required format/.test(t));
+  pruefe('I2 die markierte Form ohne Farbe löst keine Warnung des Farbfelds aus', farbfeld.length === 0, farbfeld.slice(0, 1));
+  pruefe('I3 die App steht, ohne Seitenfehler', await P.locator('.react-flow').isVisible() && fehler.length === 0, fehler.slice(0, 2));
   await ctx.close();
 }
 

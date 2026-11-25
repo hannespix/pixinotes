@@ -171,7 +171,8 @@ export function ShapeCard({ id, data, selected }: NodeProps<ShapeNode>) {
           type="color"
           className="pn-colorpick nodrag"
           title="Eigene Füllfarbe"
-          value={data.color}
+          // M519: ohne Farbe (alter Stand) oder mit einer Farbe in anderer Schreibweise verlangt das Farbfeld trotzdem #rrggbb — sonst warnt der Browser bei jedem Zeichnen
+          value={/^#[0-9a-f]{6}$/i.test(data.color ?? '') ? data.color : '#ffffff'}
           onChange={(e) => updateNodeData(id, { color: e.target.value })}
         />
       </div>

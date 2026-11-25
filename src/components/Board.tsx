@@ -1494,6 +1494,9 @@ export function Board() {
     // Karte wählen) — nicht der Finger-Tipp, der am Tablet das Blatt öffnet.
     const stift = (e.nativeEvent as PointerEvent).pointerType === 'pen';
     if (e.shiftKey || stift || !(isPhoneFocus() || st0.fokusEinKlick) || !oeffneFokus(node)) return;
+    // M519: Traf der öffnende Tipp einen Verweis der verkleinerten Karte (Telefonnummer, E-Mail, Web), ging die Karte auf
+    // UND der Wähldialog bzw. die Seite — ein Tipp, zwei Wirkungen. Der Tipp, der öffnet, öffnet nur.
+    if ((e.target as HTMLElement).closest?.('a[href]')) e.preventDefault();
     // M521: Doppeltipp — der zweite Tipp kam an, während die Karte schon aufging, und traf, was dann unter dem Finger
     // lag (im Kanban verschob er ein Ticket oder löschte eine Spalte). Eine halbe Sekunde lang gehört kein Tipp dem
     // Inhalt: so lange fährt die Kamera ohnehin noch. Gemessen wird an der Zeit der EREIGNISSE, nicht mit einer Uhr —

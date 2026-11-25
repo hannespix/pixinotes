@@ -28,6 +28,9 @@
     .react-flow__node-time, .react-flow__node-minutes, .react-flow__node-calendar, .react-flow__node-bubbles, .react-flow__node-mermaid, .react-flow__node-htmlapp) {
     min-width: calc(var(--fokus-platz, calc(100vw / var(--pn-anz, 1))) - var(--fokus-rand, 8px)) !important;
   }
+  /* M519: Am Telefon füllt die offene Karte den Schirm — ihre Größen-Anfasser lagen an den Bildrändern, und ein Wisch
+     vom Kartenrand (Blättern, Rollen) zog stattdessen die Karte auf eine feste Höhe. Größe ändert man auf dem Board. */
+  .focus-mode .react-flow__node.pn-focused .react-flow__resize-control { display: none; }
 }
 .focus-mode .pn-focused .card-shell,
 .focus-mode .pn-focused .card-body { width: 100% !important; }
