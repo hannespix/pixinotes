@@ -47,8 +47,29 @@ console.log('\n════ 1: Migrationen einspielen ════');
     if (r.rc !== 0 || /ERROR/.test(r.aus)) fehler.push(`${f}: ${r.aus.split('\n').filter((z) => /ERROR/.test(z)).join(' ')}`);
   }
   pruefe(`1b alle ${dateien.length} Migrationen laufen der Reihe nach durch`, fehler.length === 0 && dateien.some((f) => /board_aendern/.test(f)), fehler.join(' | '));
-  const zwei = sql(`\\set ON_ERROR_STOP 1\n${readFileSync(path.join(dir, dateien.find((f) => /board_aendern/.test(f))), 'utf8')}`);
-  pruefe('1c die neue Migration lässt sich ein zweites Mal einspielen (nichts doppelt, kein Fehler)', zwei.rc === 0 && !/ERROR/.test(zwei.aus), zwei.aus.slice(-300));
+  // M536: die JÜNGSTE Migration zu board_aendern wiederholen. Vorher nahm `find` die erste (M383) — die legte nach
+  // M529 die alte Fassung mit vier Parametern NEBEN die neue, und jeder Aufruf war mehrdeutig („is not unique").
+  const neueste = dateien.filter((f) => /board_aendern/.test(f)).at(-1);
+  const zwei = sql(`\\set ON_ERROR_STOP 1\n${readFileSync(path.join(dir, neueste), 'utf8')}`);
+  pruefe(`1c die neueste Migration (${neueste}) lässt sich ein zweites Mal einspielen (nichts doppelt, kein Fehler)`, zwei.rc === 0 && !/ERROR/.test(zwei.aus), zwei.aus.slice(-300));
+  const fassungen = () => sql(`\\pset tuples_only on\n\\pset format unaligned\nselect string_agg(p.oid::regprocedure::text, ' ; ' order by 1) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'board_aendern';`).aus.trim();
+  const eine = fassungen();
+  pruefe('1d danach gibt es genau EINE board_aendern (keine Überladung, die PostgREST mehrdeutig macht)', eine.split(' ; ').length === 1, eine);
+  // Aufrufe wie PostgREST: benannte Parameter, alte App-Stände mit vier, neue mit sechs. „kein board" heißt: die
+  // Funktion wurde eindeutig gefunden und lief an (die Prüf-Datenbank hat hier noch kein Board).
+  const A = 'aaaaaaaa-0000-0000-0000-000000000001';
+  const aufruf = (extra) => sql(`set role authenticated;\nselect set_config('test.uid', '${A}', false);\nselect public.board_aendern(p_besitzer => '${A}', p_board_id => 'm536-nichtda', p_patch => '{}'::json, p_saved_at => null${extra});`).aus;
+  const vier = aufruf(''); const sechs = aufruf(', p_wenn_umgebung => 1, p_wenn_version => null');
+  pruefe('1e Aufrufe mit 4 und mit 6 benannten Parametern lösen eindeutig auf', /kein board/.test(vier) && /kein board/.test(sechs) && !/not unique|does not exist/.test(vier + sechs), (vier + sechs).split('\n').filter((z) => /ERROR/.test(z)).join(' '));
+  // Die alte Migration noch einmal (Wiederholung der Kette) und eine fremde Fassung aus einem Entwurf: die neue
+  // Migration räumt beide ab.
+  const alt = dateien.filter((f) => /board_aendern/.test(f))[0];
+  sql(`\\set ON_ERROR_STOP 1\n${readFileSync(path.join(dir, alt), 'utf8')}`);
+  sql(`create function public.board_aendern(p_besitzer uuid, p_board_id text, p_patch json) returns jsonb language sql as $$ select null::jsonb $$;`);
+  const vorAufraeumen = fassungen().split(' ; ').length;
+  const drei = sql(`\\set ON_ERROR_STOP 1\n${readFileSync(path.join(dir, neueste), 'utf8')}`);
+  const nachAufraeumen = fassungen();
+  pruefe('1f stehen andere Fassungen daneben (alte Migration erneut, Entwurf), entfernt die neueste Migration sie alle', vorAufraeumen === 3 && drei.rc === 0 && !/ERROR/.test(drei.aus) && nachAufraeumen === 'board_aendern(uuid,text,json,text,bigint,bigint)', `${vorAufraeumen} → ${nachAufraeumen} ${drei.aus.slice(-200)}`);
 }
 
 console.log('\n════ 2: board_aendern – Rechte, Rechnung, Antwort ════');

@@ -69,7 +69,7 @@ select set_config('test.uid', '', false) \gset x_
 select pg_temp.pruefe('C3 ohne Anmeldung: abgelehnt', pg_temp.fehler('aaaaaaaa-0000-0000-0000-000000000001', 'bx', '{"nodes":{"del":["k1"]}}'::json) = 'nicht angemeldet');
 select pg_temp.pruefe('C4 nichts davon hat das Board geändert', pg_temp.ids(pg_temp.board(), 'nodes') = 'k1,k2,k9,b1' and pg_temp.ver('board-bx.json') = 4);
 reset role;
-select pg_temp.pruefe('C5 die Rolle anon darf die Funktion gar nicht aufrufen; die Hilfsfunktion niemand von außen', not has_function_privilege('anon', 'public.board_aendern(uuid, text, json, text)', 'execute') and has_function_privilege('authenticated', 'public.board_aendern(uuid, text, json, text)', 'execute') and not has_function_privilege('authenticated', 'public.board_patch_anwenden(json, json)', 'execute') and not has_function_privilege('anon', 'public.board_patch_anwenden(json, json)', 'execute'));
+select pg_temp.pruefe('C5 die Rolle anon darf die Funktion gar nicht aufrufen; die Hilfsfunktion niemand von außen', not has_function_privilege('anon', 'public.board_aendern(uuid, text, json, text, bigint, bigint)', 'execute') and has_function_privilege('authenticated', 'public.board_aendern(uuid, text, json, text, bigint, bigint)', 'execute') and not has_function_privilege('authenticated', 'public.board_patch_anwenden(json, json)', 'execute') and not has_function_privilege('anon', 'public.board_patch_anwenden(json, json)', 'execute'));
 
 -- ── D: ungültig, fehlend ──
 set role authenticated;
