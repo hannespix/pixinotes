@@ -12,13 +12,23 @@ const VORSILBEN = ['file:', 'happ:', 'happ-state:', 'happ-state-at:'];
 export async function anhaengeKopieren(paare: Array<[string, string]>): Promise<void> {
   let kopiert = 0;
   for (const [alt, neu] of paare) {
+    let inhaltDa = false;
     for (const v of VORSILBEN) {
       try {
         const inhalt = await idbGet<unknown>(`${v}${alt}`);
         if (inhalt === undefined || inhalt === null) continue;
         await idbSet(`${v}${neu}`, inhalt);
         kopiert += 1;
+        if (v === 'file:' || v === 'happ:') inhaltDa = true;
       } catch { /* dieser Inhalt bleibt aus — die Karte zeigt es an */ }
+    }
+    // M529: Liegt der Inhalt nur im Konto (große Datei, noch nie geöffnet), ihn von dort holen. Sonst bekam die Kopie
+    // eine neue Kennung ohne Inhalt — auf keinem Gerät und nicht im Konto (HTTP 400 bei jedem Aufbau der Karte).
+    if (!inhaltDa) {
+      try {
+        const blob = await import('./syncStart').then((m) => m.kontoDateiHolen(alt));
+        if (blob) { await idbSet(`file:${neu}`, blob); kopiert += 1; }
+      } catch { /* nicht im Konto — die Karte sagt es */ }
     }
   }
   if (kopiert > 0) window.dispatchEvent(new CustomEvent('pixinotes:dateien-da'));

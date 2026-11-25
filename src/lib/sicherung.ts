@@ -22,6 +22,7 @@ import './sicherGestalt';   // M522: hängt die Gestalt-Prüfung in lib/sicher.t
 import { idbDel, idbGet, idbKeys, idbSet, KONTO_DIRTY_KEY, SYNC_DIRTY_KEY, WEBDAV_DIRTY_KEY, type SyncDatei, type SyncDirHandle } from './syncFolder';
 import { zumWeitergeben } from './share';
 import { EINGANG_ID, istEingang } from './eingangId';
+import { leeresStartboard } from '../store/start';
 import { versionSichern } from './boardVersionen';
 import { VORLIEBEN_FELDER, vorliebenAuszug } from './einstellungen';
 import { ZipArchive } from './unzip';
@@ -530,7 +531,11 @@ export async function sicherungEinspielen(s: Sicherung, modus: Modus): Promise<s
     await Promise.all(st.boards.filter((b) => kommt.has(b.id)).map((b) => versionSichern(b, 'import').catch(() => null)));
     const jetzt = useBoard.getState();
     const hier = new Set(jetzt.boards.map((b) => b.id));
-    const boards = [
+    // M529 (M522 O1): Nach „Alles leeren" steht nur das unberührte Startboard da — es macht der Gesamt-Sicherung Platz
+    // (wie beim Import eines Boards, M370), statt leer daneben stehen zu bleiben
+    const start = s.art === 'alles' ? leeresStartboard(jetzt.boards.filter((b) => !istEingang(b))) : null;
+    const startWeg = !!start && !kommt.has(start.id) && s.boards.some((b) => !istEingang(b));
+    let boards = [
       ...jetzt.boards.map((b) => (kommt.get(b.id) ?? b)),
       ...s.boards.filter((b) => !hier.has(b.id)),
     ];
@@ -569,12 +574,21 @@ export async function sicherungEinspielen(s: Sicherung, modus: Modus): Promise<s
       const aktiv = jetzt.spaces.flatMap((sp) => sp.projects).find((p) => p.boardIds.includes(jetzt.activeId)) ?? jetzt.spaces[0]?.projects[0];
       if (aktiv) spaces = jetzt.spaces.map((sp) => ({ ...sp, projects: sp.projects.map((p) => (p.id === aktiv.id ? { ...p, boardIds: [...p.boardIds, s.boards[0].id] } : p)) }));
     }
+    if (startWeg && start) {
+      boards = boards.filter((b) => b.id !== start.id);
+      const heimatRaum = jetzt.spaces.find((sp) => sp.projects.some((p) => p.boardIds.includes(start.id)));
+      spaces = spaces.map((sp) => ({ ...sp, projects: sp.projects.map((p) => (p.boardIds.includes(start.id) ? { ...p, boardIds: p.boardIds.filter((id) => id !== start.id) } : p)) }));
+      // sein Bereich (aus dem leeren Start) geht mit, wenn er jetzt leer ist und die Sicherung ihn nicht kennt
+      if (heimatRaum && !s.spaces.some((sp) => sp.id === heimatRaum.id) && spaces.length > 1) {
+        spaces = spaces.filter((sp) => sp.id !== heimatRaum.id || sp.projects.some((p) => p.boardIds.length > 0));
+      }
+    }
     const betroffen = new Set(s.boards.map((b) => b.id));
     const ohne = (e: { boardId: string }) => !betroffen.has(e.boardId);
     useBoard.setState({
       boards,
       spaces,
-      activeId: s.art === 'board' ? s.boards[0].id : (s.activeId && betroffen.has(s.activeId) ? s.activeId : jetzt.activeId),
+      activeId: s.art === 'board' ? s.boards[0].id : (s.activeId && betroffen.has(s.activeId) ? s.activeId : startWeg && jetzt.activeId === start?.id ? (boards.find((b) => !istEingang(b)) ?? boards[0]).id : jetzt.activeId),
       templates: vorlagenMischen(jetzt.templates, s.templates, true),
       // Schritte auf ersetzten Boards passen nicht mehr zu ihrem Inhalt
       past: jetzt.past.filter(ohne),

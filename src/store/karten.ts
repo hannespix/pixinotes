@@ -23,7 +23,7 @@ const VORLAGEN_MAX = 40;
 
 /** M388: Inhalte im Gerätespeicher (große Dateien, Tool-Quelltexte) zu den Karten einer Kopie mitnehmen */
 export function anhaengeMitnehmen(nodes: AppNode[], karte: Map<string, string>): void {
-  const paare = nodes.filter((n) => n.type === 'file' || n.type === 'htmlapp' || (n.type === 'sheet' && !!(n.data as { datei?: string }).datei)).map((n) => [n.id, karte.get(n.id) as string] as [string, string]);
+  const paare = nodes.filter((n) => n.type === 'file' || (n.type === 'htmlapp' && !(n.data as { live?: boolean }).live) || (n.type === 'sheet' && !!(n.data as { datei?: string }).datei)).map((n) => [n.id, karte.get(n.id) as string] as [string, string]);
   if (paare.length) void import('../lib/anhangKopie').then((m) => m.anhaengeKopieren(paare)).catch(() => {});
 }
 

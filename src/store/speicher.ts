@@ -141,8 +141,15 @@ function setWriterRole(role: WriterRole): void {
  *  true = der aktuelle Stand liegt jetzt sicher in localStorage.
  *  Bei Quota-Fehler bleibt der Write gepuffert (Retry beim nächsten Flush).
  *  M525 `gruendlich` (Seite wird verlassen/verdeckt): Text ohne Gedächtnis, siehe speicherText. */
+/** M529: Wird gerade ein unlesbarer Stand als Rettungskopie aufgehoben, wartet das Schreiben darauf */
+let rettungLaeuft: Promise<void> | null = null;
 export function flushPersist(gruendlich?: boolean): boolean {
   if (!pendingWrite) return true;
+  if (rettungLaeuft) {
+    clearTimeout(writeTimer);
+    void rettungLaeuft.then(() => { writeTimer = setTimeout(flushPersist, 0); });
+    return false;
+  }
   try {
     const wert = pendingWrite.wert;
     let text = speicherText(wert, gruendlich === true);
@@ -204,7 +211,12 @@ export const speicherAblage = {
   // schon überholten localStorage-Stand liefern
   getItem: (k: string): Gespeichert | null => {
     const roh = pendingWrite?.key === k ? speicherText(pendingWrite.wert, true) : localStorage.getItem(k);
-    return roh === null ? null : (JSON.parse(roh) as Gespeichert);
+    if (roh === null) return null;
+    try { return JSON.parse(roh) as Gespeichert; } catch {
+      // M529 (M522 O2): Unlesbar — vor dem ersten Überschreiben als Rettungskopie aufheben (lib/rettung.ts)
+      rettungLaeuft = import('../lib/rettung').then((m) => m.rettungSichern(roh)).catch(() => {}).finally(() => { rettungLaeuft = null; });
+      return null;
+    }
   },
   setItem: (k: string, v: Gespeichert): void => {
     if (writerRole !== 'writer') return; // Mitlese-Fenster schreibt NIE
