@@ -16,10 +16,95 @@ import { useBoard } from '../store';
  * K1+M5-Schutz: localStorage-Writes werden gedrosselt (max. alle 400 ms statt
  * pro Tastendruck/Drag-Frame) und Quota-Fehler abgefangen statt die App zu
  * crashen. Bei vollem Speicher informiert ein Event die UI (Toast in App.tsx).
+ *
+ * M525: Gemerkt wird der STAND (ein Verweis, kostet nichts), nicht mehr sein Text. Vorher schrieb jede einzelne
+ * Store-Änderung — jedes Maus-Ereignis beim Ziehen, jeder Tastendruck, sogar ein Hinweis-Toast — den kompletten
+ * Stand aller Boards als JSON (mehrere MB), nur um ihn 400 ms lang zu puffern und fast immer ungenutzt zu verwerfen.
+ * Jetzt entsteht der Text erst beim Schreiben, und unveränderte Karten, Striche und Boards behalten ihren Text
+ * (siehe speicherText).
  */
 let writeTimer: ReturnType<typeof setTimeout> | undefined;
-let pendingWrite: { key: string; value: string } | null = null;
+let pendingWrite: { key: string; wert: Gespeichert } | null = null;
+/** Der Stand, der zuletzt zum Schreiben vorgemerkt wurde — Vergleichsbasis für „nichts Gespeichertes geändert" */
+let letzterStand: Record<string, unknown> | null = null;
+/** reassertPersist: derselbe Stand soll trotzdem geschrieben werden */
+let erzwingen = false;
 let quotaWarned = false;
+
+type Gespeichert = { state: Record<string, unknown>; version?: number };
+
+/* ───── M525: Text des Stands, ohne Unverändertes neu zu schreiben ─────
+   Der Store ersetzt geänderte Karten, Striche, Kanten und Boards durch neue Objekte und lässt alles andere stehen
+   (so erkennt auch React, was neu zu zeichnen ist). Der Text eines Objekts wird deshalb an das Objekt selbst geheftet
+   (WeakMap): Wer eine Karte verschiebt, schreibt den Text dieser einen Karte neu — nicht die eingebetteten Bilder
+   und langen Notizen aller anderen. Das Ergebnis ist Zeichen für Zeichen dasselbe wie JSON.stringify.
+   Sicherheitsnetz: Beim Verlassen der Seite (und in den Prüfreihen bei jedem Schreiben, s. u.) entsteht der Text
+   ohne Gedächtnis — sollte je ein Objekt an Ort und Stelle verändert worden sein, steht spätestens dann das Richtige
+   im Speicher. */
+let textVon = new WeakMap<object, string>();
+const einzeln = (v: unknown): string => {
+  if (v === null || typeof v !== 'object') return JSON.stringify(v) ?? 'null';
+  let t = textVon.get(v);
+  if (t === undefined) { t = JSON.stringify(v) ?? 'null'; textVon.set(v, t); }
+  return t;
+};
+/** Objekt wie JSON.stringify, aber die Listen unter `listen` Eintrag für Eintrag über das Gedächtnis */
+const mitListen = (o: Record<string, unknown>, listen: ReadonlySet<string>, eintrag: (v: unknown) => string): string => {
+  let aus = '{'; let erster = true;
+  for (const k of Object.keys(o)) {
+    const v = o[k];
+    const t = listen.has(k) && Array.isArray(v) ? `[${v.map(eintrag).join(',')}]` : JSON.stringify(v);
+    if (t === undefined) continue;   // undefined/Funktion: lässt JSON.stringify ebenfalls aus
+    aus += `${erster ? '' : ','}${JSON.stringify(k)}:${t}`; erster = false;
+  }
+  return `${aus}}`;
+};
+const BOARD_LISTEN: ReadonlySet<string> = new Set(['nodes', 'edges', 'drawings', 'comments']);
+const STAND_LISTEN: ReadonlySet<string> = new Set(['boards']);
+const boardText = (b: unknown): string => {
+  if (b === null || typeof b !== 'object' || Array.isArray(b)) return JSON.stringify(b) ?? 'null';
+  let t = textVon.get(b);
+  if (t === undefined) { t = mitListen(b as Record<string, unknown>, BOARD_LISTEN, einzeln); textVon.set(b, t); }
+  return t;
+};
+/** Der Text, der in localStorage geht — gleich JSON.stringify(wert) */
+export function speicherText(wert: Gespeichert, ohneGedaechtnis = false): string {
+  if (ohneGedaechtnis) return JSON.stringify(wert);
+  const o = wert as unknown as Record<string, unknown>;
+  let aus = '{'; let erster = true;
+  for (const k of Object.keys(o)) {
+    const v = o[k];
+    const t = k === 'state' && v && typeof v === 'object' && !Array.isArray(v) ? mitListen(v as Record<string, unknown>, STAND_LISTEN, boardText) : JSON.stringify(v);
+    if (t === undefined) continue;
+    aus += `${erster ? '' : ','}${JSON.stringify(k)}:${t}`; erster = false;
+  }
+  return `${aus}}`;
+}
+/** Prüfreihen (und wer es wissen will) schalten mit diesem Schlüssel den Vergleich bei JEDEM Schreiben ein */
+const PRUEF_KEY = 'pixinotes-speicher-pruefen';
+let pruefen: boolean | null = null;
+const pruefenAn = (): boolean => {
+  if (pruefen === null) { try { pruefen = (import.meta.env as Record<string, string | undefined>).VITE_SPEICHER_PRUEFEN === '1' || localStorage.getItem(PRUEF_KEY) === '1'; } catch { pruefen = false; } }
+  return pruefen;
+};
+/** Zähler für Prüfreihen und Fehlersuche; `abweichungen` (gemerkter Text ≠ Stand) muss 0 bleiben */
+export const speicherZaehler = { vorgemerkt: 0, uebersprungen: 0, geschrieben: 0, abweichungen: 0 };
+if (typeof window !== 'undefined') (window as unknown as { pixinotesSpeicher: typeof speicherZaehler }).pixinotesSpeicher = speicherZaehler;
+
+/** Ist gegenüber dem zuletzt vorgemerkten Stand nichts anders, das gespeichert wird? */
+function standGleich(a: Record<string, unknown> | null, b: Record<string, unknown>): boolean {
+  if (!a) return false;
+  const kb = Object.keys(b);
+  if (Object.keys(a).length !== kb.length) return false;
+  for (const k of kb) {
+    const x = a[k]; const y = b[k];
+    if (x === y) continue;
+    // `boards` baut die Auswahl bei jedem Aufruf als neue Liste (persistHaken) — die Boards darin sind dieselben
+    if (k === 'boards' && Array.isArray(x) && Array.isArray(y) && x.length === y.length && x.every((e, i) => e === y[i])) continue;
+    return false;
+  }
+  return true;
+}
 
 // ---------------------------------------------------------------------------
 // Single-Writer-Schutz (Sync-Audit M81): Läuft PixiNotes doppelt (installierte
@@ -42,18 +127,29 @@ function setWriterRole(role: WriterRole): void {
   writerRole = role;
   // Nie einen veralteten Puffer nachschieben (z. B. via visibilitychange-Flush)
   if (role === 'follower') pendingWrite = null;
+  letzterStand = null;   // M525: nach einem Rollenwechsel zählt der nächste Stand in jedem Fall als neu
   window.dispatchEvent(new CustomEvent('pixinotes:writer-change'));
 }
 
 /** Ausstehenden (gedrosselten) Persist-Write sofort schreiben.
  *  true = der aktuelle Stand liegt jetzt sicher in localStorage.
- *  Bei Quota-Fehler bleibt der Write gepuffert (Retry beim nächsten Flush). */
-export function flushPersist(): boolean {
+ *  Bei Quota-Fehler bleibt der Write gepuffert (Retry beim nächsten Flush).
+ *  M525 `gruendlich` (Seite wird verlassen/verdeckt): Text ohne Gedächtnis, siehe speicherText. */
+export function flushPersist(gruendlich?: boolean): boolean {
   if (!pendingWrite) return true;
   try {
-    localStorage.setItem(pendingWrite.key, pendingWrite.value);
+    const wert = pendingWrite.wert;
+    let text = speicherText(wert, gruendlich === true);
+    if (gruendlich !== true && pruefenAn()) {
+      const soll = JSON.stringify(wert);
+      if (soll !== text) { abweichung(); text = soll; }
+    }
+    localStorage.setItem(pendingWrite.key, text);
+    // Mit Gedächtnis geschrieben: beim Verlassen der Seite noch einmal ohne nachsehen (nachpruefen)
+    ungeprueft = gruendlich === true ? null : { key: pendingWrite.key, wert };
     pendingWrite = null;
     quotaWarned = false;
+    speicherZaehler.geschrieben += 1;
     return true;
   } catch {
     if (!quotaWarned) {
@@ -63,25 +159,58 @@ export function flushPersist(): boolean {
     return false;
   }
 }
+/** Der zuletzt MIT Gedächtnis geschriebene Stand — beim Verlassen der Seite einmal ohne Gedächtnis gegengeprüft */
+let ungeprueft: { key: string; wert: Gespeichert } | null = null;
+function abweichung(): void {
+  speicherZaehler.abweichungen += 1;
+  textVon = new WeakMap();   // dem Gedächtnis ist nicht mehr zu trauen
+  console.error('PixiNotes: Der gemerkte Speichertext wich vom Stand ab (M525) – der Stand wurde vollständig neu geschrieben.');
+  // Im Prüfbetrieb laut scheitern (die Prüfreihen sammeln Seitenfehler) — geschrieben ist der richtige Stand trotzdem
+  if (pruefenAn()) setTimeout(() => { throw new Error('M525: gemerkter Speichertext weicht vom Stand ab'); }, 0);
+}
+/** Sicherheitsnetz: Stimmt, was mit Gedächtnis geschrieben wurde, mit dem Stand überein? Sonst jetzt richtig schreiben. */
+function nachpruefen(): void {
+  const u = ungeprueft;
+  if (!u || writerRole !== 'writer') return;
+  ungeprueft = null;
+  try {
+    const soll = JSON.stringify(u.wert);
+    if (soll === speicherText(u.wert)) return;
+    abweichung();
+    localStorage.setItem(u.key, soll);
+  } catch { /* voll: der Stand von eben bleibt stehen */ }
+}
 if (typeof window !== 'undefined') {
-  window.addEventListener('beforeunload', flushPersist);
+  // M525: Beim Verlassen sofort und gründlich schreiben — der gedrosselte Schreiber bleibt nichts schuldig
+  const sofort = () => { clearTimeout(writeTimer); if (pendingWrite) flushPersist(true); else nachpruefen(); };
+  window.addEventListener('beforeunload', sofort);
+  window.addEventListener('pagehide', sofort);
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') flushPersist();
+    if (document.visibilityState === 'hidden') sofort();
   });
 }
-export const debouncedSafeStorage = {
+/** Die Ablage für persist: nimmt den Stand als Objekt (kein JSON je Änderung, M525) und schreibt gedrosselt. */
+export const speicherAblage = {
   // pendingWrite mitlesen: ein getItem direkt nach setItem darf nie den
   // schon überholten localStorage-Stand liefern
-  getItem: (k: string) => (pendingWrite?.key === k ? pendingWrite.value : localStorage.getItem(k)),
-  setItem: (k: string, v: string) => {
+  getItem: (k: string): Gespeichert | null => {
+    const roh = pendingWrite?.key === k ? speicherText(pendingWrite.wert, true) : localStorage.getItem(k);
+    return roh === null ? null : (JSON.parse(roh) as Gespeichert);
+  },
+  setItem: (k: string, v: Gespeichert): void => {
     if (writerRole !== 'writer') return; // Mitlese-Fenster schreibt NIE
-    pendingWrite = { key: k, value: v };
+    // M525: Nichts geändert, das gespeichert wird (Toast, Dialog auf/zu, Schwebezustände) → kein Schreiben
+    if (!erzwingen && standGleich(letzterStand, v.state)) { speicherZaehler.uebersprungen += 1; return; }
+    letzterStand = v.state;
+    pendingWrite = { key: k, wert: v };
+    speicherZaehler.vorgemerkt += 1;
     clearTimeout(writeTimer);
     writeTimer = setTimeout(flushPersist, 400);
   },
-  removeItem: (k: string) => {
+  removeItem: (k: string): void => {
     if (writerRole !== 'writer') return;
     pendingWrite = null;
+    letzterStand = null;
     localStorage.removeItem(k);
   },
 };
@@ -196,7 +325,9 @@ export const inDerived = (): boolean => derivedDepth > 0;
  *  damit fremde Writes ab (z. B. ein alter Tab mit einer App-Version ohne
  *  Single-Writer-Schutz), statt Daten zu verlieren. */
 export function reassertPersist(): void {
-  useBoard.setState({}); // no-op-Merge: stößt den persist-Layer neu an
+  // M525: Der Stand selbst ist unverändert — der Vergleich „nichts geändert" darf dieses Schreiben nicht schlucken
+  erzwingen = true;
+  try { useBoard.setState({}); } finally { erzwingen = false; } // no-op-Merge: stößt den persist-Layer neu an
   flushPersist();
 }
 
