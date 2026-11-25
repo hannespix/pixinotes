@@ -62,6 +62,14 @@
   box-shadow: var(--chrome-shadow); white-space: nowrap;
 }
 .frame-wrap.selected .frame-head { color: var(--ink); border-color: var(--accent); }
+/* M527: Der Titel behält in jeder Zoomstufe seine Bildschirm-Größe (wie der Griff der Karten, `--pn-inv`): er ist der
+   einzige Griff des Rahmens und war bei 25 % noch 7, bei 15 % 4 Bildpunkte hoch — kaum zu treffen; bei 300 % 78. Er
+   wächst und schrumpft um seine Unterkante und kürzt den Namen auf die Breite des Rahmens. */
+.frame-head {
+  transform-origin: 0 100%; scale: var(--pn-inv, 1);
+  max-width: calc((100% - 16px) / var(--pn-inv, 1));
+}
+html[data-alles-zeigen] .frame-head { scale: none; max-width: calc(100% - 16px); }
 /* M521: Der Titel ist der einzige Griff des Rahmens — er liegt über den Anfass-Linien der Größe (z-index 4,
    10 bzw. 16 Bildpunkte dick, mittig auf der Oberkante). Vorher lagen sie am gewählten Rahmen über ihm: ab etwa
    35 % Zoom zur Hälfte, unter 20 % ganz — wer den gewählten Rahmen am Titel zog, zog stattdessen seine Oberkante
