@@ -242,6 +242,10 @@ export function FocusSheet() {
    * die Fokus-Leisten liegen zwar auch „neben" der Karte, sind aber
    * Bedienung — wer dort klickt, will etwas tun, nicht schließen.
    */
+  // M519: wann der Fokus aufging (von „zu" nach „offen", nicht beim Blättern zur nächsten Karte)
+  const offenSeit = useRef(0);
+  const fokusOffen = !!focusCard;
+  useEffect(() => { if (fokusOffen) offenSeit.current = performance.now(); }, [fokusOffen]);
   useEffect(() => {
     if (!focusCard) return;
     // M333: Nur ein kurzer TIPP neben die Karte schließt. Ein Stift-Strich, ein
@@ -250,10 +254,10 @@ export function FocusSheet() {
     // M519: Der zweite Tipp eines Doppeltipps am Telefon gehört eine halbe Sekunde lang niemandem (M521, Board.tsx).
     // Dessen Sperre hält ihn vom Inhalt fern, aber nicht von diesem Lauscher am selben Fenster: Lag unter dem Finger
     // inzwischen freie Fläche, ging die eben geöffnete Karte sofort wieder zu. Gemessen an der Zeit des Ereignisses.
-    const offenSeit = performance.now();
+    // Der Zeitpunkt des Öffnens steht in offenSeit (unten) — nicht der Lauf dieses Effekts, der sich auch im offenen Fokus wiederholt.
     const onDown = (e: PointerEvent) => {
       start = null;
-      if (e.timeStamp - offenSeit < 500) return;
+      if (e.timeStamp - offenSeit.current < 500) return;
       const t = e.target as HTMLElement | null;
       if (!t || t.closest('.pn-focused, .focus-head, .focus-nav')) return;
       if (!t.closest('.react-flow__pane')) return;
