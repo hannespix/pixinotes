@@ -29,8 +29,8 @@
 .hit-im-bild { color: var(--accent-strong); font-weight: 600; margin-right: 6px; }
 /* M534: archivierte Boards und Karten bleiben auffindbar — mit leiser Marke */
 .hit-archiviert {
-  color: var(--muted); font-weight: 600; margin-right: 6px; padding: 0 6px;
-  border: 1px solid var(--border); border-radius: var(--r-pill);
+  color: var(--muted); font-weight: 600; margin-right: 6px; padding: 0 7px;
+  background: var(--surface-dim); border-radius: var(--r-pill);
 }
 /* M534: Fundstelle der Suchwörter — auch ohne Umlaute getippt („ubersicht" → „Übersicht"); ohne eigene Fläche */
 .such-treffer {

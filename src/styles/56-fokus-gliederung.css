@@ -144,7 +144,7 @@ html[data-keyboard='on']:has(.app.focus-mode) { --focus-nav-h: 0px; }
 /* M534: Ein nachgeladener Teil kam nicht (Netz weg, alte Datei nach einem Update). Fenster und Ansichten zeigen den
    Hinweis schwebend unten in der Mitte, in einer Karte steht er an ihrer Stelle. */
 .nachlade-fehler {
-  position: fixed; left: 50%; bottom: 72px; transform: translateX(-50%); z-index: 120;
+  position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 120;
   max-width: min(520px, calc(100vw - 24px)); padding: 12px 14px; border-radius: var(--r-lg);
   border: 1px solid var(--border); background: var(--surface); color: var(--ink); box-shadow: var(--pop-shadow);
   font-size: 13px; line-height: 1.45; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
