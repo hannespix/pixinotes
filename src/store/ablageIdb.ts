@@ -9,6 +9,8 @@ import { A, AUSLAGERN_AB, VERWEIS_MUSTER, ablageErsetzer, abarbeiten as planeLau
 import { runDerived, speicherAuswahl } from './speicher';
 import type { BoardDoc, BoardState } from './typen';
 import { useBoard } from '../store';
+/** M397 (nachgeladen, siehe start.ts → alteNamenOhneEmoji) */
+export { namenOhneEmoji } from './ohneEmoji';
 
 /** Verweise im rohen JSON-Text (mit Anführungszeichen) */
 const VERWEIS_IM_TEXT = /"(pixinotes-ablage:[0-9a-z]{1,12}-[0-9a-z]{1,12}-\d{1,10})"/g;

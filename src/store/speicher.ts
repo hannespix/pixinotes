@@ -80,7 +80,7 @@ const boardText = (b: unknown): string => {
    im Text steht ein Verweis. Das Wie lädt nach: Bis ablage.ts da ist, merkt dieser kleine Ersetzer nur, DASS es etwas
    auszulagern gibt, und holt das Modul — das setzt dann seinen Ersetzer ein und schreibt den Stand einmal neu. */
 export const AUSLAGERN_AB = 10_000;
-const ablageModul = () => import('./ablageIdb');
+export const ablageModul = () => import('./ablageIdb');
 let ersetzer = (_k: string, v: unknown): unknown => {
   if (typeof v === 'string' && v.length >= AUSLAGERN_AB && v.startsWith('data:')) void ablageModul();
   return v;
@@ -184,8 +184,7 @@ export function flushPersist(gruendlich?: boolean): boolean {
     return true;
   } catch (e) {
     // M532: voll oder anders gesperrt? — der Abgleich nennt es beim Namen statt zu raten
-    const name = (e as { name?: string })?.name ?? '';
-    letzterFehler = /quota/i.test(name) || (e as { code?: number })?.code === 22 ? 'voll' : 'anderer';
+    letzterFehler = /quota/i.test((e as Error)?.name) ? 'voll' : 'anderer';
     if (!quotaWarned) {
       quotaWarned = true;
       window.dispatchEvent(new CustomEvent('pixinotes:quota'));
@@ -194,9 +193,8 @@ export function flushPersist(gruendlich?: boolean): boolean {
   }
 }
 /** M532: Warum das letzte Schreiben scheiterte (null = es gelang) */
-let letzterFehler: 'voll' | 'anderer' | null = null;
-/** M532: Grund des letzten gescheiterten Schreibens — die Meldung dazu baut lib/syncFolder.ts (speicherFehlerText) */
-export const speicherFehlerArt = (): 'voll' | 'anderer' | null => letzterFehler;
+/* (die Meldung dazu baut kontoSync.ts → speicherFehlerText) */
+export let letzterFehler: 'voll' | 'anderer' | null = null;
 /** Meldung des Prüfbetriebs (kein Oberflächentext — Nutzer sehen sie nie) */
 const ABWEICHUNG = 'M525: gemerkter Speichertext weicht vom Stand ab';
 /** Der zuletzt MIT Gedächtnis geschriebene Stand — beim Verlassen der Seite einmal ohne Gedächtnis gegengeprüft */

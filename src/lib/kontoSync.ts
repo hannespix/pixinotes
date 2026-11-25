@@ -16,7 +16,7 @@
 import { boardVonAussen } from './sicher';
 import './sicherGestalt';   // M522: hängt die Gestalt-Prüfung in lib/sicher.ts ein
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc, type Space } from '../store';
-import { speicherFehlerArt } from '../store/speicher';
+import { letzterFehler } from '../store/speicher';
 import { t } from './sprache';
 import {
   alsBase64, anhangKarte, base64AlsBlob, basisLesen, basisMerken, basisVergessen, buildSyncPayloadMitDateien, DATEI_BUDGET_MB,
@@ -1065,7 +1065,7 @@ export async function kontoWrite(): Promise<string> {
  * (Vorher hieß es immer „Browser-Speicher voll?", auch wenn der Grund ein anderer war.)
  */
 function speicherFehlerText(): string {
-  const art = speicherFehlerArt();
+  const art = letzterFehler;
   if (art === 'voll') return t('Konto-Stand nicht gespeichert: Browser-Speicher voll. Bitte unter Einstellungen → Daten „Alles sichern“.');
   if (art === 'anderer') return t('Konto-Stand nicht gespeichert: Der Browser lässt gerade nicht in seinen Speicher schreiben.');
   return t('Konto-Stand konnte nicht eingearbeitet werden – der Abgleich versucht es gleich noch einmal.');
