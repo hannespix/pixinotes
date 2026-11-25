@@ -121,3 +121,25 @@ Eine Fassung von vor M538 lässt sich nachträglich nicht umstimmen (ihr Code st
 - Prüfreihen: F1–F4 (Marke, Band, keine Schreibvorgänge, Marke bleibt), R1–R5 (WebDAV-Nachbau: ein Stand mit Verweis —
   Inhalt hier vorhanden bzw. nirgends — kommt an, beide Bilder bleiben, der nächste Upload trägt wieder die ganzen
   Bilder). Gegen den Build davor: R3, R4, R5 rot (Bilder leer, leer hochgeladen), F2–F3 rot.
+
+## Nicht umgesetzt: Bilder im Konto-Abgleich über den Datei-Weg (offen aus M529/M532)
+Auf Wunsch des Besitzers („alles zum Ende bringen") nur angefangen, wenn es sauber und sicher in überschaubarer Zeit
+geht — das ist es nicht: Der Board-Stand im Konto ist zugleich das Austauschformat für ältere App-Stände, Gäste per Link
+(`gast_lesen`/`gast_aendern` lesen und schreiben die Board-Zeile selbst), Freigaben und den Inhalt-Prüfer (M388). Ein
+Verweis statt Bild in der Board-Zeile müsste auf all diesen Wegen verstanden werden, und ein älteres Gerät sähe genau den
+Fehler, den Abschnitt F gerade schließt (leere Bilder). **Plan:**
+1. **Lesen zuerst ausliefern** (ein Meilenstein): Jedes Gerät versteht in Board-Zeilen einen Verweis
+   `pixinotes-datei:<prüfsumme>` und holt den Inhalt aus `<Nutzer>/datei-<prüfsumme>` (bestehender Datei-Weg aus M329,
+   Bucket-Regeln unverändert, Gäste über die Freigabe-Dateiliste wie bei Tools, M391); `standGeprueft` setzt ihn ein wie
+   heute die Ablage-Verweise. Schreiben bleibt unverändert (ganzes Bild).
+2. **Schreiben erst, wenn alle Geräte lesen können:** Jedes Gerät trägt seine Fassung in die Umgebung des Kontos ein
+   (`umgebung.json → geraete: { <Gerät>: { format, zuletzt } }`); hochgeladen wird als Verweis nur, wenn jedes Gerät,
+   das sich in den letzten 60 Tagen gemeldet hat, Schritt 1 kann, und nie für geteilte Boards, solange Gäste per Link
+   einen älteren Stand haben könnten (bis die Gast-Funktionen Verweise verstehen). Ein Bild geht genau einmal als Datei
+   hoch (Prüfsumme = Name, wiederholbar), danach reist nur der Verweis.
+3. **Messen** mit einem Board der Gestalt des Besitzers (8 SVG à 80 KB, 16 HTML-Tools) — vor dem Bau von Schritt 2:
+   Geschrieben wird seit M383/M529 kartenweise (`board_aendern`, ein Bild reist nur mit, wenn seine Karte sich ändert);
+   gelesen wird nach jeder fremden Änderung die ganze Board-Zeile (rund 0,7 MB bei diesem Board). Dort steckt die
+   Ersparnis — oder in einem Lese-Weg „nur geänderte Karten" (M529, Grenzen), der ganz ohne Formatwechsel auskäme und
+   zuerst geprüft werden sollte.
+4. Prüfreihe mit drei Geräten (alt/neu gemischt), Export/Import-Rundreise, Gast-Link, zweites Gerät ohne Ablage.

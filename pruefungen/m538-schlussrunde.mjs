@@ -108,6 +108,15 @@ if (will('D')) {
     pruefe('D3 … auch nicht, wenn der Schreib-Cursor im Text steht', b.nodes.length === 2, b.nodes.map((n) => n.id));
   } else pruefe('D3 Schreib-Cursor im Text der offenen Notiz', false, 'kein Textfeld');
   pruefe('D4 die Karte bleibt offen', await P.evaluate(() => !!document.querySelector('.focus-head')));
+  // Der Knopf „Duplizieren" der Auswahl-Leiste an der offenen Karte: genauso
+  await P.evaluate(() => { window.__hinweise.length = 0; });
+  const knopf = P.locator('.sel-toolbar button[title^="Duplizieren"], .sel-toolbar button[aria-label^="Duplizieren"]').first();
+  if (await knopf.count()) {
+    await knopf.click();
+    await warteBis(P, () => window.__hinweise.some((h) => /nicht dupliziert/.test(h)));
+    b = await standRuhig(P, 3000);
+    pruefe('D4b der Knopf „Duplizieren" an der offenen Karte legt ebenfalls nichts dahinter', b.nodes.length === 2 && (await hinweise(P)).some((h) => /nicht dupliziert/.test(h)), { n: b.nodes.map((n) => n.id), h: await hinweise(P) });
+  } else pruefe('D4b Knopf „Duplizieren" an der offenen Karte gefunden', false, 'kein Knopf');
   for (let i = 0; i < 4 && await P.evaluate(() => !!document.querySelector('.focus-head')); i += 1) { await P.keyboard.press('Escape'); await P.waitForTimeout(400); }
   await warteBis(P, () => !document.querySelector('.focus-head'));
   await P.waitForTimeout(700);
