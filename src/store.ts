@@ -31,7 +31,7 @@ export { selectActiveBoard, selectNurLesen, useNurLesen, useKarteFest } from './
 export { ohneLeseschutz, LESE_HINWEIS, persistHaken, vorUmbauHaken, FREMD_SCHUB_AB, setzeKartenSperren, setzeNotizSchutz, GRUPPE_EREIGNIS, setzeGruppe, karteFest, gruppeVon } from './store/schutz';
 export type { GastRecht, GruppenInfo } from './store/schutz';
 export { verlaufAbgrenzen, mutedHistory, kamVonAussen, NOTIZ_EXTERN } from './store/verlauf';
-export { getWriterRole, istZuAlt, singleWriterSupported, flushPersist, adoptPersistedState, claimWriter, takeOverWriter, isImportedState, markImported, runDerived, inDerived, reassertPersist } from './store/speicher';
+export { getWriterRole, singleWriterSupported, flushPersist, adoptPersistedState, claimWriter, takeOverWriter, isImportedState, markImported, runDerived, inDerived, reassertPersist } from './store/speicher';
 export type { WriterRole } from './store/speicher';
 export { START_BOARD_NAME, START_BOARD_NAME_EN, leeresStartboard, ohneStartboard, alteNamenOhneEmoji, startNamenAufEnglisch } from './store/start';
 

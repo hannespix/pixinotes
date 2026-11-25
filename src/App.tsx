@@ -8,9 +8,10 @@ import { Dock } from './components/Dock';
 import { Tabs } from './components/Tabs';
 import { TopActions } from './components/TopActions';
 import {
-  adoptPersistedState, claimWriter, getWriterRole, hinweisKnopfDruecken, hinweisMitKnopf, istZuAlt, reassertPersist,
+  adoptPersistedState, claimWriter, getWriterRole, hinweisKnopfDruecken, hinweisMitKnopf, reassertPersist,
   selectActiveBoard, selectNurLesen, singleWriterSupported, takeOverWriter, useBoard, type WriterRole,
 } from './store';
+import { istZuAlt } from './store/speicher';   // M538 (nicht über store.ts: dessen Namensliste bleibt fest, m480)
 import { initAutoSync } from './lib/syncFolder';
 import { EIGENER_LOOK_EREIGNIS, eigenerLook, eigenerLookSetzen, hinweisEinmal, lookAnders, lookAusRoh, lookRohVon, lookWort, wirksamerLook } from './lib/boardLook';
 import { sicherungStartFaellig, SICHERUNG_EREIGNIS } from './lib/sicherungTakt';
