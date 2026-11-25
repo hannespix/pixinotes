@@ -106,6 +106,7 @@ export function SelectionToolbar() {
   // Beim Pannen und Zoomen ändert sich der Platz — die Regel rechnet mit
   const transform = useStore((z) => z.transform);
   const [seite, setSeite] = useState<'oben' | 'unten' | 'dock'>('oben');
+  const [titelUeber, setTitelUeber] = useState(0);   // M527: Bildpunkte, die ein gewählter Rahmentitel über den Kasten ragt
   // M168: Die Popover (KI/Attribute/Ausrichten/Verschieben) leben als PORTAL
   // mit fester Bildschirmposition — innerhalb der NodeToolbar deckelt der
   // Stacking-Kontext des Flow-Viewports sie unter Kopf- und Tab-Leiste, bei
@@ -372,7 +373,15 @@ export function SelectionToolbar() {
       .map((id) => document.querySelector(`.react-flow__node[data-id="${id}"]`)?.getBoundingClientRect())
       .filter((r): r is DOMRect => !!r && r.height > 0);
     if (!kaesten.length) return;
-    const oben = Math.min(...kaesten.map((r) => r.top));
+    // M527: Der Titel eines gewählten Rahmens ragt über seinen Kasten (in jeder Zoomstufe ~30 Bildpunkte) — die Leiste
+    // steht darüber, sonst deckte sie den einzigen Griff des Rahmens zu
+    const titel = Math.max(0, ...selFrames.map((f) => {
+      const n = document.querySelector(`.react-flow__node[data-id="${f.id}"]`);
+      const h = n?.querySelector('.frame-head');
+      return n && h ? Math.round(n.getBoundingClientRect().top - h.getBoundingClientRect().top) : 0;
+    }));
+    setTitelUeber((alt) => (alt === titel ? alt : titel));
+    const oben = Math.min(...kaesten.map((r) => r.top)) - titel;
     const unten = Math.max(...kaesten.map((r) => r.bottom));
     // Höhe der Leiste selbst messen statt zu schätzen — sie wächst mit dem
     // Anzeige-Zoom und bei mehreren Zeilen
@@ -1110,7 +1119,7 @@ export function SelectionToolbar() {
       nodeId={[...selected, ...selFrames].map((n) => n.id)}
       isVisible
       position={seite === 'unten' ? Position.Bottom : Position.Top}
-      offset={12}
+      offset={12 + (seite === 'unten' ? 0 : titelUeber)}
       className="sel-toolbar-anker"
     >
       <div className="sel-toolbar nodrag" ref={leisteRef}>{bar}</div>

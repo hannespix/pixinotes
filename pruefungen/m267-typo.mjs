@@ -278,7 +278,8 @@ const mass = await P.evaluate(() => {
   const tb = document.querySelector('.bn-formatting-toolbar');
   if (!tb) return null;
   const r = tb.getBoundingClientRect();
-  const karte = tb.closest('.card-body')?.getBoundingClientRect();
+  // M527: Die Leiste liegt in einer eigenen Ebene über dem Board — gemessen wird gegen die Karte, deren Text markiert ist
+  const karte = (tb.closest('.card-body') ?? document.querySelector('.react-flow__node-note .card-body'))?.getBoundingClientRect();
   /* Der ehrliche Test ist nicht „welcher Vorfahre hat overflow:hidden" — die
      Leiste steht `fixed` und hängt damit gar nicht mehr in dessen
      Beschneidungskette. Gefragt ist, ob man die Knöpfe TRIFFT. Also für jeden

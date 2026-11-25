@@ -261,6 +261,10 @@ html[data-alles-zeigen] .react-flow__node.selected > .card-shell[data-winkel] { 
 .dreh-knopf:hover { background: var(--surface-2); }
 .dreh-knopf:active { cursor: grabbing; }
 @media (pointer: coarse) { .dreh-knopf { width: 32px; height: 32px; right: -40px; bottom: -40px; } }
+/* M527: in jeder Zoomstufe bildschirmgroß wie die übrigen Griffe (`--pn-inv`) — bei 25 % war er 5 Bildpunkte groß und lag
+   auf der Größen-Ecke, bei 300 % 66. Er wächst um seine äußere Ecke, der Abstand zur Karte wächst mit. */
+.dreh-knopf { transform-origin: 100% 100%; scale: var(--pn-inv, 1); right: calc(-30px * var(--pn-inv, 1)); bottom: calc(-30px * var(--pn-inv, 1)); }
+@media (pointer: coarse) { .dreh-knopf { right: calc(-40px * var(--pn-inv, 1)); bottom: calc(-40px * var(--pn-inv, 1)); } }
 .dreh-anzeige {
   position: absolute; left: 50%; top: -34px; transform: translateX(-50%) rotate(calc(-1 * var(--winkel, 0deg))); z-index: 8; pointer-events: none;
   background: var(--ink); color: var(--surface); font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: var(--r-sm); font-variant-numeric: tabular-nums; white-space: nowrap;
