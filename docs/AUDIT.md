@@ -1,6 +1,7 @@
 # Audit November 2026
 
-Vier Durchgänge: Code (M388), Oberfläche (M389), Logik im Tool (M390), Zusammenarbeit im Team (M391).
+Vier Durchgänge: Code (M388), Oberfläche (M389), Logik im Tool (M390), Zusammenarbeit im Team (M391); dazu
+Barrierefreiheit (M447) und das große Bugfixing-Audit mit Umsetzungsrunde (M518–M541, Abschnitt 6).
 Jeder Fund wurde am Code nachgeprüft, bevor er behoben wurde. Status: ✅ behoben · ⏳ offen · ➖ bewusst nicht geändert (mit Grund).
 
 ## 1 · Code-Audit (M388)
@@ -230,3 +231,98 @@ Dunkeln, Einstellungen, Hilfe, Suche, Karten-Fokus, Übersicht, reduzierte Beweg
 | B11 | Navigation als Ausklapp-Spalte am Telefon (`.nav-panel`): `role="dialog"` ohne `aria-modal` und ohne Fokus-Falle | ✅ M456: `aria-modal`, Fokus-Führung über `lib/fensterFokus.ts` (`.nav-backdrop`), Hintergrund `inert`, Auslöser mit `aria-expanded`/`aria-controls` — die Abdunklung deckt die Kopfleiste ohnehin, eine Ausnahme braucht es nicht |
 | B12 | Vor dem Board liegen am Laptop rund 50 Tab-Stationen der Navigation | ➖ F6 springt von Bereich zu Bereich (M345), Strg+K sucht |
 | B13 | Einstellungen › Dienste › „KI-Programme von außen (MCP)": Verweis „pixinotes-mcp.mjs laden" in `--accent` mit 3,5:1 | ✅ `--accent-strong` |
+
+## 6 · Bugfixing-Audit und Umsetzung (M518–M541, November 2026)
+
+Auftrag des Besitzers: „Prüfe das gesamte Tool auf Logikfehler und UI-Fehler – ein großes Bugfixing-Audit." Danach
+kamen Rückmeldungen aus dem echten Betrieb dazu (Konto-Abgleich mit mehreren Geräten, große Boards mit HTML-Tools,
+Zoom, „Speicher voll", flüssige Schrift). Jeder Befund wurde nachgestellt, bevor er behoben wurde; jede Behebung hat
+eine Prüfreihe, die gegen den Stand davor rot ist. Einzelheiten, Ursachen und Grenzen stehen je Meilenstein in
+`docs/meilensteine/`.
+
+### 6.1 Audit (sechs Durchgänge)
+
+| Meilenstein | Bereich | Ergebnis |
+|---|---|---|
+| M518 | Gesamtlauf aller Prüfreihen | Reihen mit Zeitmessung rechnen die Maschinenlast heraus (`werkzeug/maschinen-last.mjs`) und laufen allein; Befund „Text weg unter Last" (m377) → M524/M533 |
+| M519 | Inhaltskarten, Fokus-Ansicht | Fehler in Notiz, Bild, PDF, Diagramm, Code u. a. behoben (Tabelle im Meilenstein) |
+| M520 | Planung, Daten, Workshop | Kanban, Zeitplan, Kalender, Tabelle, Mitmachen; fehlende Funktionen → M528, M531 |
+| M521 | Board und Präsentation | vierzehn Fehler behoben; Rest → M530 |
+| M522 | Daten, Abgleich, Team | eine kaputte Karte von außen legt die App nicht mehr lahm (Gestalt-Prüfung `lib/sicherGestalt.ts`) |
+| M523 | Rahmen-Oberfläche | Fenster, Kürzel, Suche, Menüs, Offline-Start, Hilfe; Rest → M534 |
+
+### 6.2 Rückmeldungen aus dem Betrieb und Umsetzungsrunde
+
+| Meilenstein | Was der Nutzer merkt |
+|---|---|
+| M524 | Konto-Abgleich setzt die eigene Arbeit nicht mehr auf einen älteren Stand zurück (mit dem echten Board des Besitzers nachgestellt, drei Geräte) |
+| M525 | Große Boards (Dutzende Karten, HTML-Tools) bleiben beim Ziehen und Tippen flüssig |
+| M526 | Archivierte Boards lassen in der Übersicht keine Lücken mehr |
+| M527 | Formatier-Leiste, Griffe, Pfeil-Anschlüsse und Auswahl in jeder Zoomstufe gleich verlässlich |
+| M528 | Rechen-Tabelle: Zeilen/Spalten einfügen und löschen, Bereiche kopieren, Datumsrechnung, ganze Spalten |
+| M529 | Konto: Schreiben mit Vorbedingung (`board_aendern`), fehlende Dateien werden nachgereicht, „Speicher aufräumen" |
+| M530 | Einfügen im Fokus, Rahmen samt Inhalt duplizieren/verschieben, Ausgänge der Rahmen-Reise, Esc-Stapel, Board löschen mit Rückgängig |
+| M531 | Fristen auf Englisch, Timer überlebt Neuladen, Kalender, Nur-lesen-Leisten, Kontakt |
+| M532 | „Speicher voll": große Bilder liegen in der IndexedDB, der Stand im localStorage bleibt klein |
+| M533 | Gemeinsam schreiben: der neueste Text bleibt, auch unter Last |
+| M534 | Zurück-Taste in der App, Suche ohne Umlaute, robustes Nachladen, Service Worker räumt alte Dateien auf |
+| M535 | Leichter Start, flüssige Schrift ruht ohne Maus, animierte Bilder und HTML-Tools halten außerhalb des Bildes an, Diagramme werden abseits gezeichnet |
+| M536 | Hauptzweig wieder grün; `board_aendern` räumt jede alte Fassung ab |
+| M537 | Flüssige Schrift fließt wieder flüssig (Rückschritt aus M535) |
+| M538 | Strg+D im Fokus, Vorbedingung auch für Gäste (`gast_aendern`), Geräte-Ablage räumt sich auf, ältere App-Fassung kann keine Bilder mehr leeren |
+| M539 | Kein Ruckler, wenn das Nachladen nach dem Start in einen Zug fällt (Rückschritt aus M534) |
+| M540 | Flüssige Schrift läuft auf 120/144/240-Hz-Schirmen so schnell wie auf 60 Hz (Restzeit je Bild wurde verworfen) |
+| M541 | … auch während sich Maus oder Stift bewegen (Rückschritt aus M540) |
+
+Entscheidungen des Besitzers (Rückfragen mit Ja/Nein, alle mit „Ja" beantwortet): flüssige Schrift hält nach rund
+zwei Sekunden ohne Mausbewegung an; animierte Bilder zeigen beim Ziehen und außerhalb des Bildes ein Standbild;
+HTML-Tools halten nach einer Weile außerhalb des Bildes an, dazu „Alle Tools anhalten"; die Suche findet archivierte
+Boards weiter (Marke „archiviert"). „Bereich löschen" zählt archivierte Boards mit. Der Viewport-Zusatz
+`interactive-widget=resizes-content` (Hinweis von BlockNote in der Konsole) bleibt bewusst weg – er änderte das
+Verhalten der Bildschirmtastatur am Telefon (Begründung in M523).
+
+### 6.3 Server (Supabase)
+
+Mit Freigabe des Besitzers eingespielt und danach geprüft (genau eine Fassung je Funktion, Rechte, `security definer`):
+
+| Migration | Wirkung | Rückweg |
+|---|---|---|
+| `20261125100000_board_aendern_vorbedingung.sql` (M529, gehärtet in M536) | Konto-Geräte schreiben eine Karte nur, wenn der Server-Stand noch der gesehene ist; sonst neu lesen und je Feld zusammenführen | im Kopf der Datei |
+| `20261125120000_gast_aendern_vorbedingung.sql` (M538) | dasselbe für Gäste per Link; Vorbedingung im Patch, Signatur unverändert | `gast_aendern` aus `20261117100000_team_haertung.sql` |
+
+Die App läuft mit und ohne beide Migrationen (sie erkennt den Server an `geprueft: true`).
+
+### 6.4 Schlusslauf
+
+Gesamtlauf aller Prüfreihen am 25.11.2026 auf dem Stand `34a4ba8` (nach M538, mit eingespielten Migrationen im
+Nachbau): **260 von 260 Dateien grün, 7 682 Prüfpunkte, 0 rot**, 93 Minuten bei zwei Bahnen
+(`node werkzeug/alle-pruefungen.mjs --bahnen 2`). Einziger Wiederholungsfall: `m537` fand im ersten Anlauf ihren
+Port belegt (eine parallel von Hand gestartete m537) und war allein grün. Danach kamen M540 und M541 (flüssige Schrift
+auf 144-Hz-Schirmen, auch bei bewegter Maus); sie sind mit `m540` und den betroffenen Reihen (m500, m535, m537)
+geprüft.
+
+### 6.5 Offen
+
+Bewusst nicht umgesetzt oder als eigener Schritt vorgemerkt; Einzelheiten im genannten Meilenstein.
+
+| Thema | Stand | Meilenstein |
+|---|---|---|
+| Datenverkehr im Konto: bei jeder fremden Änderung wird die ganze Board-Zeile gelesen; eingebettete Bilder reisen darin mit | Plan liegt vor: erst nur Lesen über den Datei-Weg ausliefern, Schreiben erst, wenn alle Geräte des Kontos lesen können; vorher messen | M524, M529, M538 |
+| Lese-Weg „nur geänderte Karten seit Version n" | lohnt sich erst nach dem Datei-Weg für Bilder messbar zu prüfen | M529 |
+| Ring der letzten Server-Stände (`konto:basen`) wird je Abgleich ganz gelesen und geschrieben | nicht angefasst | M524, M529 |
+| Wer minutenlang ohne Pause tippt, lädt in dieser Zeit nicht hoch (Tipp-Schutz) | bewusst so (m383 B5, m328 F0) | M524 |
+| Speicherstand von HTML-Tools reist nicht über Konto oder geteilte Boards | war schon so | M524, M529 |
+| Speicher ist ein localStorage-Text (synchron geschrieben); `canEmbed` baut beim Einfügen eines Bildes einmal den ganzen Stand | Umbau des Speicherformats wäre ein eigener Schritt | M525, M536 |
+| Tabelle: zwei Geräte bauen gleichzeitig um → „hiesige Fassung gilt" mit Hinweis; Live-Team nicht eigens geprüft; Datum geht als Text nach Excel | Grenzen der Umsetzung | M528 |
+| Timer in einem anderen Fenster des Starters; Mitmachen-Zustand auf anderen Geräten nach dem Löschen | so gebaut | M531 |
+| Nur lesen: Menüeinträge, die Ansicht und Inhalt mischen, bleiben sichtbar und melden | so gebaut | M531 |
+| Weit herausgezoomt keine Anschlusspunkte beim bloßen Zeigen (erst wählen, dann ziehen) | braucht eine Entscheidung | M527 |
+| Waagerechter Trackpad-Wisch über der unteren Leiste kann im Browser „Zurück" auslösen | nicht untersucht | M527 |
+| Rahmen größer als der Bildschirm: Titel außerhalb, verschieben erst nach dem Herauszoomen | wie in Miro | M527 |
+| Zurück-Taste schließt die Präsentation nicht; Fenster außerhalb des Stores ohne Verlaufseintrag | Grenze | M534 |
+| Erster Besuch ohne Netz: fehlt eine gemeinsame Datei, hilft erst „Neu laden" | Grenze | M534 |
+| Duplizieren nimmt auf Karten geankerte Striche nicht mit; Rahmenpfeile zwischen kopierten Rahmen ebenso | neue Funktion | M530 |
+| Reihenfolge an Verzweigungen der Rahmenpfeile umsortieren | neue Funktion | M521 |
+| Ablage-Aufräumen: Rückgängig in einem anderen Fenster in genau der Löschsekunde (nach sieben Tagen Verwaisung) | Grenze, Abgleich trägt das Bild weiter | M538 |
+| App-Fassungen von vor M538 kennen die Format-Marke nicht | Reparatur beim Empfang deckt sie ab | M538 |
+| `m537` B3 („lebendig" bewegt sich weiter) liegt nahe an ihrer Schwelle und fällt unter starker Fremdlast gelegentlich im ersten Lauf | Messwerte vor und nach M540 in der Notiz | M541 |
