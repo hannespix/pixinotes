@@ -8,6 +8,7 @@
  * es gibt nichts zu zeigen. Wird erst beim ersten Öffnen geladen (App.tsx).
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { fensterDarueber } from '../lib/overlay';
 import { useBoard } from '../store';
 import type { AppNode } from '../types';
 import {
@@ -90,7 +91,8 @@ export function EingangFenster({ gruppe, wunsch, onClose }: { gruppe?: string; w
   }, [gruppe, wunsch]);
   useEffect(() => {
     const esc = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || document.querySelector('.modal-backdrop, .search-backdrop')) return;
+      // M534: der Stapel vom Tastendruck (M523) — ein eben über dem Eingang geschlossenes Fenster nimmt ihn nicht mit
+      if (e.key !== 'Escape' || fensterDarueber(null, e)) return;
       // M488: Esc schließt zuerst Menü bzw. Notiz-Wahl, erst dann die Liste
       if (menueRef.current) { setMenue(null); return; }
       if (wahlRef.current) { setNotizFuer(null); return; }

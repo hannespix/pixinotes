@@ -181,26 +181,11 @@ export function FocusSheet() {
 
   // Android-Zurücktaste: Ohne eigenen History-Eintrag schlösse die Systemgeste
   // die ganze PWA statt nur das Blatt — genau das erwartet dort niemand.
-  // WICHTIG: nur am OFFEN/ZU hängen, nicht an der Karten-ID. Sonst räumt das
-  // Cleanup beim Blättern seinen eigenen Eintrag ab, das löst popstate aus —
-  // und der Fokus schlösse sich beim Weiterblättern von selbst.
+  // M534: Den Eintrag führt jetzt lib/verlauf.ts (mit Board, Ansicht und Fenstern); die erste Karte im Fokus holt es.
   const isOpen = !!focusCard;
   // M426: Nur Inhalt – Vollbild ohne Kopf- und Fußleiste, ohne Rahmen und Bedienung (F, Esc)
   const reinAnsicht = useReinAnsicht('fokus', isOpen);
-  useEffect(() => {
-    if (!isOpen) return;
-    history.pushState({ pnFocus: true }, '');
-    const onPop = () => setFocusCard(null);
-    window.addEventListener('popstate', onPop);
-    return () => {
-      window.removeEventListener('popstate', onPop);
-      // Beim Schließen über ✕/Wischen den eigenen Eintrag wieder abräumen,
-      // sonst sammeln sich tote Schritte im Verlauf. Kam das Schließen von
-      // der Zurück-Taste, ist er schon weg — der Guard verhindert den
-      // Schritt zu weit zurück.
-      if (history.state?.pnFocus) history.back();
-    };
-  }, [isOpen, setFocusCard]);
+  useEffect(() => { if (isOpen) void import('../lib/verlauf').then((m) => m.verlaufStarten(), () => {}); }, [isOpen]);
 
   /**
    * Esc schließt — und zwar beim ERSTEN Druck.

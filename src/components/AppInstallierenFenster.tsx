@@ -1,6 +1,7 @@
 // M516: „Als App installieren" — Diagnose in Klartext, wenn der Browser gerade keinen Installations-Dialog anbietet.
 // Wird erst geladen, wenn jemand den Eintrag wählt (⋯ der Leiste, Strg+K) und der Browser kein Angebot gemacht hat.
 import { useEffect, useRef, useState } from 'react';
+import { escDarueber } from '../lib/fensterEsc';
 import { appInstallieren, installStand } from '../lib/appInstallieren';
 import { useBoard } from '../store';
 import { IX } from './Icons';
@@ -45,7 +46,14 @@ function anleitung(os: Os, browser: Browser): Anleitung {
   if (browser === 'firefox') {
     return os === 'android'
       ? { titel: 'Firefox (Android)', schritte: ['Menü ⋮ → „Installieren“ (bzw. „Zum Startbildschirm hinzufügen“).'] }
-      : { titel: 'Firefox', schritte: ['Firefox installiert Web-Apps am Computer nicht.', 'Öffne PixiNotes in Chrome oder Edge und installiere es dort.'] };
+      // M534: Neuere Fassungen unter Windows heften Web-Apps an die Taskleiste (eigenes Fenster) — das ist ihr Weg
+      : os === 'windows'
+        ? { titel: 'Firefox (Windows)', schritte: [
+          'Neuere Firefox-Fassungen bieten „Zur Taskleiste hinzufügen“: Symbol rechts in der Adressleiste – oder Menü ≡ → „Zur Taskleiste hinzufügen“.',
+          'PixiNotes öffnet sich dann aus der Taskleiste in einem eigenen Fenster.',
+          'Fehlt der Eintrag, Firefox aktualisieren – oder PixiNotes in Chrome oder Edge öffnen und dort installieren.',
+        ] }
+        : { titel: 'Firefox', schritte: ['Firefox installiert Web-Apps am Computer nicht.', 'Öffne PixiNotes in Chrome oder Edge und installiere es dort.'] };
   }
   if (browser === 'samsung') return { titel: 'Samsung Internet', schritte: ['Menü ≡ → „Seite hinzufügen zu“ → „Startbildschirm“.'] };
   if (browser === 'safari') {
@@ -83,7 +91,8 @@ export function AppInstallierenFenster({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     zu.current?.focus();
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    // M534: Liegt ein anderes Fenster darüber (Alt+H, Alt+E, Strg+K), gehört Esc ihm
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !escDarueber(zu.current, e)) { e.stopPropagation(); onClose(); } };
     // Kommt das Angebot des Browsers, während das Fenster offen ist, steht der Knopf gleich da
     const angebot = () => setBereit(true);
     const fertig = () => onClose();
