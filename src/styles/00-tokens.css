@@ -84,6 +84,8 @@
   --auf-farbe-hell: #ffffff;
   --auf-farbe-dunkel: #16191e;
   --auf-farbe-schwarz: #000000;
+  /* M519: Rufnummer als Link im Fließtext (Mail-Karte) — 5,3:1 auf Weiß; im Dunkeln die helle Stufe */
+  --tel-gruen: #0a7d40;
   /* M494: Rand eines Eingabefelds (Nicht-Text-Kontrast, WCAG 1.4.11) — ≥ 3:1 auf Weiß, --bg, --surface-3 und
      --surface-2. --border-soft (1,4:1) bleibt für Trennlinien und Karten, wo der Rand nichts bedienbar macht. */
   --feld-rand: #80868f;
@@ -200,6 +202,7 @@
   --prio-hoch: #ff8a7d;             /* M515: ≥ 5:1 auf Karte, Fläche und --surface-2 */
   --prio-mittel: #f0b45a;
   --prio-niedrig: #8eabff;
+  --tel-gruen: #5fcf93;              /* M519: 8,6:1 auf der Karte */
   --feld-rand: #737983;              /* M494: ≥ 3:1 auf --bg, --surface, --surface-card und --surface-2 */
   --glass: var(--surface);
   --glass-strong: var(--surface);

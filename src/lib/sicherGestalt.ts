@@ -37,7 +37,6 @@ const satzMit = (texte: string[], zahlen: string[] = []): Richten => (x, i) => {
   return aus;
 };
 const nurText: Richten = (x) => (textFeld(x) ? x : undefined);
-const nurSatz: Richten = (x) => (istSatz(x) ? x : undefined);
 /** Eine Liste richten; dieselbe Liste, wenn nichts zu tun war */
 function listeRichten(v: unknown[], richten: Richten | undefined): unknown[] {
   if (!richten) return v;
@@ -63,12 +62,34 @@ const mitListen = (grund: Richten, listen: Record<string, Richten>): Richten => 
 };
 const ticket = mitListen(satzMit(['id', 'text'], ['col']), { subs: satzMit(['id', 'text']), deps: nurText, links: satzMit(['boardId', 'nodeId']) });
 /**
+ * M519: Ein Block einer Notiz (auch in Formen und Protokoll-Sitzungen) — bis in die Unterblöcke. `nurSatz` prüfte
+ * nur die oberste Ebene: `children: "x"` oder ein Inline-Inhalt, der weder Text noch Liste noch Tabelle ist, ließ
+ * weiter die ganze App ausfallen (Klartext, Aufgaben und Suche laufen durch alle Ebenen). Unterblöcke müssen eine
+ * Liste sein (sonst weg), Inline-Stücke Objekte, ein Link braucht seine Stück-Liste.
+ */
+const stueck: Richten = (t) => (istSatz(t) && (t.type !== 'link' || Array.isArray(t.content)) ? t : undefined);
+const block: Richten = (x) => {
+  if (!istSatz(x)) return undefined;
+  let aus = x;
+  const setze = (k: string, v: unknown) => { if (aus === x) aus = { ...x }; if (v === undefined) delete aus[k]; else aus[k] = v; };
+  if (x.children !== undefined) {
+    const k = Array.isArray(x.children) ? listeRichten(x.children, block) : undefined;
+    if (k !== x.children) setze('children', k);
+  }
+  const c = x.content;
+  if (Array.isArray(c)) { const s = listeRichten(c, stueck); if (s !== c) setze('content', s); }
+  else if (c !== undefined && !textFeld(c) && !(istSatz(c) && Array.isArray(c.rows))) setze('content', '');
+  if (x.type !== undefined && !textFeld(x.type)) setze('type', 'paragraph');
+  if (x.props !== undefined && !istSatz(x.props)) setze('props', undefined);
+  return aus;
+};
+/**
  * `bereich`: Zahlen, die Schleifen treiben (Spalten, Zeilen, Pixel je Tag, Stunden) — fehlen dürfen sie; was keine
  * Zahl ist oder außerhalb liegt, fällt weg (dann gilt die Vorgabe der Karte). Ein `dayWidth: [[]]` oder
  * `cols: 10000000` ließ sonst nicht die Karte ausfallen, sondern die Seite hängen.
  */
 const GESTALT: Record<string, { felder: Record<string, FeldArt>; eintraege?: Record<string, Richten>; bereich?: Record<string, [number, number]> }> = {
-  note: { felder: { blocks: 'listeOpt' }, eintraege: { blocks: nurSatz } },
+  note: { felder: { blocks: 'listeOpt', hex: 'textOpt' }, eintraege: { blocks: block } },
   email: { felder: { subject: 'text', fromName: 'text', fromAddress: 'textOpt', date: 'textOpt', text: 'text', attachments: 'liste' }, eintraege: { attachments: satzMit(['name'], ['size']) } },
   image: { felder: { src: 'text', name: 'textOpt', titel: 'textOpt' } },
   file: { felder: { name: 'text', size: 'zahl', mime: 'textOpt', titel: 'textOpt' } },
@@ -77,7 +98,7 @@ const GESTALT: Record<string, { felder: Record<string, FeldArt>; eintraege?: Rec
     eintraege: { items: ticket, archiv: ticket, cols: nurText, collectFrom: nurText, collectExcludeNodes: nurText, ignoreKeys: nurText },
   },
   portal: { felder: { boardId: 'textOpt' } },
-  shape: { felder: { text: 'text', shape: 'textOpt', color: 'textOpt' } },
+  shape: { felder: { text: 'text', shape: 'textOpt', color: 'textOpt', blocks: 'listeOpt' }, eintraege: { blocks: block } },
   mermaid: { felder: { code: 'text' } },
   gantt: { felder: { title: 'text', rows: 'liste' }, eintraege: { rows: satzMit(['id', 'name', 'start', 'end']) }, bereich: { dayWidth: [0.01, 1000] } },
   calendar: { felder: { month: 'textOpt' } },
@@ -86,7 +107,7 @@ const GESTALT: Record<string, { felder: Record<string, FeldArt>; eintraege?: Rec
   sheet: { felder: { title: 'textOpt', cells: 'texteOpt', colW: 'objektOpt', links: 'texteOpt', stile: 'objektOpt', filter: 'objektOpt', stilListe: 'listeOpt', verbunden: 'listeOpt' }, eintraege: { verbunden: nurText }, bereich: { cols: [1, 702], rows: [1, 1048576], kopf: [0, 1048576], bis: [0, 1048576] } },   // Zeilen: so viele fasst Excel
   minutes: {
     felder: { title: 'text', entries: 'liste', agenda: 'listeOpt', personenAbgelehnt: 'listeOpt' },
-    eintraege: { entries: mitListen(satzMit(['id', 'date']), { blocks: nurSatz, decisions: satzMit(['id', 'text']), infoTops: nurText }), agenda: nurText, personenAbgelehnt: nurText },
+    eintraege: { entries: mitListen(satzMit(['id', 'date']), { blocks: block, decisions: satzMit(['id', 'text']), infoTops: nurText }), agenda: nurText, personenAbgelehnt: nurText },
   },
   time: { felder: { title: 'text', segs: 'liste' }, eintraege: { segs: satzMit(['id', 'date'], ['start']) } },
   htmlapp: { felder: { name: 'text', size: 'zahl' } },
