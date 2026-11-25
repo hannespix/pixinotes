@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Handle, NodeResizer, Position, useReactFlow, useUpdateNodeInternals } from '@xyflow/react';
-import { mutedHistory, runDerived, selectActiveBoard, useBoard, useKarteFestId } from '../../store';
+import { mutedHistory, runDerived, selectActiveBoard, useBoard } from '../../store';
+import { useKarteFestId } from '../../store/selektoren';   // M531 (direkt: store.ts behält seine Namen, m480)
 import { groesseGedreht, istDrehbar, winkelNorm, winkelRaste, winkelVon } from '../../lib/drehung';
 import { sizeOf } from '../../lib/arrange';
 import { IDrehen } from '../Icons';

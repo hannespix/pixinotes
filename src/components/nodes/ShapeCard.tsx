@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react';
-import { runDerived, useBoard, useKarteFestId } from '../../store';
+import { runDerived, useBoard } from '../../store';
+import { useKarteFestId } from '../../store/selektoren';   // M531 (direkt: store.ts behält seine Namen, m480)
 import type { NoteNode, ShapeKind, ShapeNode } from '../../types';
 import { IPalette } from '../Icons';
 import { NotizEditor } from './NoteCard';
