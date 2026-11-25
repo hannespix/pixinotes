@@ -167,6 +167,16 @@ if (NUR.includes('S')) {
   pruefe('S0 das Board steht: 31 Karten', n0 === 31, n0);
   const pruefbar = await P.evaluate(() => typeof window.pixinotesSpeicher === 'object');
   pruefe('S0b der Speicher zählt mit', pruefbar);
+  // M536: Der Start schreibt einmal (M532: Bilder ziehen in die Ablage um, der Stand wird mit Verweisen neu geschrieben).
+  // Auf einer ausgelasteten Maschine fiel dieses EINE Schreiben in das Messfenster von S1 (gemessen: 1,0 Stände).
+  // S1 gilt dem Ziehen — also erst messen, wenn der Start fertig geschrieben hat (kein großes Bild mehr im Text,
+  // Zähler der Schreibvorgänge 1,5 s ruhig).
+  await warteBis(P, async () => {
+    const a = await P.evaluate(() => ({ g: window.pixinotesSpeicher?.geschrieben ?? 0, daten: /"data:[^"]{10000,}"/.test(localStorage.getItem('pixinotes-board') ?? '') }));
+    await P.waitForTimeout(1500);
+    const b = await P.evaluate(() => window.pixinotesSpeicher?.geschrieben ?? 0);
+    return !a.daten && a.g === b;
+  }, 30000);
   // S1: 30 Mausbewegungen ziehen — wie viel JSON entsteht?
   await P.evaluate(() => { window.__m525.strZeichen = 0; window.__m525.strGross = 0; });
   const lage0 = await lageVon(P, 'k2');

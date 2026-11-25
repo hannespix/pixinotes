@@ -45,7 +45,29 @@ nicht im Repository): zwei Fenster, Mitleser, Schreiber schließt (auch 150 ms n
 Bildes), Nachfolger übernimmt, neu laden, drittes Fenster — alle Bilder überall geladen, im localStorage nur Verweise.
 Kein App-Fehler, daher keine neue Prüfreihe.
 
+### m525 S1 — „1,0 Stände" JSON beim Ziehen (gemeldet aus M534)
+Kein Rückschritt beim Ziehen, sondern **ein** einmaliges Schreiben nach dem Start, das ins Messfenster fiel: Seit M532
+lädt beim Start die Ablage nach, setzt Bilder ein bzw. lagert sie aus und schreibt den Stand einmal neu — mit leerem
+Gedächtnis (M525) ist das ein voller Stand. Auf einer ausgelasteten Maschine (mehrere Agenten, parallele Reihen) kam
+dieses Schreiben erst nach den 2,5 s Wartezeit der Reihe, also während der 30 Mausbewegungen von S1. Nachgestellt:
+misst S1 direkt nach dem Laden, steht genau `{"zeichen":482318,"staende":"1.0"}` mit **einem** großen Text da; nach dem
+Start-Schreiben gemessen 0,02 Mio. Zeichen.
+- `pruefungen/m525-grosse-boards.mjs`: vor S1 wartet die Reihe, bis der Start fertig geschrieben hat (kein großes Bild
+  mehr im gespeicherten Text, Zähler `pixinotesSpeicher.geschrieben` 1,5 s ruhig).
+- **Gegenprobe:** ein Build, der wie vor M525 bei jeder Store-Änderung den ganzen Stand als JSON baut (eine Zeile in
+  `speicherAblage.setItem`, nur zum Messen gebaut, nicht im Repository) → S1 rot mit 36,3 Ständen. Die Wartezeit
+  verdeckt also keinen Rückschritt beim Ziehen.
+- Ein Versuch, das Gedächtnis nach dem Sichern eines Bildes nur für Texte mit data-URL zu verwerfen statt ganz, brachte
+  gemessen nichts (beim Einfügen eines Bildes stammt der volle Stand JSON aus `canEmbed` in `lib/nodes.ts`, siehe
+  M532 „Grenzen") und wurde verworfen.
+
+Nebenbei: Mehrere Agenten auf derselben Maschine teilen die festen Ports der Reihen (5525 …); läuft dieselbe Reihe
+gleichzeitig in einem anderen Arbeitsbaum, scheitert sie mit `EADDRINUSE` (das Werkzeug wiederholt sie allein).
+
 ## Grenzen / offen
+- Jeder Start schreibt seit M532 einmal den ganzen Stand (Gedächtnis leer). Bei sehr großen Ständen kostet das einmal
+  einige zehn Millisekunden; nicht weiter verfolgt.
+- `canEmbed` (lib/nodes.ts) baut beim Einfügen eines Bildes einmal den ganzen Stand als JSON (bekannt seit M532).
 - `adoptPersistedState` übernimmt seit M532 nachgeladen (asynchron). Ändert ein Nachfolger im Bruchteil einer Sekunde
   nach der Übernahme etwas, könnte die Übernahme danach eintreffen; im Versuch (Wechsel 150 ms nach dem Einfügen) trat
   nichts auf. Nicht weiter verfolgt.
