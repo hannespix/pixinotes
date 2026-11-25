@@ -910,6 +910,9 @@ export function Board() {
         return;
       }
       if (e.key.toLowerCase() !== 'n' || e.metaKey || e.ctrlKey || e.altKey) return;
+      // M521: Im Karten-Fokus liegt die Bildmitte unter der offenen Karte — die neue Notiz entstand dahinter, unsichtbar,
+      // und nahm den Schreib-Cursor mit
+      if (st.focusCard) return;
       addNode(makeNote(screenToFlowPosition({ x: window.innerWidth / 2 - 130, y: window.innerHeight / 2 - 40 })));
     };
     window.addEventListener('keydown', onKey);
@@ -1488,7 +1491,20 @@ export function Board() {
     // M325: Ein STIFT-Tipp ist ein Klick wie mit der Maus (Cursor setzen, Haken,
     // Karte wählen) — nicht der Finger-Tipp, der am Tablet das Blatt öffnet.
     const stift = (e.nativeEvent as PointerEvent).pointerType === 'pen';
-    if (!e.shiftKey && !stift && (isPhoneFocus() || st0.fokusEinKlick) && oeffneFokus(node)) return;
+    if (e.shiftKey || stift || !(isPhoneFocus() || st0.fokusEinKlick) || !oeffneFokus(node)) return;
+    // M521: Doppeltipp — der zweite Tipp kam an, während die Karte schon aufging, und traf, was dann unter dem Finger
+    // lag (im Kanban verschob er ein Ticket oder löschte eine Spalte). Eine halbe Sekunde lang gehört kein Tipp dem
+    // Inhalt: so lange fährt die Kamera ohnehin noch. Gemessen wird an der Zeit der EREIGNISSE, nicht mit einer Uhr —
+    // das Aufgehen der Karte kann den Browser länger beschäftigen, der zweite Tipp wartet dann schon in der Schlange.
+    const t0 = e.timeStamp;
+    const arten = ['pointerdown', 'pointerup', 'click', 'dblclick'];
+    let unten = false;   // der Druck dieses Tipps wurde geschluckt — dann auch sein Loslassen und sein Klick
+    const stopp = (ev: Event) => {
+      if (ev.type === 'pointerdown') unten = ev.timeStamp - t0 < 500;
+      if (!unten) { if (ev.type === 'pointerdown') for (const a of arten) window.removeEventListener(a, stopp, true); return; }
+      ev.stopPropagation(); ev.preventDefault();
+    };
+    for (const a of arten) window.addEventListener(a, stopp, true);
   }, [oeffneFokus]);
 
   /**
@@ -1686,6 +1702,9 @@ export function Board() {
       // Offene Overlays (Suche, Einstellungen, Aufgaben, Hilfe, Präsentation) nicht unterlaufen
       const st = useBoard.getState();
       if (st.searchOpen || st.settingsOpen || st.tasksOpen || st.helpOpen || st.presenting) return;
+      // M521: … und jedes andere Fenster (Teilen, Versionen, Vorlagen, Ticket): Lag der Fokus dort auf einem Knopf,
+      // entstand hinter dem Fenster eine Notiz bzw. ein Bild
+      if (overlayOffen()) return;
 
       const dt = e.clipboardData;
       if (!dt) return;
@@ -1799,10 +1818,11 @@ export function Board() {
         onNodesChange={onNodesChangeFang}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        onBeforeDelete={async ({ nodes: delNodes }) => {
+        onBeforeDelete={async ({ nodes: delNodes, edges: delEdges }) => {
           // Entf-Taste: durch removeNodes leiten, damit Undo auch die Kanten kennt (M1)
           if (delNodes.length === 0) return true;
-          removeNodes(delNodes.map((n) => n.id));
+          // M521: … samt der mitgewählten Verbindungen — vorher blieb eine gewählte Verbindung zwischen anderen Karten stehen
+          removeNodes(delNodes.map((n) => n.id), delEdges.map((k) => k.id));
           return false;
         }}
         onNodeDragStart={onNodeDragStart}

@@ -336,12 +336,14 @@ export function kartenScheibe(set: Setzen, get: Holen, patchActive: AufsOffene) 
 
     removeNode: (id) => get().removeNodes([id]),
 
-    removeNodes: (ids) => {
+    removeNodes: (ids, kantenIds) => {
       const board = get().boards.find((b) => b.id === get().activeId);
       if (!board) return;
       const idSet = new Set(ids);
+      // M521: mitgewählte Verbindungen zwischen ANDEREN Karten gehen im selben Schritt mit (Entf mit Karte + Verbindung)
+      const kanteWeg = (e: { id: string; source: string; target: string }) => idSet.has(e.source) || idSet.has(e.target) || !!kantenIds?.includes(e.id);
       const removedNodes = board.nodes.filter((n) => idSet.has(n.id));
-      const removedEdges = board.edges.filter((e) => idSet.has(e.source) || idSet.has(e.target));
+      const removedEdges = board.edges.filter(kanteWeg);
       if (removedNodes.length === 0) return;
       // Geankerte Markierungen gehören zur Karte — sie gehen (undo-fähig) mit
       const removedDrawings = (board.drawings ?? []).filter((s) => s.anchor && idSet.has(s.anchor));
@@ -349,7 +351,7 @@ export function kartenScheibe(set: Setzen, get: Holen, patchActive: AufsOffene) 
       get().pushHistory();
       patchActive((b) => ({
         nodes: b.nodes.filter((n) => !idSet.has(n.id)),
-        edges: b.edges.filter((e) => !idSet.has(e.source) && !idSet.has(e.target)),
+        edges: b.edges.filter((e) => !kanteWeg(e)),
         drawings: (b.drawings ?? []).filter((s) => !s.anchor || !idSet.has(s.anchor)),
         // Kommentar-Pins hängen an der Karte — mit ihr verschwinden sie (M148)
         comments: (b.comments ?? []).filter((c) => !idSet.has(c.nodeId)),
@@ -368,9 +370,10 @@ export function kartenScheibe(set: Setzen, get: Holen, patchActive: AufsOffene) 
       if (!src || !tgt || src.id === tgt.id) return;
       const idSet = new Set(ids);
       // Rahmen nehmen ihre Mitglieder mit (dieselbe Regel wie beim Ziehen)
+      // M521: auch die archivierten — sie blieben sonst unsichtbar auf dem alten Board zurück (wie M390 beim Ziehen)
       for (const n of src.nodes) {
         if (n.type === 'frame' && idSet.has(n.id)) {
-          for (const m of frameMembers(n, src.nodes, true)) idSet.add(m.id);
+          for (const m of frameMembers(n, src.nodes, true, true)) idSet.add(m.id);
         }
       }
       const moving = src.nodes.filter((n) => idSet.has(n.id));

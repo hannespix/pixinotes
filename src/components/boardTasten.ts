@@ -138,13 +138,17 @@ export function useBoardTasten(kamera: Kamera, anzRef: MutableRefObject<number>)
       // ── Pfeiltasten schieben die gewählten Karten (M390) ─────────────────────────────────
       // Vorher tat das die Bibliothek selbst: ohne Rückgängig-Schritt (Strg+Z nahm den Schritt davor mit) und ohne
       // den Inhalt eines Rahmens mitzunehmen. Schrittweite wie gewohnt: 5 Punkte, mit Umschalt 20.
-      if (/^Arrow/.test(e.key) && gewaehlt.length && !st.focusCard && t?.classList?.contains('react-flow__node')) {
+      // M521: auch gewählte RAHMEN — `gewaehlt` kennt sie nicht (Tab springt nur von Karte zu Karte). War nur ein Rahmen
+      // gewählt, schob ihn weiter die Bibliothek: ohne seinen Inhalt und ohne Rückgängig-Schritt; neben einer Karte
+      // gewählt, blieb er liegen.
+      const schiebbar = board.nodes.filter((n) => n.selected && (!n.archived || st.showArchived));
+      if (/^Arrow/.test(e.key) && schiebbar.length && !st.focusCard && t?.classList?.contains('react-flow__node')) {
         // In einem Dokument (PDF, Word, Folien), das zuletzt angefasst wurde, blättern ← → — das regelt die Karte selbst
-        if (!e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && gewaehlt.length === 1 && dokumentHatPfeile(gewaehlt[0].id)) return;
+        if (!e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && schiebbar.length === 1 && gewaehlt.length === 1 && dokumentHatPfeile(gewaehlt[0].id)) return;
         const w = e.shiftKey ? 20 : 5;
         const [dx, dy] = e.key === 'ArrowRight' ? [w, 0] : e.key === 'ArrowLeft' ? [-w, 0] : e.key === 'ArrowDown' ? [0, w] : [0, -w];
         e.stopPropagation();
-        return tun(() => st.verschiebeUm(gewaehlt.map((n) => n.id), dx, dy));
+        return tun(() => st.verschiebeUm(schiebbar.map((n) => n.id), dx, dy));
       }
 
       // ── Enter: in die gewählte Karte — Notiz: schreiben, sonst: im Fokus öffnen ─────────

@@ -489,7 +489,8 @@ export interface BoardState {
   /** Fehlenden Rückverweis nachtragen (ältere Portale, M262) */
   rueckverweisNachtragen: (quellBoardId: string, zielBoardId: string) => void;
   removeNode: (id: string) => void;
-  removeNodes: (ids: string[]) => void;
+  /** `kantenIds` (M521): Verbindungen, die im selben Schritt mit entfernt werden (mitgewählt, zwischen anderen Karten) */
+  removeNodes: (ids: string[], kantenIds?: string[]) => void;
   /** M163: Karten in ein anderes Board verschieben — Rahmen nehmen ihre
    *  Mitglieder mit; interne Verbindungen, Kommentar-Pins und geankerte
    *  Zeichnungen wandern mit; EIN Undo-Schritt stellt beide Boards her */
