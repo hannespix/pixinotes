@@ -1861,8 +1861,10 @@ export function Board() {
         // (M315: Die Papiertextur ist weg — und mit ihr die Kachel-Variablen,
         // die hier bei jedem Schwenk ins DOM geschrieben wurden.)
         onViewportChange={(vp) => { gemerkteAnsicht.set(activeId, vp); if (!reiseFliegt()) uiMelden(vp.zoom); zoomMelden(vp.zoom); if (fokusRef.current) fokusBalken(vp.y); }}
-        // M343: im weiten Zoom gibt es keine „nicht ziehen"-Zonen — die ganze Karte ist der Griff, das Rad gehört dem Board
-        noDragClassName={weit && !focusCard ? 'nodrag-aus' : 'nodrag'}
+        // M343: im weiten Zoom gibt es keine „nicht ziehen"-Zonen — die ganze Karte ist der Griff, das Rad gehört dem Board.
+        // M527: … außer den Anschlusspunkten: Dort zog der Griff sonst die Karte statt eines Pfeils (der Zug erreichte den
+        // Anschluss nie), Verbinden ging unter ~45 % gar nicht.
+        noDragClassName={weit && !focusCard ? 'react-flow__handle' : 'nodrag'}
         noWheelClassName={weit && !focusCard ? 'nowheel-aus' : 'nowheel'}
         zoomOnDoubleClick={false}
         deleteKeyCode={['Delete', 'Backspace']}

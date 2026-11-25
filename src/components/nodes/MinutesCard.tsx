@@ -1052,7 +1052,7 @@ export function EntryEditor({ nodeId, entryId, blocks, editorRef, sitzung }: Ent
           });
         }}
       >
-        <NoteToolbar />
+        <NoteToolbar aufDemBoard />
         {/* M283: „/" bietet die rechnende Tabelle an */}
         <NoteSlashMenu />
         {/* M495: „@" schlägt die Runde der Sitzung vor */}

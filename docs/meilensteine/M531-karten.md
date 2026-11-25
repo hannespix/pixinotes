@@ -66,7 +66,7 @@ aus M520 (Planung, Daten, Workshop), M519 (KA10, KA11, KA13) und M513 (Mitmachen
   und bei Größenänderung (ResizeObserver der Zeichenfläche), ob eine der Gruppen unter dem `svg` den Hinweis schneidet.
   Nicht frei → Hinweis `visibility: hidden` (behält seine Lage für die nächste Messung), Text als `title` der
   `.mermaid-preview`.
-- **Nur lesen** (zentral): `useKarteFestId(id)` in `store/selektoren.ts` (wie `useKarteFest`, sucht den Ersteller nur,
+- **Nur lesen** (zentral): `useKarteFestId(id)` in `store/selektoren.ts`, direkt von dort importiert (store.ts behält seine Namen, m480 Q1) (wie `useKarteFest`, sucht den Ersteller nur,
   wenn Gäste eingeschränkt sind). `CardShell` und die Form-Hülle (`ShapeCard`, ohne CardShell) setzen `data-fest`; die
   Liste der Bearbeiten-Leisten steht **einmal** in `src/styles/62-greifen-tastatur-teilen.css` (`[data-fest] :is(…)`,
   dazu `.board-wrap.nur-lesen .mm-toolbar` für die Diagramm-Leiste, die als NodeToolbar außerhalb der Karte liegt;
@@ -88,3 +88,4 @@ aus M520 (Planung, Daten, Workshop), M519 (KA10, KA11, KA13) und M513 (Mitmachen
 - Wochenplan: Blöcke außerhalb des Rasters zählen nicht mehr zum Soll und werden nicht gesondert angezeigt.
 - Zeiterfassung: Wer vom 31.01. über Februar in den März blättert, landet auf dem 28.03. (der Februar kürzt den Tag).
 - Bilder: `pruefungen/ablage/m531/` (Kalender, Diagramm schmal, Nur lesen, Mitmachen, Timer).
+- Nachtrag: m522 H löst „Stop“ auf dem Nur-lesen-Board per Zeiger und Klick aus (der Knopf ist ausgeblendet); `useKarteFestId` wird direkt aus `store/selektoren.ts` importiert, damit `store.ts` seine 55 Namen behält (m480).
