@@ -1,4 +1,6 @@
 {"Geteiltes Board „{0}\" ({1} Karten) übernehmen?":"Add shared board “{0}” ({1} cards)?",
+"„Bis\" liegt vor „Von\". Zeiten tauschen oder für mehrere Tage ein Bis-Datum setzen.":"“To” is before “From”. Swap the times or set an end date for several days.",
+"Tauschen":"Swap",
 "Board":"Board",
 "Geteiltes Board übernommen – liegt als eigenes Board in deiner Tab-Leiste.":"Shared board added – it’s now a board of your own in your tab bar.",
 "Geteiltes Board wird geladen …":"Loading shared board …",

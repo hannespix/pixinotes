@@ -158,14 +158,16 @@ console.log('\n════ C: Kalender, Wochenplan, Zeiterfassung ════'
   await P.locator('.cal-evform input.cal-evform-title').press('Enter');
   await P.waitForTimeout(300);
   pruefe('C4 … auch Enter speichert nicht', (await P.locator('.cal-evform').count()) === 1);
-  await P.locator('[data-taste="cal-zeit-fehler"] button', { hasText: 'Tauschen' }).click();
-  const getauscht = [await zeiten.nth(0).inputValue(), await zeiten.nth(1).inputValue()];
+  // (ohne Knopf – Stand vor M531 – nur bis hierher; die übrigen Teile laufen weiter)
+  await P.locator('[data-taste="cal-zeit-fehler"] button', { hasText: 'Tauschen' }).click({ timeout: 3000 }).catch(() => {});
+  const getauscht = [await zeiten.nth(0).inputValue({ timeout: 3000 }).catch(() => ''), await zeiten.nth(1).inputValue({ timeout: 3000 }).catch(() => '')];
   pruefe('C5 „Tauschen" macht 08:00 bis 09:00, der Hinweis geht', getauscht[0] === '08:00' && getauscht[1] === '09:00' && (await P.locator('[data-taste="cal-zeit-fehler"]').count()) === 0, getauscht);
-  await P.locator('.cal-evform-save').click();
+  await P.locator('.cal-evform-save').click({ timeout: 3000 }).catch(() => {});
   const ev = await warte(async () => (await h.karte('ca')).data.myEvents.find((e) => e.id === 'e2')?.time === '08:00', 6000);
   const e2 = (await h.karte('ca')).data.myEvents.find((e) => e.id === 'e2');
   pruefe('C6 gespeichert: 08:00 bis 09:00', ev && e2.end === '09:00', e2);
   // Mehrtägig: Bis-Uhrzeit vor Von ist dann erlaubt
+  if (!(await P.locator('.cal-dayedit-row').count())) { const zb2 = await zelle.boundingBox(); await P.mouse.click(zb2.x + 4, zb2.y + 4); }
   await P.locator('.cal-dayedit-row .cal-dayedit-title', { hasText: 'Nachmittag' }).click();
   await P.waitForSelector('.cal-evform');
   await zeiten.nth(1).fill('10:00');
@@ -366,14 +368,14 @@ console.log('\n════ G: Kontakt ════');
   pruefe('G2 … die Eingabe bleibt gespeichert', gespeichert);
   // Fokus woandershin (Tastatur): aus dem Formular in eine andere Karte
   await h.waehlen('ko', 30, 10);
-  await P.locator('.react-flow__node[data-id="ko"] .kontakt-tools button[aria-label="Bearbeiten"]').click();
+  await P.locator('.react-flow__node[data-id="ko"] .kontakt-tools button[aria-label="Bearbeiten"]').click({ timeout: 3000 }).catch(() => {});   // (vor M531 stand das Formular noch offen)
   await P.waitForSelector('.react-flow__node[data-id="ko"] .kontakt-form');
   await P.locator('.react-flow__node[data-id="ko"] .kontakt-feld[aria-label="Name"]').focus();
   await P.evaluate(() => { const b = document.querySelector('[data-taste="einstellungen"]'); b?.focus(); });
   pruefe('G3 Fokus verlässt die Karte (Tastatur) → Bearbeiten endet', await warte(async () => (await form()) === 0, 3000));
   // Klick IN die Karte (anderes Feld) beendet nichts
   await h.waehlen('ko', 30, 10);
-  await P.locator('.react-flow__node[data-id="ko"] .kontakt-tools button[aria-label="Bearbeiten"]').click();
+  await P.locator('.react-flow__node[data-id="ko"] .kontakt-tools button[aria-label="Bearbeiten"]').click({ timeout: 3000 }).catch(() => {});
   await P.waitForSelector('.react-flow__node[data-id="ko"] .kontakt-form');
   await P.locator('.react-flow__node[data-id="ko"] .kontakt-feld[aria-label="Firma"]').click();
   await P.locator('.react-flow__node[data-id="ko"] .kontakt-feld[aria-label="Name"]').click();
