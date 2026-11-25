@@ -40423,7 +40423,7 @@ function baseNodeText(node2) {
       return blocksToText(node2.data.blocks);
     case "email": {
       const e = node2.data;
-      const atts = e.attachments.length ? `
+      const atts = e.attachments?.length ? `
 Anh\xE4nge: ${e.attachments.map((a) => a.name).join(", ")}` : "";
       return `E-Mail: ${e.subject}
 Von: ${e.fromName}${e.fromAddress ? ` <${e.fromAddress}>` : ""}

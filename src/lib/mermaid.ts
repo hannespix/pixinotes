@@ -49,10 +49,28 @@ export async function getMermaid(): Promise<MermaidApi> {
   // Theme folgt dem App-Design; bei Wechsel neu initialisieren (dark ⇄ neutral)
   const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'neutral';
   if (theme !== initializedTheme) {
-    m.initialize({ startOnLoad: false, theme, securityLevel: 'strict' });
+    // M519: suppressErrorRendering — bei kaputtem Code hängte mermaid sonst eine „Syntax error in text"-Grafik
+    // ans Ende des Dokuments und ließ sie dort; die Karte zeigt den Fehler selbst (Fehler-Chip).
+    m.initialize({ startOnLoad: false, theme, securityLevel: 'strict', suppressErrorRendering: true });
     initializedTheme = theme;
   }
   return m;
+}
+
+/**
+ * M519: Was ein gescheiterter `render(id, …)` im Dokument zurücklässt, wegräumen. mermaid hängt sein Arbeits-Element
+ * (`d<id>`, darin das SVG `<id>`) an `document.body` und entfernt es nur nach Erfolg. Je ungültigem Zwischenstand im
+ * Code-Editor blieb so eines stehen: Das Dokument wurde höher als das Fenster, die Fehlergrafik rutschte ins Bild,
+ * sobald etwas das Dokument rollte, und stand im Ausdruck. Sicherheitsnetz zu `suppressErrorRendering` oben.
+ */
+export function mermaidResteWeg(renderId: string): void {
+  for (const id of [`d${renderId}`, `i${renderId}`, renderId]) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    // nur, was lose am Dokument hängt — nie das angezeigte Diagramm einer Karte
+    if (el.parentElement === document.body) el.remove();
+    else if (el.parentElement?.parentElement === document.body && el.parentElement.id === `d${renderId}`) el.parentElement.remove();
+  }
 }
 
 // ---------------------------------------------------------------------------

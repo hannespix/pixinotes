@@ -1358,7 +1358,9 @@ export function Board() {
           ? kd * (passtD < 1 && passtD >= 0.75 ? passtD : inBreiteD < 1 ? Math.max(0.3, inBreiteD) : grob ? Math.min(2.2, inBreiteD) : 1)
                 : bild ? Math.max(0.2, Math.min(grob ? 4 : 3, passt))
                   // Text: am Finger so breit wie der Schirm; mit der Maus auf eine gute Lesebreite (um 640 Punkte)
-                  : text ? Math.max(0.3, Math.min(hoechstens, inBreite, grob ? hoechstens : Math.max(1.25, 640 / w)))
+                  // M519: am Telefon zählt auch die Kontakt-Karte als Text — sie blieb sonst so klein wie auf dem Board
+                  // (Rufnummern zum Antippen in 11 Punkt), weil sie weder hier noch in der Modul-Liste des Stylesheets stand
+                  : text || (schmal && n.type === 'kontakt') ? Math.max(0.3, Math.min(hoechstens, inBreite, grob ? hoechstens : Math.max(1.25, 640 / w)))
                     : schmal ? Math.min(1, Math.max(0.3, inBreite))
                       : Math.max(0.3, Math.min(hoechstens, Math.max(passt, Math.min(inBreite, 1))));
         // M424: die gewählte Darstellung (Automatisch = die Regel oben, Einpassen, Seitenbreite, Originalgröße) samt Stufe
@@ -1503,6 +1505,9 @@ export function Board() {
     // Karte wählen) — nicht der Finger-Tipp, der am Tablet das Blatt öffnet.
     const stift = (e.nativeEvent as PointerEvent).pointerType === 'pen';
     if (e.shiftKey || stift || !(isPhoneFocus() || st0.fokusEinKlick) || !oeffneFokus(node)) return;
+    // M519: Traf der öffnende Tipp einen Verweis der verkleinerten Karte (Telefonnummer, E-Mail, Web), ging die Karte auf
+    // UND der Wähldialog bzw. die Seite — ein Tipp, zwei Wirkungen. Der Tipp, der öffnet, öffnet nur.
+    if ((e.target as HTMLElement).closest?.('a[href]')) e.preventDefault();
     // M521: Doppeltipp — der zweite Tipp kam an, während die Karte schon aufging, und traf, was dann unter dem Finger
     // lag (im Kanban verschob er ein Ticket oder löschte eine Spalte). Eine halbe Sekunde lang gehört kein Tipp dem
     // Inhalt: so lange fährt die Kamera ohnehin noch. Gemessen wird an der Zeit der EREIGNISSE, nicht mit einer Uhr —

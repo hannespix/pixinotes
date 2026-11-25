@@ -472,6 +472,24 @@
 .note-fortschritt-balken > i { display: block; height: 100%; background: var(--accent); transition: width .25s; }
 .note-fortschritt.fertig { color: #2f7a3d; }
 .note-fortschritt.fertig .note-fortschritt-balken > i { background: #3d9a4e; }
+/* M519: Was UNTER dem Notiztext steht (Zähler der Checkliste, Fristen-, Telefon-, Mail-, Link- und Verweis-Chips),
+   trägt die Schrift seines Papiers statt fester Farben. Vorher: der Zähler im hellen Grau des dunklen Themas auf
+   gelbem Papier (1,7:1), Telefon-Grün und Mail-Blau auf Pastell (2,7–4,3:1), auf der im Dunkeln dunklen weißen
+   Notiz (2,1:1) und auf einer Notiz in eigener Farbe (bis 1,4:1). `--notiz-zusatz` ist die Tinte des Papiers:
+   Pastell bleibt helles Papier (dunkle Tinte, auch im Dunkeln), Weiß und Notizen ohne Farbe folgen dem Thema, eine
+   eigene Farbe bringt ihre Schrift mit (M515). Die Tönung der Chips bleibt — sie sagt weiter, was der Chip ist. */
+.note-card { --notiz-zusatz: var(--auf-farbe-dunkel); }
+.note-card.sticky-white,
+.note-card:not(.sticky-yellow, .sticky-pink, .sticky-mint, .sticky-sky, .sticky-white):not([style*='background']) { --notiz-zusatz: var(--ink); }
+.note-card.schrift-eigen { --notiz-zusatz: var(--notiz-schrift); }
+.note-card .note-fortschritt { color: color-mix(in srgb, var(--notiz-zusatz) 78%, transparent); }
+.note-card .note-fortschritt.fertig { color: color-mix(in srgb, var(--notiz-zusatz) 72%, #1f9d45); }
+.note-card .due-chip:not(.due-soon, .due-overdue, .table-del-chip) { color: var(--notiz-zusatz) !important; }
+/* die Löschen-Chips der Tabelle bleiben rot, wo das Papier hell ist — auf dunklem oder eigenem Papier nehmen auch sie dessen Schrift */
+[data-theme='dark'] .note-card.sticky-white .table-del-chip, .note-card.schrift-eigen .table-del-chip { color: var(--notiz-zusatz); }
+/* eigene Farbe: mittlere Töne tragen Schwarz nur knapp (4,6:1) — dort ohne Tönung, mit feinem Rand */
+.note-card.schrift-eigen .note-fortschritt { color: var(--notiz-zusatz); }
+.note-card.schrift-eigen .due-chip:not(.due-soon, .due-overdue) { background: transparent !important; border-color: color-mix(in srgb, var(--notiz-zusatz) 45%, transparent); }
 /* Fokus: Lesetypografie für Notizen */
 .focus-mode .react-flow__node-note.pn-focused .note-editor .bn-editor {
   font-size: 16px !important; line-height: 1.55; max-width: 72ch; margin-inline: auto; padding-block: 14px !important;

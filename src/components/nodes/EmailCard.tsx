@@ -16,7 +16,8 @@ const PREVIEW_CHARS = 420;
 
 /** E-Mail als lebendige Karte: Absender, Text mit klickbaren Entities, Anhänge als Chips. */
 export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsoluteY }: NodeProps<EmailNode>) {
-  const email = data;
+  // M519: fehlt in einem alten Stand ein Feld, rechnet die Karte mit der leeren Vorgabe statt auszufallen
+  const email: EmailNode['data'] = { ...data, subject: data.subject ?? '', fromName: data.fromName ?? '', text: data.text ?? '', attachments: data.attachments ?? [] };
   const [expanded, setExpanded] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const showToast = useBoard((s) => s.showToast);

@@ -16,8 +16,7 @@ import { loadFile, saveFile, vorschauArt, warumKeineVorschau } from '../../lib/f
 
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
-import { BildLupe } from './BildLupe';
-import { BildTextChips } from './BildTextChips';
+import { BildLupe, BildTextChips, bildTeileVorladen } from './bildSpaet';   // M519: nachgeladen
 import { ICrop, IDownload, IX, IImage, IComment } from '../Icons';
 import { bildBearbeiten } from '../BildEditorHost';
 
@@ -31,7 +30,8 @@ import { kontoDateiHolen } from '../../lib/syncStart';
  */
 export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
   const showToast = useBoard((s) => s.showToast);
-  const file = data;
+  // M519: ohne Namen oder Größe (alter Stand) mit Vorgaben rechnen statt auszufallen
+  const file = data.name && typeof data.size === 'number' ? data : { ...data, name: data.name || 'Datei', size: data.size ?? 0 };
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
   /** M263: „DB_Reservierung_762631109316.pdf" sagt niemandem etwas. */
   const eigenerTitel = !!file.titel?.trim();
@@ -99,6 +99,7 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
    * ist damit auch dann noch brauchbar, wenn er auftritt.
    */
   const istBild = !!quelle && art === 'bild';
+  useEffect(() => { if (istBild) bildTeileVorladen(); }, [istBild]);
   /**
    * M335: PDF zugeklappt oder aufgeklappt. Zugeklappt (Standard) zeigt die
    * Karte die erste Seite klein, Seitenzahl und Anmerkungszähler; aufgeklappt

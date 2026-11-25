@@ -55,7 +55,10 @@ export function KontaktCard({ id, data, selected }: NodeProps<KontaktNode>) {
   const showToast = useBoard((s) => s.showToast);
   const nurLesen = useBoard((s) => s.boards.find((b) => b.id === s.activeId)?.geteiltRolle === 'lesen');
   const k = kontaktDaten(data);
-  const leer = !k.name && !k.firma && !k.telefone.length && !k.emails.length;
+  // M519: „leer" heißt wirklich leer — eine Karte nur mit Anschrift, Funktion, Webseite, Notiz oder Foto stand sonst
+  // bei jedem Öffnen des Boards im Bearbeiten-Formular und trug den Hinweis „Noch leer" über ihrem Inhalt
+  const leer = !k.name && !k.firma && !k.telefone.length && !k.emails.length
+    && !k.funktion?.trim() && !k.adresse?.trim() && !k.web?.trim() && !k.notiz?.trim() && !k.foto;
   const [bearbeiten, setBearbeiten] = useState(leer && !nurLesen);
   const nameRef = useRef<HTMLInputElement>(null);
   const fotoRef = useRef<HTMLInputElement>(null);
@@ -173,7 +176,9 @@ export function KontaktCard({ id, data, selected }: NodeProps<KontaktNode>) {
           {k.emails.filter((m) => m.trim()).map((m, i) => (
             <div className="kontakt-zeile" key={`m${i}`}>
               <IMail size={14} />
-              <a className="kontakt-link nodrag" href={`mailto:${encodeURI(m.trim())}`} translate="no">{m.trim()}</a>
+              {/* M519: die Adresse ganz kodieren (nur „@" bleibt) — sonst hängte eine Adresse aus einer fremden vCard
+                  wie „a@b.de?bcc=…&body=…" dem Mail-Programm stille Empfänger und Text an (wie SEC-2 bei der Mail-Karte) */}
+              <a className="kontakt-link nodrag" href={`mailto:${encodeURIComponent(m.trim()).replace(/%40/g, '@')}`} translate="no">{m.trim()}</a>
             </div>
           ))}
           {k.adresse?.trim() && (
