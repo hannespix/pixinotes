@@ -3857,7 +3857,7 @@
 "Schriftart und Textgröße dieser Karte zurück auf Standard":"Reset font and text size of this card to default",
 "Schriftart und Textgröße dieser Karten zurück auf Standard":"Reset font and text size of these cards to default",
 "{0} · in {1} T.":"{0} · in {1} d",
-"Speicher voll – nichts wird gesichert. Bitte Einstellungen → Daten → „Alles sichern“.":"Storage full – nothing is being saved. Please use Settings → Data → “Back up everything”.",
+"Speicher voll – bitte Einstellungen → Daten → „Alles sichern“.":"Storage full – please use Settings → Data → “Back up everything”.",
 "Konto-Stand nicht gespeichert: Browser-Speicher voll. Bitte unter Einstellungen → Daten „Alles sichern“.":"Account version not saved: browser storage full. Please use “Back up everything” under Settings → Data.",
 "Konto-Stand nicht gespeichert: Der Browser lässt gerade nicht in seinen Speicher schreiben.":"Account version not saved: the browser doesn’t allow writing to its storage right now.",
 "Konto-Stand konnte nicht eingearbeitet werden – der Abgleich versucht es gleich noch einmal.":"Couldn’t merge in the account version – sync will try again shortly.",
@@ -3879,4 +3879,6 @@
 "{0} rechts einfügen":"Insert {0} right",
 "{0} löschen":"Delete {0}",
 "Auswahl {0}":"Selection {0}",
-"{0} · Strg+C, Strg+X, Strg+V · Rechtsklick: Zeilen und Spalten":"{0} · Ctrl+C, Ctrl+X, Ctrl+V · Right-click: rows and columns"}
+"{0} · Strg+C, Strg+X, Strg+V · Rechtsklick: Zeilen und Spalten":"{0} · Ctrl+C, Ctrl+X, Ctrl+V · Right-click: rows and columns",
+"Neuester Stand aus dem Ersatzspeicher geladen – der Browser-Speicher war voll.":"Latest version loaded from the backup storage – the browser storage was full.",
+"Browser-Speicher voll – die Arbeit liegt sicher im Ersatzspeicher. Größte Boards: {0}.":"Browser storage full – your work is safe in the backup storage. Largest boards: {0}."}

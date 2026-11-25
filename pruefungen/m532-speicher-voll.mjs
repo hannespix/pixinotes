@@ -23,8 +23,10 @@
  *      Neuladen alle Bilder, und ein weiteres Bild von A kommt bei B an.
  *   D  Meldung: Ist der Speicher wirklich voll (großer Text, kein Bild), nennt der Abgleich den Grund und den Ausweg
  *      („Alles sichern"), statt zu raten.
+ *   E  Ersatzspeicher: Voll durch Text — der Stand geht in die IndexedDB, nach dem Neuladen ist alles da (auch die
+ *      letzte Änderung); ist wieder Platz, steht der Stand im localStorage und der Ersatz ist weg (kommt nicht zurück).
  *
- * Aufruf: `node pruefungen/m532-speicher-voll.mjs [A] [B] [C] [D]`; `PN_DIST=<alter Build>` zeigt den Stand davor.
+ * Aufruf: `node pruefungen/m532-speicher-voll.mjs [A] [B] [C] [D] [E]`; `PN_DIST=<alter Build>` zeigt den Stand davor.
  */
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -111,6 +113,9 @@ async function seiteVorbereiten(g, P) {
 }
 const toastsMitschreiben = (P) => P.evaluate(() => {
   const gesehen = new WeakSet(); let letzter = '';
+  // was schon steht (ein Hinweis vom Start), zählt mit
+  const schon = document.querySelector('.toast.show');
+  if (schon) { gesehen.add(schon); letzter = schon.textContent ?? ''; window.__m532Toast(letzter); }
   new MutationObserver(() => {
     for (const el of document.querySelectorAll('.toast.show')) {
       const t = el.textContent ?? '';
@@ -480,6 +485,55 @@ if (will('D')) {
   const gemeldet = await warteBis(() => g.toasts.some((t) => /Speicher voll/.test(t)), 10000);
   pruefe('D1 ein Hinweis sagt, dass der Speicher voll ist', gemeldet, g.toasts);
   pruefe('D2 … und nennt den Ausweg „Alles sichern"', g.toasts.some((t) => /Speicher voll/.test(t) && /Alles sichern/.test(t)), g.toasts.filter((t) => /Speicher/.test(t)));
+  await g.ctx.close();
+}
+
+// ══ E: Ersatzspeicher — voll durch Text, trotzdem nichts verloren ═══════
+if (will('E')) {
+  console.log('\n════ E: Ersatzspeicher (IndexedDB), wenn der localStorage voll ist ════');
+  const GRENZE = 600_000;
+  const stand = { boards: [board('br', 'Text', [notiz('ng', 'x'.repeat(560_000))])], spaces: [{ id: 'sr', name: 'Arbeit', projects: [{ id: 'pr', name: 'Allgemein', boardIds: ['br'] }] }], activeId: 'br', view: 'board', ...RUHIG };
+  const g = await profil({ grenze: GRENZE, stand });
+  await g.P.locator('.react-flow__pane').click({ position: { x: 900, y: 600 } });
+  for (let i = 0; i < 4; i++) {
+    await g.P.evaluate((i) => {
+      const dt = new DataTransfer(); dt.setData('text/plain', `Absatz ${i} ${'z'.repeat(19_000)}`);
+      document.body.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, clipboardData: dt }));
+    }, i);
+    await g.P.waitForTimeout(700);
+  }
+  const karten = () => g.P.locator('.react-flow__node').count();
+  pruefe('E0 fünf Karten auf dem Board (eine große, vier eingefügte)', (await karten()) === 5, await karten());
+  const gesichert = await warteBis(() => g.toasts.some((t) => /Ersatzspeicher/.test(t)), 15000);
+  pruefe('E1 ein Hinweis sagt: voll, aber die Arbeit liegt sicher im Ersatzspeicher – mit den größten Boards', gesichert && g.toasts.some((t) => /Ersatzspeicher/.test(t) && /Größte Boards: Text \(/.test(t)), g.toasts);
+  // Noch eine Änderung, während der Speicher voll ist: auch sie landet im Ersatz
+  await g.P.evaluate(() => {
+    const dt = new DataTransfer(); dt.setData('text/plain', 'Nachzügler');
+    document.body.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, clipboardData: dt }));
+  });
+  await warteBis(async () => (await karten()) === 6, 5000);
+  await g.P.waitForTimeout(1500);
+  if (LAUT) console.log('    vor dem Neuladen:', await g.P.evaluate(() => ({ marke: localStorage.getItem('pixinotes-reserve'), laenge: localStorage.getItem('pixinotes-board').length })), await ablageSchluessel(g.P));
+  const vorNeuladen = g.toasts.length;
+  await neuLaden(g);
+  await warteBis(async () => (await karten()) === 6, 15000);
+  pruefe('E2 nach dem Neuladen sind alle sechs Karten da (Stand aus dem Ersatzspeicher)', (await karten()) === 6, await karten());
+  // (der Speicher ist weiter voll: der Hinweis „liegt sicher im Ersatzspeicher" kann den Start-Hinweis gleich ablösen)
+  pruefe('E3 … und ein Hinweis sagt, dass der Stand aus dem Ersatzspeicher kommt bzw. dort liegt', await warteBis(() => g.toasts.slice(vorNeuladen).some((t) => /Ersatzspeicher/.test(t)), 8000), g.toasts.slice(vorNeuladen));
+  pruefe('E4 der Text der letzten Änderung ist da', (await g.P.locator('.react-flow__node', { hasText: 'Nachzügler' }).count()) === 1);
+  // Platz schaffen: die große Karte löschen → der localStorage nimmt den Stand wieder, der Ersatz wird überflüssig
+  await g.P.locator('.react-flow__node[data-id="ng"] .card-grip').click({ force: true }); await g.P.waitForTimeout(300);
+  await g.P.keyboard.press('Delete');
+  const frei = await warteBis(async () => { const r = await rohText(g.P); return r.length < GRENZE && !r.includes('"ng"'); }, 15000);
+  pruefe('E5 nach dem Löschen steht der Stand wieder im localStorage', frei, (await rohText(g.P)).length);
+  const weg = await warteBis(async () => !(await ablageSchluessel(g.P)).includes('pixinotes-stand-reserve') && (await g.P.evaluate(() => localStorage.getItem('pixinotes-reserve'))) !== '1', 10000);
+  pruefe('E6 … und der Ersatzspeicher ist geräumt', weg, await ablageSchluessel(g.P));
+  await neuLaden(g);
+  await g.P.waitForTimeout(1500);
+  pruefe('E7 nach dem Neuladen bleibt die gelöschte Karte gelöscht (kein alter Ersatz kommt zurück)', (await karten()) === 5 && (await g.P.locator('.react-flow__node[data-id="ng"]').count()) === 0, await karten());
+  const zaehler = await g.P.evaluate(() => window.pixinotesSpeicher);
+  pruefe('E8 Prüfbetrieb (M525): keine Abweichung', zaehler?.abweichungen === 0, zaehler);
+  pruefe('E9 keine Seitenfehler', g.fehler.length === 0, g.fehler);
   await g.ctx.close();
 }
 
