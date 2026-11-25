@@ -11,6 +11,8 @@ import {
 } from '../lib/calAccounts';
 import { exportToFolder } from '../lib/exporter';
 import { OneNoteImport } from './OneNoteImport';
+import KontoAufraeumen from './KontoAufraeumen';
+import RettungsKopie from './RettungsKopie';
 import {
   applySync, checkSyncRemote, disconnectSync, ensurePermission, getSyncHandle, knownStamp,
   permissionState, pickSyncFolder, readSync, syncSupported, writeSync,
@@ -1058,6 +1060,8 @@ export function Settings() {
                     {kontoStamp() ? ` (letzter Abgleich: ${new Date(kontoStamp()!).toLocaleString('de-DE')})` : ''}
                     {kontoIstEigenes(kontoSitz) ? (kontoLiveVerbunden() ? ', live verbunden' : ', Abgleich alle zehn Sekunden') : ''}. Anhänge bis {kontoDateiMaxMb(kontoSitz)} MB wandern mit{kontoIstEigenes(kontoSitz) ? ' – große laden beim Öffnen der Karte nach' : ''}.
                   </div>
+                  {/* M529: Dateien im Konto, auf die nichts mehr verweist — anzeigen, erst nach Bestätigung löschen */}
+                  {kontoIstEigenes(kontoSitz) && <KontoAufraeumen />}
                 </>
               )}
               {kontoError && (
@@ -1306,6 +1310,9 @@ export function Settings() {
         </section>
 
         <OneNoteImport onClose={() => setOpen(false)} onDienste={() => setTab('dienste')} />
+
+        {/* M529: Rettungskopie eines unlesbaren gespeicherten Stands (nur, wenn es eine gibt) */}
+        <RettungsKopie />
 
         <section className="modal-section modal-danger">
           <h3>Alles leeren &amp; neu starten</h3>

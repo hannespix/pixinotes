@@ -52,5 +52,6 @@
  "WebGL2 ist auf diesem Gerät nicht verfügbar.",
  "Shader",
  "Programm",
- "Die Grafikoberfläche konnte nicht angelegt werden."
+ "Die Grafikoberfläche konnte nicht angelegt werden.",
+ "{0}/storage/v1/object/{1}pixinotes/{2}/{3}{4}"
 ]
