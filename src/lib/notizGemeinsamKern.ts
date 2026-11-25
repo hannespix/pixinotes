@@ -978,6 +978,32 @@ async function kernOeffnen(auftrag: KernAuftrag): Promise<SitzungIntern> {
     if (!bereit) return;   // vor dem Start nichts senden (der Stand geht mit der Antwort auf `hallo`)
     if (!sendTimer) sendTimer = setTimeout(jetztSenden, takt(boardId, 40));
   });
+  /**
+   * M533: Wer hier getippt hat und die Notiz verlässt, ohne selbst zu speichern, fragt einmal nach (`hallo`). Die anderen
+   * antworten mit ihrem Stand-Vektor, und was nur dieses Gerät hat, geht noch einmal hinaus (siehe `stand`). Vorher war
+   * die letzte Änderung verloren, wenn ihre Nachricht im Kanal unterging (Realtime sichert die Zustellung nicht zu): Sie
+   * lag nur im Y-Dokument dieses Geräts, der Schreiber bekam sie nie — eine Lücke meldet Yjs erst, wenn danach noch
+   * etwas vom selben Gerät kommt.
+   */
+  let hatteCursor = false;
+  let eigeneSeitBetreten = false;
+  let verlassenTimer: ReturnType<typeof setTimeout> | undefined;
+  doc.on('update', (_u: Uint8Array, herkunft: unknown) => { if (herkunft !== FERN && herkunft !== 'init') eigeneSeitBetreten = true; });
+  function verlassenPruefen(): void {
+    const cursor = !!(awareness.getLocalState() as { cursor?: unknown } | null)?.cursor;
+    if (cursor) { hatteCursor = true; clearTimeout(verlassenTimer); return; }
+    if (!hatteCursor) return;
+    hatteCursor = false;
+    if (!eigeneSeitBetreten) return;
+    eigeneSeitBetreten = false;
+    clearTimeout(verlassenTimer);
+    verlassenTimer = setTimeout(() => {
+      if (zu || !bereit || istSchreiber()) return;   // der Schreiber hat seinen Stand selbst gesichert
+      jetztSenden(); nachfrageAm = 0; nachfragen();
+    }, 400);
+  }
+  aufraeumen.push(() => clearTimeout(verlassenTimer));
+
   // --- Cursor und Markierung (Awareness) ---
   let awTimer: ReturnType<typeof setTimeout> | undefined;
   const awSenden = () => {
@@ -989,6 +1015,7 @@ async function kernOeffnen(auftrag: KernAuftrag): Promise<SitzungIntern> {
     if (herkunft === 'local' && bereit && [...added, ...updated, ...removed].includes(doc.clientID)) {
       if (awareness.getLocalState() === null) awSenden();   // Abschied sofort
       else if (!awTimer) awTimer = setTimeout(awSenden, takt(boardId, 90));
+      verlassenPruefen();
     }
     schreiberPruefen();
     // Tippt (Cursor im Editor) gerade jemand anderes hier? Dann bleibt die Karte, wie sie ist — bis auf den Text

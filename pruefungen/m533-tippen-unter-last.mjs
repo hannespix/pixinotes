@@ -8,6 +8,8 @@
  *   B  Besitzerin (Konto): dasselbe, Anna gibt den Punkt.
  *   C  Dauerlauf: drei Geräte, abwechselnd tippen und verlassen, die anderen punkten sofort, verzögerte und verlorene
  *      Nachrichten, gedrosselte Seiten — am Ende überall (und auf dem Server) der neueste Text.
+ *   D  Gemeinsam tippen (Yjs, zwei weitere Gäste): Wer nicht speichert, tippt; seine letzte Yjs-Nachricht geht verloren —
+ *      beim Verlassen der Notiz fragt er nach, seine letzten Wörter kommen trotzdem auf den Server.
  */
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -69,10 +71,11 @@ const patchAuf = (board, p) => {
 };
 const textAus = (n) => (JSON.stringify(n?.data?.blocks ?? []).match(/"(?:text|content)":"([^"]*)"/g) ?? []).map((t) => t.replace(/^"(?:text|content)":"|"$/g, '')).join('');
 const protokoll = [];
+const schreiber = new Map();   // Karte → Gerät, das sie zuletzt per gast_aendern schrieb
 const t0 = Date.now();
 const notiere = (was) => { protokoll.push(`${((Date.now() - t0) / 1000).toFixed(1)}s ${was}`); if (process.env.M533_LAUT) console.log('      ·', protokoll.at(-1)); };
-const serverAendern = (e, p) => {
-  for (const n of p.nodes?.set ?? []) if (n.type === 'note') notiere(`gast_aendern ${n.id}: „${textAus(n)}“ Punkte ${Object.values(n.data?.punkte ?? {}).filter((x) => x.n > 0).length}`);
+const serverAendern = (e, p, wer = '?') => {
+  for (const n of p.nodes?.set ?? []) if (n.type === 'note') { notiere(`gast_aendern ${wer} ${n.id}: „${textAus(n)}“ Punkte ${Object.values(n.data?.punkte ?? {}).filter((x) => x.n > 0).length}`); schreiber.set(n.id, wer); }
   const name = `board-${e.board_id}.json`;
   const z = zeile(e.besitzer, name);
   const vor = z.version;
@@ -197,7 +200,7 @@ async function dienste(ctx, geraet = '?') {
         if (sb.ohneAendern) return json(route, 404, { code: 'PGRST202', message: 'Could not find the function' });
         if (!z || e.rolle !== 'bearbeiten') { sb.aufrufe.gastAbgelehnt += 1; return json(route, 400, { code: 'P0002', message: 'keine freigabe' }); }
         sb.aufrufe.gastAendern += 1;
-        return json(route, 200, serverAendern(e, b.p_patch));
+        return json(route, 200, serverAendern(e, b.p_patch, geraet));
       }
       if (pfad.endsWith('/gast_schreiben')) {
         if (!z || e.rolle !== 'bearbeiten') { sb.aufrufe.gastAbgelehnt += 1; return json(route, 400, { code: 'P0002', message: 'keine freigabe' }); }
@@ -351,7 +354,7 @@ async function dienste(ctx, geraet = '?') {
           const alt = l.meta; l.meta = j.payload.payload;
           liveAn(l.topic, { topic: l.topic, event: 'presence_diff', payload: { joins: { [l.key]: { metas: [l.meta] } }, leaves: alt ? { [l.key]: { metas: [alt] } } : {} }, ref: null });
         } else if (j.event === 'broadcast' && eintrag.live) {
-          if (steuerung.verwerfen.has(`${geraet}:${j.payload?.event}`)) return;   // M533: geht im Netz verloren
+          if (steuerung.verwerfen.has(`${geraet}:${j.payload?.event}`) || steuerung.verwerfen.has(`${geraet}:${j.payload?.event}:${j.payload?.payload?.a}`)) return;   // M533: geht im Netz verloren
           if (j.payload?.event === 'karte') sb.aufrufe.karte += 1;
           if (j.payload?.event === 'stand') sb.aufrufe.stand += 1;
           if (j.payload?.event === 'delta') sb.aufrufe.delta += 1;
@@ -499,7 +502,9 @@ const inKarte = async (P, text) => {
   await k.locator('.note-editor').first().click({ position: { x: 24, y: 12 } }); await P.waitForTimeout(500);
   const ed = k.locator('[contenteditable="true"]').first();
   if ((await ed.count()) && !(await P.evaluate(() => !!document.activeElement?.isContentEditable))) { await ed.click({ position: { x: 24, y: 12 } }).catch(() => {}); await P.waitForTimeout(350); }
-  return P.evaluate(() => !!document.activeElement?.isContentEditable && !!document.activeElement.closest('.react-flow__node'));
+  // M533: Unter Last baut sich der Editor erst nach Sekunden auf (der Yjs-Teil wird gefragt, lehnt ab, der Editor kommt
+  // allein wieder) — vorher getippte Tasten fehlten, und C1 sah keinen Rahmen. Auf den Cursor warten statt fester Pausen.
+  return P.waitForFunction(() => !!document.activeElement?.isContentEditable && !!document.activeElement.closest('.react-flow__node'), null, { timeout: 10000 }).then(() => true).catch(() => false);
 };
 const heraus = async (P) => { await P.keyboard.press('Escape'); await P.waitForTimeout(150); await P.evaluate(() => document.activeElement?.blur?.()); await P.waitForTimeout(350); };
 /** Eine Stelle suchen, an der eine ganze neue Karte Platz hat (auch neben Karten, die erst vom anderen Gerät kamen) */
@@ -626,12 +631,12 @@ const stand371 = {
   spaces: [{ id: 's1', name: 'Arbeit', projects: [{ id: 'p1', name: 'Allgemein', boardIds: ['bx'] }] }],
   activeId: 'bx', view: 'board',
 };
-async function geraet2(name, stand, anker = '') {
+async function geraet2(name, stand, anker = '', mitYjs = false) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, locale: 'de-DE' });
   await dienste(ctx, name);
   // Wie m377: Notizen auf dem Weg mit Karten-Sperre und Mitlesen (der Yjs-Teil lädt nicht) — auf diesem Weg ging der Text
   // verloren. Gemeinsames Tippen über Yjs prüfen m477/m487/m493.
-  await ctx.route(/\/assets\/notizGemeinsamKern-[^/]*\.js$/, (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: 'export async function sitzungOeffnen() { throw new Error("M533: Yjs-Teil abgeschaltet"); }' }));
+  if (!mitYjs) await ctx.route(/\/assets\/notizGemeinsamKern-[^/]*\.js$/, (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: 'export async function sitzungOeffnen() { throw new Error("M533: Yjs-Teil abgeschaltet"); }' }));
   await speicher(ctx);
   await ctx.addInitScript(({ st, konfig }) => {
     if (window !== window.top) return;   // nicht in den Rahmen der Tools (abgeschottet, kein Speicher)
@@ -642,8 +647,8 @@ async function geraet2(name, stand, anker = '') {
     localStorage.setItem('pixinotes-board', JSON.stringify({ version: 5, state: st }));
   }, { st: stand, konfig: { url: SB_URL, key: SB_KEY } });
   const P = await ctx.newPage();
-  // M533: künstliche Last — die Seite rechnet um diesen Faktor langsamer (CDP)
-  if (DROSSEL > 1) await (await ctx.newCDPSession(P)).send('Emulation.setCPUThrottlingRate', { rate: DROSSEL });
+  // M533: künstliche Last zum Nachstellen (PN_DROSSEL=4 → die Seite rechnet viermal langsamer, CDP)
+  if (Number(process.env.PN_DROSSEL ?? 1) > 1) await (await ctx.newCDPSession(P)).send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.PN_DROSSEL) });
   P.fehler = [];
   P.on("pageerror", (e) => { P.fehler.push(e.message); console.log(`    PAGEERROR[${name}]:`, e.message, String(e.stack).split("\n").slice(0, 4).join(" | ")); });
   P.on('dialog', (d) => d.accept());
@@ -692,7 +697,7 @@ const standText = (P) => P.locator('[data-taste="punkte-stand"]').textContent().
 
 // ══ M533 ═══════════════════════════════════════════════════════════
 const standM533 = {
-  boards: [board('bx', 'Planung', [note('t1', 'Mehr Fenster', 40, 60), note('t2', 'Ruheraum', 420, 60), note('t3', 'Kaffee', 800, 60)])],
+  boards: [board('bx', 'Planung', [note('t1', 'Mehr Fenster', 40, 60), note('t2', 'Ruheraum', 420, 60), note('t3', 'Kaffee', 800, 60), note('t4', 'Notizen', 40, 420)])],
   spaces: [{ id: 's1', name: 'Arbeit', projects: [{ id: 'p1', name: 'Allgemein', boardIds: ['bx'] }] }],
   activeId: 'bx', view: 'board',
 };
@@ -714,6 +719,7 @@ async function hinein(P, id) {
 const gesperrt = (P, id) => P.locator(`[data-taste="live-sperre"][data-karte="${id}"]`).count();
 const modusAus = async (P) => { if (await P.locator('[data-taste="punkte-fertig"]').count()) { await P.locator('[data-taste="punkte-fertig"]').click(); await P.waitForTimeout(250); } };
 const modusEin = async (P) => { if (!(await P.locator('[data-taste="punkte-leiste"]').count())) await modusAn(P); };
+console.log('\n════ Aufbau ════');
 const A = await geraet2('A', standM533);
 await anmelden(A.P, 'anna@example.de', 'geheim123', true);
 const uidA = nutzerId('anna@example.de');
@@ -723,8 +729,8 @@ await A.P.locator('[data-taste="einladung-anlegen"]').click();
 await warteBis(A.P, async () => (await A.P.locator('[data-taste="einladung-adresse"]').count()) === 1, 6000);
 const token = /#e=(.+)$/.exec(await A.P.locator('[data-taste="einladung-adresse"]').inputValue().catch(() => ''))?.[1] ?? '';
 await schliessen(A.P);
-const beitreten = async (kurz, name) => {
-  const g = await geraet2(kurz, standB, `#e=${token}`);
+const beitreten = async (kurz, name, mitYjs = false) => {
+  const g = await geraet2(kurz, standB, `#e=${token}`, mitYjs);
   await warteBis(g.P, async () => !!(await boardVon(g.P, 'bx')), 12000);
   await g.P.locator('[data-taste="gast-name"]').fill(name);
   await g.P.locator('[data-taste="gast-name-ok"]').click(); await g.P.waitForTimeout(500);
@@ -820,6 +826,40 @@ pruefe('C2 am Ende zeigen alle und der Server den neuesten Text', await ueberall
 const am = await Promise.all(alle.map((g) => marken(g.P)));
 pruefe('C3 die Punkte der Karte stimmen überall mit dem Server überein', am.every((m) => (m.t3?.zahl ?? 0) === serverPunkte('t3')), `${JSON.stringify(am.map((m) => m.t3))} · Server ${serverPunkte('t3')}`);
 pruefe('C4 keine Skriptfehler', alle.every((g) => g.P.fehler.length === 0), JSON.stringify(alle.map((g) => g.P.fehler)).slice(0, 400));
+
+// ══ D ═══════════════════════════════════════════════════════════════
+console.log('\n════ D: Gemeinsam tippen (Yjs) — die letzte Nachricht geht verloren ════');
+// Zwei weitere Gäste, bei denen der Yjs-Teil lädt (Normalfall für Notizen): Nur der Schreiber der Sitzung speichert.
+const Y = await beitreten('Y', 'Yvonne', true);
+const Z = await beitreten('Z', 'Zora', true);
+await warteBis(Y.P, async () => /5 dabei/.test(await zahl(Y.P)), 15000);
+const yz = [Y, Z];
+const tippen = async (g, text) => { const drin = await hinein(g.P, 't4'); await g.P.keyboard.type(text, { delay: 30 }); return drin; };
+await tippen(Y, ' eins');
+await warteBis(Y.P, () => serverText('t4').includes('eins'), 15000);
+await heraus(Y.P);
+await Z.P.waitForTimeout(1500);
+await tippen(Z, ' zwei');
+await warteBis(Z.P, () => serverText('t4').includes('zwei'), 15000);
+await heraus(Z.P);
+await Z.P.waitForTimeout(1500);
+const sichert = schreiber.get('t4');
+pruefe('D1 die Notiz geht gemeinsam: Text beider liegt auf dem Server, einer speichert', /eins.*zwei/.test(serverText('t4')) && ['Y', 'Z'].includes(sichert), `${serverText('t4')} · ${sichert}`);
+// Wer NICHT speichert, tippt — und seine letzte Änderung geht im Kanal verloren
+const tipper = sichert === 'Y' ? Z : Y;
+await tippen(tipper, ' drei');
+await warteBis(A.P, () => serverText('t4').includes('drei'), 15000);
+await tipper.P.waitForTimeout(600);
+steuerung.verwerfen.add(`${tipper.name}:notiz-y:upd`);
+await tipper.P.keyboard.type(' VIER', { delay: 20 });
+await tipper.P.waitForTimeout(400);   // die Nachrichten mit „ VIER“ sind hinaus — und verloren
+steuerung.verwerfen.clear();
+await heraus(tipper.P);
+const dAn = await warteBis(A.P, () => serverText('t4').includes('drei VIER'), 10000);
+pruefe(`D2 ${tipper.name === 'Y' ? 'Yvonnes' : 'Zoras'} letzte Wörter kommen trotzdem auf den Server`, dAn, serverText('t4'));
+await warteBis(A.P, async () => (await Promise.all([...alle, ...yz].map((g) => sicht(g.P, 't4')))).every((t) => t.includes('drei VIER')), 10000);
+pruefe('D3 … und bei allen fünf an', (await Promise.all([...alle, ...yz].map((g) => sicht(g.P, 't4')))).every((t) => t.includes('drei VIER')), (await Promise.all([...alle, ...yz].map((g) => sicht(g.P, 't4')))).join(' / '));
+pruefe('D4 keine Skriptfehler', yz.every((g) => g.P.fehler.length === 0), JSON.stringify(yz.map((g) => g.P.fehler)).slice(0, 400));
 
 console.log(`\n  m533-tippen-unter-last: ${ok} bestanden, ${bad} fehlgeschlagen`);
 await browser.close(); app.close();

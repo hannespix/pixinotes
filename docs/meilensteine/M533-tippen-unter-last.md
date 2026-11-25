@@ -41,6 +41,8 @@ speichert ──────────────────► „… und L
   ändert nur das, was er selbst tut (Punkt, Lage, Farbe) — der Text bleibt der des Schreibers.
 - Bevor ein Gast eine Karte schreibt, die eben noch ein anderer in der Hand hatte, holt sein Gerät erst dessen neuesten
   Stand.
+- Beim gemeinsamen Tippen (Yjs) kommen die letzten Zeichen beim Speichernden auch dann an, wenn ihre Nachricht im
+  Kanal verloren ging: Wer das Feld verlässt, fragt einmal nach.
 - Sichtbar ist nur der Eintrag unter „Was ist neu“ (DE/EN); keine neue Bedienung.
 
 ## Wie (Architektur)
@@ -60,6 +62,13 @@ speichert ──────────────────► „… und L
   Karten schreiben ohne den zusätzlichen Blick (keine Mehrlast in großen Gruppen).
 - Konto-Geräte (Besitzer, Gast mit Konto) hatten den Blick vor dem Schreiben schon (M524, `kontoWriteRoh`); für sie
   genügt die erste Änderung. Ordner/WebDAV kennen kein Mitlesen.
+- `lib/notizGemeinsamKern.ts` (Yjs-Weg, Notiz/Protokoll/Ticket): Dort speichert nur der Schreiber der Sitzung. Ging die
+  letzte Yjs-Nachricht eines anderen im Kanal verloren (Realtime-Broadcast ist nicht zugesichert), fragte niemand nach —
+  Yjs meldet eine Lücke erst, wenn danach noch etwas vom selben Gerät kommt; die letzten Zeichen lagen nur in dessen
+  Y-Dokument. Jetzt: Verlässt ein Gerät, das hier getippt hat und nicht Schreiber ist, das Feld (sein Cursor in der
+  Anwesenheit wird leer, `verlassenPruefen`), schickt es nach 400 ms ein `hallo`; die anderen antworten mit `stand`
+  samt Stand-Vektor, und was nur es selbst hat, geht noch einmal hinaus (Weg aus M477). Kosten: eine Nachfrage je
+  Verlassen, nur bei eigenen Änderungen.
 - Prüfreihe `m377`: `inKarte` wartet auf den Cursor statt fester Pausen (der rote C1-Lauf aus M518: Unter Last kam der
   Editor nach dem abgelehnten Yjs-Teil erst nach Sekunden, Gerds erste Tasten gingen ins Leere — kein Fehler der App,
   das Programm setzt den Cursor wie vorgesehen); `PN_DROSSEL` drosselt die Seiten zum Nachstellen.
@@ -74,7 +83,10 @@ Schreiben auf dem Server mit Text).
 - B Besitzerin (Konto): dasselbe, Anna punktet.
 - C Dauerlauf: drei Geräte schreiben abwechselnd, ein zufälliges anderes punktet sofort, zufällige Verzögerungen und
   verlorene Live-Nachrichten → am Ende überall und auf dem Server der neueste Text, Punkte überall wie auf dem Server.
-- Gegen den Stand davor (`PN_DIST=<alter Build>`): A3/A4, B3/B4, C1/C2 rot (in jedem Lauf); jetzt grün.
+- D Gemeinsam tippen (Yjs, zwei weitere Gäste mit geladenem Yjs-Teil): Wer nicht speichert, tippt; seine letzte
+  Yjs-Nachricht geht verloren (`steuerung.verwerfen` „Gerät:notiz-y:upd“) → seine letzten Wörter kommen trotzdem auf den
+  Server und zu allen fünf.
+- Gegen den Stand davor (`PN_DIST=<alter Build>`): A3/A4, B3/B4, C1/C2, D2/D3 rot (in jedem Lauf); jetzt grün.
 
 ## Grenzen / offen
 - Es bleibt das Fenster **einer Anfrage**: Speichert der Schreiber genau zwischen dem Blick eines Gasts und dessen
@@ -84,10 +96,8 @@ Schreiben auf dem Server mit Text).
   Gezeigten auf (er sieht nichts anderes). Kommt das Speichern des anderen danach, gilt wie bisher bei „beide haben
   denselben Text geändert“ die hiesige Fassung. Mit dem Yjs-Teil (Normalfall für Notizen, Protokolle, Tickets) gibt es
   dieses Mitlesen nicht — dort wird zeichengenau zusammengeführt.
-- **Yjs-Weg** nicht verändert: Dort speichert nur der Schreiber der Sitzung. Ginge die letzte Yjs-Nachricht eines
-  anderen verloren (Realtime-Broadcast ist nicht zugesichert) und verließe er die Notiz, fragte niemand nach — seine
-  letzten Zeichen lägen nur in seinem Y-Dokument, bis jemand die Notiz neu betritt (`hallo`). In den Läufen hier nicht
-  beobachtet; ein Ansatz wäre ein `hallo` beim Verlassen (der Fragende schickt dann zurück, was nur er hat).
+- Yjs-Weg: Verlässt jemand die Notiz, ohne Schreiber zu sein, wird **einmal** nachgefragt; schließt er sie dagegen
+  ganz (Board gewechselt, Fenster zu), bevor die Antwort da ist, bleibt eine verlorene letzte Nachricht verloren.
 - Der Gesamtlauf-Fehler selbst (Stand vor M524, Gerüst m377) ließ sich mit künstlicher Last (CDP-Drosselung, verzögerte
   Nachrichten) in 16 Durchgängen nicht wieder auslösen; die Erklärung oben stützt sich auf die Mitschrift aus M518
   (Text ohne Block-Kennungen = Karte von vor dem Tippen, Punkte 2) und auf den nachgestellten Weg in A/B.
