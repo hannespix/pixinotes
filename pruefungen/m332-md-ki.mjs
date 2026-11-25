@@ -321,7 +321,10 @@ console.log('════ H: Board-Aktion mit zu viel Inhalt meldet die Auslassu
   await P.evaluate(() => [...document.querySelectorAll('.dock-menu-ai button')].find((b) => b.textContent.includes('Briefing'))?.click());
   const toasts = await wartenBisFertig(P, 30000);
   const ende = toasts[toasts.length - 1];
-  pruefe('H1 Meldung nennt weggelassene Karten', /passten nicht mehr in den Kontext/.test(ende) && /\d Karte\(n\)/.test(ende), ende);
+  // M518: Seit M523 nennt die Meldung die Zahl mit richtigem Wort („3 Karten passten …", `zahlWort` – Regel aus M461:
+  // nie „Karte(n)"). Geprüft wird weiter, dass sie die weggelassenen Karten mit ihrer Zahl nennt – und jetzt auch,
+  // dass die Klammerform nicht zurückkommt.
+  pruefe('H1 Meldung nennt weggelassene Karten', /\b[2-9] Karten passten nicht mehr in den Kontext/.test(ende) && !/Karte\(n\)/.test(ende), ende);
   await ctx.close();
 }
 
