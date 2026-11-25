@@ -205,7 +205,10 @@ dl.leer-wege dd { margin: 0; }
 }
 .shape-decision .shape-text, .shape-decision .shape-input, .shape-decision .shape-ph { position: relative; z-index: 1; }
 .shape-text { white-space: pre-wrap; word-break: break-word; }
-.shape-ph { color: var(--muted); }
+/* M519: Der Platzhalter folgt der Schrift der Form (die richtet sich nach der Füllung, M515) statt dem Grau des
+   Themas — im Dunkeln stand sonst helles Grau auf hellem Pastell (2,1:1), auf einer eigenen Farbe bis 1,5:1 */
+.shape-ph { color: color-mix(in srgb, currentColor 72%, transparent); }
+.shape-body.schrift-eigen .shape-ph { color: inherit; }
 .shape-input {
   width: 92%; height: 80%; border: none; background: transparent; resize: none;
   outline: none; font-family: inherit; font-size: 12.5px; text-align: center;

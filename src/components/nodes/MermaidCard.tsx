@@ -5,13 +5,13 @@ import type { MermaidNode } from '../../types';
 import { IWand, IUhr } from '../Icons';
 import { MenuHuelle } from '../EbenenMenu';
 import { aiReady } from '../../lib/ai';
-import { aiMermaid, buildMermaidSource, getMermaid, LEGACY_MERMAID_DEFAULT, MERMAID_STYLES, MERMAID_TEMPLATES as TEMPLATES, preloadHandFont } from '../../lib/mermaid';
+import { aiMermaid, buildMermaidSource, getMermaid, LEGACY_MERMAID_DEFAULT, MERMAID_STYLES, MERMAID_TEMPLATES as TEMPLATES, mermaidResteWeg, preloadHandFont } from '../../lib/mermaid';
 import {
   addGanttSection, addGanttTask, addMindChild, addPie, addQuadrantPoint,
   addSeqActor, addSeqMsg, addSeqNote, addState, addTimelineEvent,
   addTimelinePeriod, axisLabels, diagramKind, ganttFlags, ganttSections,
   ganttTasks, getTitle, hasAutonumber, mindLines, mindText, nudgeQuadrantPoint,
-  pieSlices, quadrantLabels, removeGanttTask, removeMind,
+  pieSlices, quadrantLabels, removeFlowNode, removeGanttTask, removeMind,
   removePie, removeQuadrantPoint, removeSeqActor, removeSeqMsg, removeState,
   removeStateTrans, removeTimelineToken, renameGanttSection, renameGanttTask,
   renameMind, renamePie, renameQuadrantPoint, renameSeqActor, renameState,
@@ -82,7 +82,9 @@ const NODE_COLORS: Array<[string, string, string]> = [
  * Sprache wie die Auswahl-Toolbar oben). Flowchart-Schritte werden direkt im
  * Bild bearbeitet: umbenennen, anfügen, Form, Farbe, verbinden, entfernen.
  */
-export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }: NodeProps<MermaidNode>) {
+export function MermaidCard({ id, data: roh, selected, width: nodeW, height: nodeH }: NodeProps<MermaidNode>) {
+  // M519: ohne Code (alter Stand) wie ein leeres Diagramm rechnen statt auszufallen
+  const data = useMemo(() => (typeof roh.code === 'string' ? roh : { ...roh, code: '' }), [roh]);
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const resizeNode = useBoard((s) => s.resizeNode);
   const showToast = useBoard((s) => s.showToast);
@@ -161,7 +163,10 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
         .then(({ svg }) => { if (!cancelled && myKey === renderKey.current) { setSvg(svg); setError(''); } })
         // svg NICHT leeren — beim Tippen bleibt das letzte gültige Diagramm
         // sichtbar, der Fehler erscheint nur als kleines Overlay (M90)
-        .catch((e) => { if (!cancelled && myKey === renderKey.current) setError(String(e?.message ?? e).split('\n')[0]); });
+        .catch((e) => {
+          mermaidResteWeg(`pn-mermaid-${id}-${myKey}`);   // M519: nichts im Dokument zurücklassen
+          if (!cancelled && myKey === renderKey.current) setError(String(e?.message ?? e).split('\n')[0]);
+        });
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
   }, [renderCode, id, uiTheme, style, look]);
@@ -356,10 +361,9 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
   };
 
   const removeNode = (nid: string) => {
-    const re = new RegExp(`(^|\\s|-)${escapeRe(nid)}(\\b|\\[|\\{|\\()`);
-    const lines = data.code.split('\n');
-    const kept = lines.filter((l, i) => i === 0 || !re.test(l));
-    updateNodeData(id, { code: kept.join('\n') });
+    // M519: nur den Schritt und seine Verbindungen — vorher fiel jede Zeile weg, die ihn nannte, samt den
+    // Beschriftungen der Nachbarn darin (lib/mermaidEdit.ts)
+    updateNodeData(id, { code: removeFlowNode(data.code, nid) });
     setSelNode(null);
     setConnectFrom(null); // ein laufender Verbinden-Modus zeigt sonst ins Leere
   };

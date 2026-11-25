@@ -30,6 +30,9 @@ import { FOKUS_ANSICHTEN, FOKUS_ZOOM_EREIGNIS, FOKUS_ANSICHT_EREIGNIS, fokusAnsi
 
 /** Kurzer, sprechender Name der Karte für die Kopfzeile */
 function cardTitle(node: AppNode): string {
+  // M519: Der Text einer Diagramm-Karte beginnt mit dem Etikett „Diagramm:" (für KI und Export) — als Titel stand
+  // es mit hängendem Doppelpunkt in der Kopfzeile und in „Nächste Karte: Diagramm:"
+  if (node.type === 'mermaid') return TYPE_LABEL.mermaid;
   const first = nodeToText(node).trim().split('\n').map((l) => l.trim()).find(Boolean);
   if (first) return first.replace(/^#+\s*/, '').slice(0, 60);
   return TYPE_LABEL[node.type ?? ''] ?? 'Karte';
@@ -239,13 +242,22 @@ export function FocusSheet() {
    * die Fokus-Leisten liegen zwar auch „neben" der Karte, sind aber
    * Bedienung — wer dort klickt, will etwas tun, nicht schließen.
    */
+  // M519: wann der Fokus aufging (von „zu" nach „offen", nicht beim Blättern zur nächsten Karte)
+  const offenSeit = useRef(0);
+  const fokusOffen = !!focusCard;
+  useEffect(() => { if (fokusOffen) offenSeit.current = performance.now(); }, [fokusOffen]);
   useEffect(() => {
     if (!focusCard) return;
     // M333: Nur ein kurzer TIPP neben die Karte schließt. Ein Stift-Strich, ein
     // Schwenken oder ein Pinch auf der Fläche gehört zum Arbeiten im Zoom.
     let start: { x: number; y: number; t: number } | null = null;
+    // M519: Der zweite Tipp eines Doppeltipps am Telefon gehört eine halbe Sekunde lang niemandem (M521, Board.tsx).
+    // Dessen Sperre hält ihn vom Inhalt fern, aber nicht von diesem Lauscher am selben Fenster: Lag unter dem Finger
+    // inzwischen freie Fläche, ging die eben geöffnete Karte sofort wieder zu. Gemessen an der Zeit des Ereignisses.
+    // Der Zeitpunkt des Öffnens steht in offenSeit (unten) — nicht der Lauf dieses Effekts, der sich auch im offenen Fokus wiederholt.
     const onDown = (e: PointerEvent) => {
       start = null;
+      if (e.timeStamp - offenSeit.current < 500) return;
       const t = e.target as HTMLElement | null;
       if (!t || t.closest('.pn-focused, .focus-head, .focus-nav')) return;
       if (!t.closest('.react-flow__pane')) return;
