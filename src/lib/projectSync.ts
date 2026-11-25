@@ -7,6 +7,7 @@
 // WICHTIG: Das Paket enthält NIEMALS KI-Schlüssel, WebDAV-Zugangsdaten oder
 // OAuth-Tokens — die leben in eigenen localStorage-Schlüsseln außerhalb des
 // Board-Stores und werden hier gar nicht erst angefasst.
+import { ablageVorab } from '../store/speicher';
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc } from '../store';
 import { ensurePermission, idbDel, idbGet, idbSet, syncSupported, type SyncDirHandle } from './syncFolder';
 import { nurAuswahlAnders, ohneAuswahl } from './syncMerge';
@@ -188,6 +189,7 @@ export async function joinProjectFolder(): Promise<{ folder: string; names: stri
     handleCache.set(p.project.id, handle);
     try { await idbSet(idbKey(p.project.id), handle); } catch { /* Sitzungs-Cache reicht */ }
     setMeta(p.project.id, handle.name);
+    await ablageVorab(p.boards); // M532: Bilder zuerst in den Datei-Speicher
     if (!applyProjectPayload(p)) persisted = false;
   }
   return { folder: handle.name, names: found.map((p) => p.project.name), persisted };
@@ -245,6 +247,7 @@ export async function checkProjectRemotes(): Promise<void> {
     if (!handle || !(await ensurePermission(handle, false))) continue;
     const remote = await readProjectFile(handle, projectId);
     if (!remote || remote.savedAt === projectStamp(projectId)) continue;
+    await ablageVorab(remote.boards); // M532
     if (!localStorage.getItem(dirtyKey(projectId)) && applyProjectPayload(remote)) {
       useBoard.getState().showToast(`Team-Projekt „${remote.project.name}" aktualisiert (${new Date(remote.savedAt).toLocaleString('de-DE')}).`);
       conflictWarned.delete(projectId);

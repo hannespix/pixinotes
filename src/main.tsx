@@ -24,6 +24,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { initUebersetzung } from './lib/uebersetzung';
 import { initSprache, sprache } from './lib/sprache';
 import { alteNamenOhneEmoji, startNamenAufEnglisch } from './store';
+import { standBereit } from './store/speicher';
 import { fensterFokusStarten } from './lib/fensterFokus';
 import { appInstallierenStarten } from './lib/appInstallieren';
 
@@ -83,8 +84,10 @@ if (!handleOAuthRedirect()) {
       </ErrorBoundary>
     </React.StrictMode>,
   );
-  alteNamenOhneEmoji();
-  void initSprache().then(() => { if (sprache() === 'en') startNamenAufEnglisch(); }).then(starten, starten);
+  // M532: Bilder, die nicht im localStorage-Stand liegen, kommen aus dem Datei-Speicher — vor dem ersten Zeichnen
+  // (ohne solche Bilder ist das sofort erledigt)
+  const bereit = standBereit().then(alteNamenOhneEmoji);
+  void Promise.all([bereit, initSprache()]).then(() => { if (sprache() === 'en') startNamenAufEnglisch(); }).then(starten, starten);
 }
 
 // PWA: Service Worker nur im Prod-Build und über http(s) registrieren —
