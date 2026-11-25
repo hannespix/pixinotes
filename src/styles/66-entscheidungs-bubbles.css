@@ -251,6 +251,23 @@
   border: 1.5px solid var(--bub-kontur, var(--border)); border-radius: 16px; background: var(--surface-card); color: var(--ink);
   font: inherit; font-size: 13px; outline: none; box-shadow: 0 8px 22px rgba(22, 25, 30, .16);
 }
+/* ---------- M543: KI gruppiert — die Blasen kreisen (Physik), die alten Gruppen treten zurück, neue erscheinen sanft ---------- */
+.bub-ki-hinweis {
+  position: absolute; left: 8px; top: 8px; z-index: 6; display: inline-flex; align-items: center; gap: 6px;   /* wo sonst „＋ Gruppe" steht */
+  height: 26px; padding: 0 12px; box-sizing: border-box; border: 1px solid var(--border-soft); border-radius: 13px;
+  background: var(--surface-card); color: var(--ink); font-size: 12px; font-weight: 600; white-space: nowrap; pointer-events: none;
+}
+.bub-ki-hinweis svg { flex: none; color: var(--accent-strong, var(--accent)); }
+.bub.gross .bub-ki-hinweis { height: 34px; padding: 0 16px; border-radius: 17px; font-size: 15px; }
+/* Namen und Ringe der alten Gruppen blenden aus, solange es kreist (die Tropfen lösen sich in der Physik selbst) */
+.bub-ring-name { transition: opacity .4s ease; }
+.bub.wirbelt .bub-ring, .bub.wirbelt .bub-ring-name { opacity: 0 !important; pointer-events: none; }
+/* Wechselt eine Idee die Gruppe, wechselt ihre Farbe weich (nicht beim Ziehen: da löst sie sich sofort) */
+.bub.tropfen .bub-blase, .bub-form { transition: background-color .45s ease, border-color .45s ease; }
+.bub.tropfen .bub-blase.zieht { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .bub-ring, .bub-ring-name, .bub.tropfen .bub-blase, .bub-form { transition: none; }
+}
 /* M415: Farbe einer Gruppe */
 .bub-farben { display: inline-flex; gap: 4px; flex-wrap: wrap; align-items: center; }
 .bub-pille button.bub-farbe {

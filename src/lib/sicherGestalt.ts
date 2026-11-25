@@ -114,7 +114,7 @@ const GESTALT: Record<string, { felder: Record<string, FeldArt>; eintraege?: Rec
   },
   time: { felder: { title: 'text', segs: 'liste' }, eintraege: { segs: satzMit(['id', 'date'], ['start']) } },
   htmlapp: { felder: { name: 'text', size: 'zahl' } },
-  bubbles: { felder: { title: 'textOpt', frage: 'textOpt', ideen: 'objektOpt', stimmen: 'objektOpt', gruppen: 'objektOpt', abstimmung: 'objektOpt', regeln: 'objektOpt' } },
+  bubbles: { felder: { title: 'textOpt', frage: 'textOpt', ideen: 'objektOpt', stimmen: 'objektOpt', gruppen: 'objektOpt', abstimmung: 'objektOpt', regeln: 'objektOpt', ki: 'objektOpt' } },   // M543: ki = „KI gruppiert gerade"
   kontakt: { felder: { name: 'text', telefone: 'liste', emails: 'liste', funktion: 'textOpt', firma: 'textOpt', adresse: 'textOpt', web: 'textOpt', notiz: 'textOpt' }, eintraege: { telefone: satzMit(['nummer']), emails: nurText } },
   fluessig: { felder: { text: 'text' } },
   pixi: { felder: { name: 'textOpt' } },

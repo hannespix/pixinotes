@@ -16,7 +16,7 @@ import {
   type NodeChange,
   type NodeTypes,
 } from '@xyflow/react';
-import { fangAktiv, fangen, fangSetzen, type Kasten } from '../lib/fang';
+import { fangAktiv, fangen, fangSetzen, groesseFangen, type Kasten } from '../lib/fang';
 import { zugSetzen } from '../lib/zugAnzeige';
 import { ablegenGenauAn } from '../lib/ablegenGenau';
 import { Fanglinien } from './Fanglinien';
@@ -24,9 +24,10 @@ import { AnsichtPortal } from './AnsichtPortal';
 import { LiveSperren, LiveZeigerSpaet } from './LiveLeiste';
 import { PunkteMarkenSpaet } from './PunkteSpaet';
 import { useBoardTasten } from './boardTasten';
-import { leeresStartboard, mutedHistory, selectActiveBoard, selectNurLesen, useBoard } from '../store';
+import { leeresStartboard, mutedHistory, runDerived, selectActiveBoard, selectNurLesen, useBoard } from '../store';
 import { DOKUMENT_BEFEHL, SEITEN_EREIGNIS, seiteVon } from '../lib/pdfSeiten';
-import { frameMembers } from '../lib/arrange';
+import { frameMembers, sizeOf } from '../lib/arrange';
+import { RAHMEN_MIN, rahmenAuto, rahmenWachsen } from '../lib/frameOps';
 import { bildMasse, imageFileToDataUrl } from '../lib/image';
 import { canEmbed, makeImage, makeNote } from '../lib/nodes';
 import { textZuBloecken } from '../lib/notiz';
@@ -1008,13 +1009,18 @@ export function Board() {
   // Frame-Mitzug (M149): Beim Greifen eines Rahmens werden alle Karten
   // eingesammelt, deren MITTELPUNKT im Rahmen liegt — sie folgen dem Rahmen
   // dann live mit jedem Drag-Delta (eine History-Stufe, keine Physik).
-  const frameDrag = useRef<{ id: string; ids: string[]; x: number; y: number } | null>(null);
+  // M542: Der Mitzug läuft in onNodesChangeFang mit dem Versatz NACH dem Einrasten (vorher in onNodeDrag mit der
+  // ungefangenen Lage aus React Flow — mit Fangen wären Rahmen und Inhalt auseinandergelaufen). `x`/`y` = zuletzt
+  // geschriebene Lage der gegriffenen Karte.
+  const frameDrag = useRef<{ id: string; ids: Set<string>; x: number; y: number } | null>(null);
+  // M542: Größe ändern mit Fangen — Kasten beim Greifen, Mitglieder (Rahmen), zuletzt geschriebene Größe
+  const groesseZug = useRef<{ id: string; start: Kasten; mit: Set<string>; min: { w: number; h: number }; fest: boolean; letzte: { w: number; h: number } | null } | null>(null);
 
   /**
    * M344: Fanglinien. Beim Ziehen rastet die Karte (bzw. der Kasten um alle gezogenen Karten) an
    * Kanten und Mitten der übrigen Karten ein — 6 Bildpunkte Fangweite, in jeder Zoomstufe gleich.
-   * Strg/⌘ gedrückt: frei ablegen. Mit Raster-Fang hat das Raster Vorrang; Rahmen ziehen ihre
-   * Karten über eigene Deltas mit und bleiben außen vor. M490: Einrasten „Aus" (fangLinien false) = frei.
+   * Strg/⌘ gedrückt: frei ablegen. Mit Raster-Fang hat das Raster Vorrang; Rahmen (seit M542) rasten
+   * genauso ein, ihr Inhalt geht im selben Schub mit. M490: Einrasten „Aus" (fangLinien false) = frei.
    * M505: Das Einrasten setzt weiter die Lage im Stand (exakt), meldet den Versatz aber dem Zug
    * (`zieh.current.fang`) — die Anzeige gleitet dann an die Stelle, statt zu springen (lib/ziehGefuehl.ts).
    * Das Raster rastet beim Ziehen von Karten deshalb hier ein statt in React Flow (`rasterSelbst`): React Flows
@@ -1035,6 +1041,59 @@ export function Board() {
     window.addEventListener('keydown', taste, true); window.addEventListener('keyup', taste, true); window.addEventListener('blur', weg);
     return () => { window.removeEventListener('keydown', taste, true); window.removeEventListener('keyup', taste, true); window.removeEventListener('blur', weg); };
   }, []);
+  /**
+   * M542: Fangen beim Ändern der Größe (Griffe von React Flow an Rahmen und Karten). Die bewegte Kante rastet an
+   * Kanten und Mitten der anderen ein, mit Linie wie beim Ziehen; die gegenüberliegende bleibt stehen. Strg/⌘ = frei,
+   * mit Raster-Fang rastet React Flow selbst aufs Raster. React Flow rechnet jeden Schritt aus dem Zeigerweg seit dem
+   * Greifen (Einrasten sammelt sich also nicht an); seine letzte Meldung (resizing: false) trägt wieder die rohe Größe
+   * und bekommt deshalb die zuletzt gefangene. Rahmen fangen nicht an ihrem eigenen Inhalt. Karten mit festem
+   * Seitenverhältnis (Bild, Datei, Pixi) bleiben frei — eine Kante allein bräche das Verhältnis.
+   */
+  const groesseImZug = useCallback((changes: NodeChange[]): 'laeuft' | 'ende' | null => {
+    const rz = changes.find((c): c is Extract<NodeChange, { type: 'dimensions' }> => c.type === 'dimensions' && typeof c.resizing === 'boolean' && !!c.dimensions);
+    if (!rz?.dimensions) return null;
+    const st = useBoard.getState();
+    const g0 = groesseZug.current;
+    if (!rz.resizing) {
+      fangSetzen([], true);
+      groesseZug.current = null;
+      if (g0?.id === rz.id && g0.letzte) rz.dimensions = { width: g0.letzte.w, height: g0.letzte.h };
+      return 'ende';
+    }
+    const alle = selectActiveBoard(st).nodes;
+    let g = g0?.id === rz.id ? g0 : null;
+    if (!g) {
+      const n = alle.find((k) => k.id === rz.id);
+      if (!n) return 'laeuft';
+      const s = sizeOf(n);
+      const rahmen = n.type === 'frame';
+      const w = rahmen && typeof n.width === 'number' ? n.width : s.w;
+      const h = rahmen && typeof n.height === 'number' ? n.height : s.h;
+      g = {
+        id: n.id, start: { x: n.position.x, y: n.position.y, w, h },
+        mit: new Set(rahmen ? frameMembers(n, alle, true, true).map((m) => m.id) : []),
+        min: rahmen ? RAHMEN_MIN : { w: 60, h: 40 },
+        fest: n.type === 'file' || n.type === 'pixi' || (n.type === 'image' && !(n.data as { rahmen?: boolean }).rahmen),
+        letzte: null,
+      };
+      groesseZug.current = g;
+    }
+    const pc = changes.find((c): c is Extract<NodeChange, { type: 'position' }> => c.type === 'position' && c.id === rz.id && !!c.position);
+    const k = { x: pc?.position?.x ?? g.start.x, y: pc?.position?.y ?? g.start.y, w: rz.dimensions.width, h: rz.dimensions.height };
+    if (g.fest || strgRef.current || st.gridSnap || !st.fangLinien) { fangSetzen([]); g.letzte = null; return 'laeuft'; }
+    const e = 0.01; const s0 = g.start;
+    const kanten = { l: Math.abs(k.x - s0.x) > e, r: Math.abs(k.x + k.w - s0.x - s0.w) > e, o: Math.abs(k.y - s0.y) > e, u: Math.abs(k.y + k.h - s0.y - s0.h) > e };
+    const mit = g.mit; const eigen = g.id;
+    const andere: Kasten[] = alle
+      .filter((n) => n.id !== eigen && !mit.has(n.id) && !n.hidden && (!n.archived || st.showArchived))
+      .map((n) => ({ x: n.position.x, y: n.position.y, w: n.measured?.width ?? n.width ?? 260, h: n.measured?.height ?? n.height ?? 120 }));
+    const f = groesseFangen(k, kanten, andere, 6 / (getViewport().zoom || 1), g.min);
+    rz.dimensions = { width: f.k.w, height: f.k.h };
+    if (pc) pc.position = { x: f.k.x, y: f.k.y };
+    g.letzte = { w: f.k.w, h: f.k.h };
+    fangSetzen({ linien: f.linien, abstaende: [] });
+    return 'laeuft';
+  }, [getViewport]);
   const onNodesChangeFang = useCallback((changes: NodeChange[]) => {
     // Auch die LETZTE Meldung eines Zugs (dragging: false) trägt die ungefangene Lage — sie muss genauso
     // einrasten, sonst springt die Karte beim Loslassen zurück. Pfeiltasten melden ebenfalls dragging: false,
@@ -1052,8 +1111,10 @@ export function Board() {
       const bewegt = alle.filter((n) => ids.has(n.id));
       // eingerastet = exakt dort (Rundungsreste der Gleitkommarechnung weg, sonst läge 0 bei 8,9e-16)
       const glatt = (v: number) => Math.round(v * 1e6) / 1e6;
-      const frei = strgRef.current || bewegt.some((n) => n.type === 'frame') || bewegt.length === 0;
+      // M542: Rahmen rasten jetzt wie Karten ein — ihr Inhalt folgt unten mit demselben Versatz
+      const frei = strgRef.current || bewegt.length === 0;
       const roh = { rx: zuege[0].position!.x, ry: zuege[0].position!.y };   // M505: Lage unter dem Zeiger
+      const fd = frameDrag.current;
       if (st.gridSnap && rasterSelbst.current && !frei) {
         // M505: Raster wie React Flow (Versatz der ersten Karte für alle), aber mit gemeldetem Versatz
         fangSetzen([], ende);
@@ -1073,8 +1134,9 @@ export function Board() {
           x1 = Math.min(x1, c.position.x); y1 = Math.min(y1, c.position.y);
           x2 = Math.max(x2, c.position.x + m.w); y2 = Math.max(y2, c.position.y + m.h);
         }
+        // M542: Was ein gezogener Rahmen mitnimmt, ist kein „anderer" — sonst rastete er an seinem eigenen Inhalt ein
         const andere: Kasten[] = alle
-          .filter((n) => !ids.has(n.id) && !n.selected && (!n.archived || st.showArchived))
+          .filter((n) => !ids.has(n.id) && !n.selected && !fd?.ids.has(n.id) && (!n.archived || st.showArchived))
           .map((n) => ({ x: n.position.x, y: n.position.y, ...mass(n) }));
         const f = fangen({ x: x1, y: y1, w: x2 - x1, h: y2 - y1 }, andere, 6 / (getViewport().zoom || 1));
         if (f.dx || f.dy) for (const c of zuege) if (c.position) c.position = { x: f.dx ? glatt(c.position.x + f.dx) : c.position.x, y: f.dy ? glatt(c.position.y + f.dy) : c.position.y };
@@ -1082,9 +1144,31 @@ export function Board() {
         // M505: den Sprung (einrasten, lösen, andere Stelle) gleitet die Anzeige ab
         zieh.current?.fang({ dx: f.dx, dy: f.dy, zx: f.gx ? glatt(x1 + f.dx) : null, zy: f.gy ? glatt(y1 + f.dy) : null, ...roh });
       }
+      // M390/M542: Rahmen-Mitzug im selben Schub wie der Rahmen — exakt derselbe Versatz wie die gegriffene Karte nach
+      // dem Einrasten (auch beim Einrasten und Lösen springt der Inhalt nicht gegen den Rahmen)
+      const greif = fd && zuege.find((c) => c.id === fd.id);
+      if (fd && greif?.position && fd.ids.size) {
+        const dx = greif.position.x - fd.x; const dy = greif.position.y - fd.y;
+        fd.x = greif.position.x; fd.y = greif.position.y;
+        if (dx || dy) {
+          for (const n of alle) {
+            if (!fd.ids.has(n.id)) continue;
+            changes.push({ id: n.id, type: 'position', position: { x: glatt(n.position.x + dx), y: glatt(n.position.y + dy) } });
+          }
+        }
+      } else if (fd && greif?.position) { fd.x = greif.position.x; fd.y = greif.position.y; }
     }
+    const groesse = groesseImZug(changes);
     onNodesChange(changes as Parameters<typeof onNodesChange>[0]);
-  }, [onNodesChange, getViewport]);
+    if (groesse === 'ende') rahmenWachsen();   // M542: Größe von Hand zu Ende — Rahmen mit Auto-Größe ziehen nach
+    // M542: Eine Karte misst sich neu (wächst mit ihrem Inhalt) — Rahmen mit Auto-Größe wachsen mit. Abgeleitet: kein
+    // eigener Rückgängig-Schritt, kein Hochladen (jedes Gerät misst selbst, CLAUDE.md §6 „Abgleich"). Mitten in einer
+    // Größenänderung von Hand oder einem Zug nicht: das übernimmt deren Ende als echte Änderung (im selben Schritt)
+    else if (!groesseZug.current && !ziehtRef.current && changes.some((c) => c.type === 'dimensions' && c.resizing === undefined)) {
+      const alle = selectActiveBoard(useBoard.getState()).nodes;
+      if (alle.some(rahmenAuto)) runDerived(() => rahmenWachsen());
+    }
+  }, [onNodesChange, getViewport, groesseImZug]);
   useBoardTasten({ getViewport, setCenter, zoomIn, zoomOut, zoomTo }, anzRef);
 
   const zugSchritt = useRef<{ eintrag: unknown; x: number; y: number } | null>(null);
@@ -1104,18 +1188,18 @@ export function Board() {
         // Mitglieder inkl. verschachtelter (kleinerer) Rahmen — deren Karten liegen ohnehin im äußeren Rahmen und
         // bewegen sich genau EINMAL (M150); archivierte wandern mit
         const ids = [...new Set(rahmen.flatMap((f) => frameMembers(f, all, true, true).map((n) => n.id)))].filter((id) => !bewegt.has(id));
-        frameDrag.current = { id: node.id, ids, x: node.position.x, y: node.position.y };
+        frameDrag.current = { id: node.id, ids: new Set(ids), x: node.position.x, y: node.position.y };
       } else frameDrag.current = null;
+    }
+    // M505: Raster beim Ziehen selbst einrasten (onNodesChangeFang) — React Flow liest `snapToGrid` je Mausbewegung aus
+    // seinem Stand. M542: auch für Rahmen (der Mitzug läuft jetzt im selben Schub mit dem gefangenen Versatz)
+    if (useBoard.getState().gridSnap) {
+      rasterSelbst.current = true;
+      rfStore.setState({ snapToGrid: false });
     }
     if (node.type === 'frame') {
       useBoard.getState().pushHistory();
       return;
-    }
-    // M505: Raster beim Ziehen von Karten selbst einrasten (onNodesChangeFang) — React Flow liest `snapToGrid` je
-    // Mausbewegung aus seinem Stand; mit Rahmen in der Auswahl bleibt es bei React Flow (Mitzug über Deltas)
-    if (useBoard.getState().gridSnap && !(node.selected && selectActiveBoard(useBoard.getState()).nodes.some((n) => n.selected && n.type === 'frame'))) {
-      rasterSelbst.current = true;
-      rfStore.setState({ snapToGrid: false });
     }
     ziehBeginnen(node); // M481: heben, neigen, Nachbarn ausweichen lassen
     // M365: Auch das Verschieben ist ein Schritt, den Strg+Z zurücknimmt (bisher nur bei Rahmen) — in der
@@ -1588,22 +1672,7 @@ export function Board() {
   useEffect(ablegenGenauAn, []);   // M535: Loslassen ohne letzte Bewegung → Karte trotzdem am Zeiger
 
   const onNodeDrag = useCallback((ev: MouseEvent | TouchEvent, node: Node) => {
-    {
-      const fd = frameDrag.current;
-      if (fd && fd.id === node.id) {
-        const dx = node.position.x - fd.x;
-        const dy = node.position.y - fd.y;
-        fd.x = node.position.x;
-        fd.y = node.position.y;
-        if ((dx || dy) && fd.ids.length > 0) {
-          const st = useBoard.getState();
-          const moves = selectActiveBoard(st).nodes
-            .filter((n) => fd.ids.includes(n.id))
-            .map((n) => [n.id, n.position.x + dx, n.position.y + dy] as [string, number, number]);
-          mutedHistory(() => st.setNodePositions(moves)); // eine History-Stufe: der pushHistory vom Drag-Start
-        }
-      }
-    }
+    // Rahmen-Mitzug: seit M542 in onNodesChangeFang (mit dem Versatz nach dem Einrasten, im selben Schub)
     if (node.type === 'frame') return; // Rahmen heben und neigen sich nicht
     ziehSchritt(node, ev);
   }, [ziehSchritt]);
@@ -1615,14 +1684,17 @@ export function Board() {
       if (rasterSelbst.current) { rasterSelbst.current = false; rfStore.setState({ snapToGrid: useBoard.getState().gridSnap }); }
       zoomWrapRef.current?.removeAttribute('data-zug');
       frameDrag.current = null;
-      if (node.type === 'frame') return;
+      // M542: Rahmen mit Auto-Größe wachsen um das Abgelegte — im selben Rückgängig-Schritt wie der Zug
+      if (node.type === 'frame') { rahmenWachsen(); return; }
       // M365: Nichts bewegt (nur gezuckt)? Dann ist es kein Schritt.
       const zug = zugSchritt.current;
       zugSchritt.current = null;
-      if (zug && node.position.x === zug.x && node.position.y === zug.y) {
+      const still = !!zug && node.position.x === zug.x && node.position.y === zug.y;
+      if (zug && still) {
         useBoard.setState((s) => (s.past[s.past.length - 1] === zug.eintrag ? { past: s.past.slice(0, -1) } : {}));
       }
       ziehEnde(); // M481: federnd ablegen, Ausgewichenes übernehmen
+      if (!still) rahmenWachsen();
     },
     [ziehEnde, rfStore],
   );
