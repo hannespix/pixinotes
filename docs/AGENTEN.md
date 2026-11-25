@@ -73,6 +73,27 @@ allein grün und unter Last rot ist, ist fast immer eine dieser Ursachen:
   fasst der Editor nur binnen kurzer Zeit zusammen, unter Last zerfällt die Eingabe in mehrere Schritte.
 - **Kurze Hinweise (Toasts) mitschreiben statt hinterher abfragen** (MutationObserver vor der Aktion, wie m332/m477).
 
+Aus dem Gesamtlauf M518 (Last 10–25 auf vier Kernen, `docs/meilensteine/M518-audit-gesamtlauf.md`):
+- **Flüchtiges misst die Seite selbst.** Wo etwas „im ersten Augenblick" gelten soll (Lage beim Entstehen, Neigung
+  im Zug, Dauer bis zu einer Markierung), vor der Aktion einen Beobachter in die Seite setzen und hinterher sein
+  Ergebnis lesen (m415 E2, m440 B1, m504 B1) – eine Abfrage „60 ms danach" kommt unter Last Sekunden später.
+- **Gesten, bei denen das Tempo zählt** (Wurf, schneller Zug, „ohne stillzuhalten"): Der Ort folgt der Uhr
+  (`anteil = (Date.now() - ab) / dauer`), nicht der Zahl der Schritte – sonst wird der schnelle Zug unter Last
+  langsam (m440, m378 C8). Beim Wurf den letzten Schritt und das Loslassen zusammen abschicken
+  (`Promise.all([mouse.move(…), mouse.up()])`), damit dazwischen keine Pause entsteht – nicht dort, wo die Lage
+  beim Ablegen geprüft wird (die Fläche übernimmt sonst die vorletzte Lage, m504).
+- **Wer „nicht stillhalten" prüft, bewegt die Maus neben dem Messen weiter** (m504 `zappler`) und über mehr als
+  zwei Stellen: Der Browser fasst Mausbewegungen je Bild zusammen, bei zwei Stellen sieht die App unter Last
+  zufällig immer dieselbe. Ob die Voraussetzung galt, in der Seite mitmessen (längste Pause) und sonst wiederholen.
+- **Bewegliche Ziele nachführen:** Vor dem Loslassen die Lage des Ziels neu lesen und warten, bis die App es als
+  Ziel zeigt (m378 `bZiehenAuf`) – „ruht" von außen heißt unter Last oft nur „gerade kein Bild gezeichnet".
+- **Die Maus dort wegnehmen, wo sie nichts zu suchen hat:** Ein Zeiger, der nach dem Hinschwenken über einer Karte
+  stehen bleibt, kann sie wach halten (m500: Magnet der flüssigen Schrift).
+- **Zeit-Messungen (Bildzeit, Bilder je Sekunde) messen die Maschine mit:** `werkzeug/maschinen-last.mjs`
+  (`ruhigeMaschine()`, `cpuAnteil()`, `bildGrenze()`, `tempoGrenze()`). Auf ruhiger Maschine gilt die Grenze
+  unverändert; nur bei nachweislich fremder Last wird sie umgerechnet (und das steht in der Ausgabe). Reihen, die
+  das Werkzeug einbinden, lässt `alle-pruefungen.mjs` allein laufen (Sperre „zeitmessung", meist am Ende).
+
 ## Brief für einen Arbeits-Agenten (Vorlage)
 ```
 Repo /home/user/pixinotes (Worktree). Lies CLAUDE.md und docs/AGENTEN.md.
