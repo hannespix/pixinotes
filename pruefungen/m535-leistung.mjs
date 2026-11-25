@@ -91,6 +91,17 @@ async function schwenken(P, dx, dy, wo = [640, 400]) {
 }
 const bildVon = (P, b) => P.screenshot({ clip: { x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.width), height: Math.round(b.height) } });
 const gleich = (a, b) => a.length === b.length && a.equals(b);
+/** Anteil der Bildpunkte, die sich zwischen zwei Aufnahmen deutlich unterscheiden (Kantenglättung zählt nicht) */
+const abweichung = (P, a, b) => P.evaluate(async ([x, y]) => {
+  const lade = async (b64) => { const i = new Image(); i.src = `data:image/png;base64,${b64}`; await i.decode(); const c = document.createElement('canvas'); c.width = i.width; c.height = i.height; const g = c.getContext('2d'); g.drawImage(i, 0, 0); return g.getImageData(0, 0, i.width, i.height).data; };
+  const [d1, d2] = [await lade(x), await lade(y)];
+  if (d1.length !== d2.length) return 1;
+  let n = 0; for (let k = 0; k < d1.length; k += 4) if (Math.abs(d1[k] - d2[k]) + Math.abs(d1[k + 1] - d2[k + 1]) + Math.abs(d1[k + 2] - d2[k + 2]) > 48) n++;
+  return n / (d1.length / 4);
+}, [a.toString('base64'), b.toString('base64')]);
+/** bewegt: mehr als 2 % der Fläche anders; steht: weniger als 0,3 % */
+const bewegt = async (P, a, b) => (await abweichung(P, a, b)) > 0.02;
+const steht = async (P, a, b) => (await abweichung(P, a, b)) < 0.003;
 
 // ══ A: Flüssige Schrift ═════════════════════════════════════════════
 console.log('\n════ A: Flüssige Schrift hält an, wenn die Maus still über ihr steht ════');
@@ -157,7 +168,7 @@ if (laufe('B')) {
   const innen = { x: bi.x + 4, y: bi.y + 4, width: bi.width - 8, height: bi.height - 8 };
   const zweiBilder = async (ms = 350) => { const a = await bildVon(P, innen); await P.waitForTimeout(ms); return [a, await bildVon(P, innen)]; };
   let [a, c] = await zweiBilder();
-  pruefe('B1 im Ruhezustand bewegt sich das Bild (zwei Aufnahmen verschieden)', !gleich(a, c));
+  pruefe('B1 im Ruhezustand bewegt sich das Bild (zwei Aufnahmen verschieden)', await bewegt(P, a, c), String(await abweichung(P, a, c)));
   // Notiz greifen und ziehen – Maus bleibt gedrückt
   const bn = await kasten(P, 'n1');
   const gx = bn.x + 8, gy = bn.y + 5;
@@ -168,7 +179,9 @@ if (laufe('B')) {
   await P.waitForTimeout(250);
   [a, c] = await zweiBilder(500);
   const src = await P.evaluate(() => document.querySelector('.react-flow__node[data-id="i1"] img').getAttribute('src'));
-  pruefe('B2 während des Ziehens steht das Bild (zwei Aufnahmen gleich)', imZug && gleich(a, c));
+  const stehtImZug = await steht(P, a, c);
+  if (!stehtImZug) { const fs = await import('node:fs'); fs.writeFileSync(path.join(SD, 'm535-b2-a.png'), a); fs.writeFileSync(path.join(SD, 'm535-b2-c.png'), c); }
+  pruefe('B2 während des Ziehens steht das Bild (zwei Aufnahmen gleich)', imZug && stehtImZug, imZug ? `Aufnahmen verschieden: ${await abweichung(P, a, c)} (pruefungen/ablage/m535-b2-*.png)` : 'kein Standbild im Zug');
   const nichtLeer = await P.evaluate(async (s) => {
     const i = new Image(); i.src = s; await i.decode();
     const c = document.createElement('canvas'); c.width = 240; c.height = 160; const g = c.getContext('2d'); g.drawImage(i, 0, 0);
@@ -181,7 +194,7 @@ if (laufe('B')) {
   await warteBis(P, (s) => document.querySelector('.react-flow__node[data-id="i1"] img')?.getAttribute('src') === s, 3000, SRC);
   await P.waitForTimeout(300);
   [a, c] = await zweiBilder();
-  pruefe('B5 nach dem Ablegen bewegt es sich wieder', !gleich(a, c));
+  pruefe('B5 nach dem Ablegen bewegt es sich wieder', await bewegt(P, a, c));
   // Außerhalb des Bildes
   await schwenken(P, 0, 2600);
   const draussen = await warteBis(P, (s) => document.querySelector('.react-flow__node[data-id="i1"] img')?.getAttribute('src') !== s, 5000, SRC);
@@ -193,7 +206,7 @@ if (laufe('B')) {
   const bi2 = await kasten(P, 'i1');
   const innen2 = { x: bi2.x + 4, y: bi2.y + 4, width: bi2.width - 8, height: bi2.height - 8 };
   a = await bildVon(P, innen2); await P.waitForTimeout(350); c = await bildVon(P, innen2);
-  pruefe('B7 wieder im Bild läuft es wie bisher', zurueck && !gleich(a, c));
+  pruefe('B7 wieder im Bild läuft es wie bisher', zurueck && await bewegt(P, a, c));
   await P.screenshot({ path: path.join(SD, 'm535-b-bild.png') });
   pruefe('B8 keine Seitenfehler', fehler.length === 0, fehler.join(' | '));
   await ctx.close();

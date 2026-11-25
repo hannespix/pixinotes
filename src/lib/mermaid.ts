@@ -99,7 +99,7 @@ function rahmenHolen(): Promise<Rahmen> {
       document.body.appendChild(el);   // einmal je Sitzung
       const win = el.contentWindow as (Window & { mermaid?: MermaidApi }) | null;
       const doc = el.contentDocument;
-      if (!win || !doc) throw new Error('Kein Rahmen');
+      if (!win || !doc) throw new Error('mermaid-rahmen');
       doc.open(); doc.write('<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>'); doc.close();
       const stil = doc.createElement('style');
       doc.head.appendChild(stil);
@@ -107,7 +107,7 @@ function rahmenHolen(): Promise<Rahmen> {
       s.textContent = quelle;
       doc.head.appendChild(s);   // läuft im Rahmen und setzt dort `mermaid`
       s.remove();
-      if (!win.mermaid) throw new Error('mermaid im Rahmen fehlt');
+      if (!win.mermaid) throw new Error('mermaid-rahmen-leer');
       return { win, doc, stil, blaetter: '', theme: null, el, schriften: new Set<string>() };
     }).catch((e) => { rahmen = null; throw e; });
   }

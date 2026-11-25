@@ -3879,4 +3879,7 @@
 "{0} rechts einfügen":"Insert {0} right",
 "{0} löschen":"Delete {0}",
 "Auswahl {0}":"Selection {0}",
-"{0} · Strg+C, Strg+X, Strg+V · Rechtsklick: Zeilen und Spalten":"{0} · Ctrl+C, Ctrl+X, Ctrl+V · Right-click: rows and columns"}
+"{0} · Strg+C, Strg+X, Strg+V · Rechtsklick: Zeilen und Spalten":"{0} · Ctrl+C, Ctrl+X, Ctrl+V · Right-click: rows and columns",
+"Alle Tools anhalten":"Stop all tools",
+"Angehalten, weil das Tool eine Weile außerhalb des Bildes war – mit Start geht es weiter. Was es gespeichert hat, bleibt.":"Stopped because the tool was outside the view for a while – Start continues. Whatever it saved stays.",
+"Angehalten – mit Start geht es weiter. Was das Tool gespeichert hat, bleibt.":"Stopped – Start continues. Whatever the tool saved stays."}
