@@ -84,7 +84,7 @@ export function mermaidResteWeg(renderId: string): void {
 // Dokument; nur das fertige SVG kommt in die Karte. Damit es dort genauso aussieht wie bisher, misst der Rahmen unter
 // denselben Bedingungen: dieselben Stylesheets, dieselben Merkmale an <html> und <body>, dieselbe Fenstergröße und die
 // Handschrift (Kalam). Geht etwas schief (kein Rahmen möglich), zeichnet mermaid wie bisher im Board-Dokument.
-type Rahmen = { win: Window & { mermaid?: MermaidApi }; doc: Document; stil: HTMLStyleElement; blaetter: string; theme: string | null; el: HTMLIFrameElement; schriften: Set<string> };
+type Rahmen = { win: Window & { mermaid?: MermaidApi }; doc: Document; stil: HTMLStyleElement; blaetter: string; theme: string | null; el: HTMLIFrameElement; schriften: Set<string>; laden: Promise<unknown> };
 let rahmen: Promise<Rahmen> | null = null;
 
 function rahmenHolen(): Promise<Rahmen> {
@@ -108,7 +108,7 @@ function rahmenHolen(): Promise<Rahmen> {
       doc.head.appendChild(s);   // läuft im Rahmen und setzt dort `mermaid`
       s.remove();
       if (!win.mermaid) throw new Error('mermaid-rahmen-leer');
-      return { win, doc, stil, blaetter: '', theme: null, el, schriften: new Set<string>() };
+      return { win, doc, stil, blaetter: '', theme: null, el, schriften: new Set<string>(), laden: Promise.resolve() };
     }).catch((e) => { rahmen = null; throw e; });
   }
   return rahmen;
@@ -156,7 +156,10 @@ async function schriftenLaden(r: Rahmen): Promise<void> {
     const name = `${f.style === 'normal' ? '' : `${f.style} `}${String(f.weight).split(' ')[0]} 16px "${f.family.replace(/["']/g, '')}"`;
     if (!r.schriften.has(name)) { r.schriften.add(name); neu.push(name); }
   });
-  if (neu.length) await Promise.all(neu.map((n) => r.doc.fonts.load(n).catch(() => [])));
+  // Gemeinsames Versprechen: Zeichnen mehrere Diagramme zugleich, warten alle auf dieselben Schriften (mermaid merkt sich
+  // gemessene Textgrößen – einmal mit Ersatzschrift gemessen, bliebe es dabei)
+  if (neu.length) r.laden = Promise.all([r.laden, ...neu.map((n) => r.doc.fonts.load(n).catch(() => []))]);
+  await r.laden;
 }
 
 /** Reste eines Zeichenversuchs im Rahmen wegräumen (wie mermaidResteWeg im Board-Dokument) */
