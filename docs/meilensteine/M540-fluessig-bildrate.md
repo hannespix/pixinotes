@@ -26,5 +26,5 @@ E Verhältnis zu 60 Hz. Neu 18/18 grün; gegen den Stand davor B2, B3, C2, C3, D
 keine Bewegung bei 144 und 240 Hz). m500, m535, m537 grün.
 
 ## Grenzen / offen
-- Die Seite pix-el.de (Repository `pix-el`, `site/liquid/`) und das Original `liquidtype` stammen aus derselben
-  Quelle; ob sie den gleichen Schritt haben, ist hier nicht geprüft (andere Repositories, nur lesend).
+- Die Seite pix-el.de (`pix-el`, `site/hero.js`) sammelt die Zeit schon über die Bilder (Akkumulator) — der Fehler
+  entstand erst bei der Übernahme in PixiNotes (M500), wo der Rest je Bild verworfen wurde.
