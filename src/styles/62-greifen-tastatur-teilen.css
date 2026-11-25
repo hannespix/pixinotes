@@ -60,6 +60,13 @@ html[data-alles-zeigen] .react-flow__node.selectable.selected:focus-visible { ou
 /* Anschlusspunkte nur an der gewählten Karte — an jeder Karte unter dem Zeiger wären sie im Weg */
 [data-weit] .react-flow__node:not(.selected) .pn-handle { visibility: hidden !important; }
 [data-weit] .react-flow__node.selected .pn-handle { opacity: 1; visibility: visible; }
+/* M527: … und sie stehen VOR der Kante statt auf ihr. Die Karte ist hier nur noch 40–100 Bildpunkte groß; mittig auf
+   der Kante deckten die vier Punkte einen guten Teil davon zu — wer die gewählte Karte dort anfasste, zog einen Pfeil
+   statt der Karte. So bleibt die ganze Karte der Griff, und der Pfeil beginnt gleich daneben. */
+[data-weit] .pn-handle.react-flow__handle-top { translate: 0 -50%; }
+[data-weit] .pn-handle.react-flow__handle-bottom { translate: 0 50%; }
+[data-weit] .pn-handle.react-flow__handle-left { translate: -50% 0; }
+[data-weit] .pn-handle.react-flow__handle-right { translate: 50% 0; }
 @media (hover: hover) and (pointer: fine) {
   /* „Die kann ich greifen": ein dünner Rahmen unter dem Zeiger */
   [data-weit] .react-flow__node:hover:not(.selected):not(.dragging) {

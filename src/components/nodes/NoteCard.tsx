@@ -191,12 +191,47 @@ function NoteAboFeeds({ id }: { id: string }) {
   );
 }
 
+/** M527: Bildschirmstellen von Anfang und Ende der Markierung in `el` — die ruhende Ansicht hat denselben Umbruch wie der Editor */
+type StartPunkt = { x: number; y: number; bis?: { x: number; y: number } };
+function auswahlPunkte(el: Element): StartPunkt | null {
+  const s = window.getSelection();
+  if (!s || s.isCollapsed || !s.rangeCount || !el.contains(s.anchorNode) || !el.contains(s.focusNode)) return null;
+  const r = s.getRangeAt(0);
+  const stelle = (anfang: boolean) => { const c = r.cloneRange(); c.collapse(anfang); const q = c.getClientRects()[0]; return q ? { x: q.left, y: q.top + q.height / 2 } : null; };
+  const a = stelle(true); const b = stelle(false);
+  return a && b ? { ...a, bis: b } : null;
+}
+/** M527: Stelle im Text unter (x, y) */
+function textStelle(x: number, y: number): Range | null {
+  const doc = document as Document & { caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null };
+  if (typeof document.caretRangeFromPoint === 'function') return document.caretRangeFromPoint(x, y);
+  const c = doc.caretPositionFromPoint?.(x, y);
+  if (!c) return null;
+  const r = document.createRange(); r.setStart(c.offsetNode, c.offset); r.collapse(true); return r;
+}
+/**
+ * M527: Doppelklick auf ein Wort einer eben geweckten Notiz markiert das Wort. Der erste Klick weckte den Editor, der
+ * zweite traf schon den neuen — ProseMirror zählte ihn als ersten Klick und ließ nichts markieren.
+ */
+function wortWaehlen(el: HTMLElement | null, x: number, y: number) {
+  const s = window.getSelection();
+  if (!el || !s || !s.isCollapsed) return;
+  const r = textStelle(x, y);
+  const t = r?.startContainer;
+  if (!r || !t || t.nodeType !== 3 || !el.contains(t)) return;
+  const text = t.textContent ?? ''; const w = /[\p{L}\p{N}_]/u;
+  let a = r.startOffset; let b = r.startOffset;
+  while (a > 0 && w.test(text[a - 1])) a -= 1;
+  while (b < text.length && w.test(text[b])) b += 1;
+  if (b > a) s.setBaseAndExtent(t, a, t, b);
+}
+
 /**
  * Der lebende Editor einer Notiz (BlockNote, MPL-2.0) — entsteht erst bei Bedarf (M338).
  * `startPunkt`: Bildschirmstelle des Klicks, der ihn geweckt hat; dort landet der Cursor.
  */
 export function NotizEditor({ id, data, startPunkt, sitzung }: {
-  id: string; data: NoteNode['data']; startPunkt: MutableRefObject<{ x: number; y: number } | null>;
+  id: string; data: NoteNode['data']; startPunkt: MutableRefObject<StartPunkt | null>;
   /** M477: gemeinsam tippen — die Yjs-Sitzung dieser Notiz (sonst allein wie bisher); Hülle: ./NotizGemeinsam.tsx */
   sitzung?: NotizSitzung;
 }) {
@@ -470,11 +505,11 @@ export function NotizEditor({ id, data, startPunkt, sitzung }: {
     const setzen = () => {
       const el = editorRef.current?.querySelector('[contenteditable="true"]') as HTMLElement | null;
       if (!el) { if (n++ < 30) raf = requestAnimationFrame(setzen); return; }
-      const doc = document as Document & { caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null };
-      let r: Range | null = null;
-      if (typeof document.caretRangeFromPoint === 'function') r = document.caretRangeFromPoint(p.x, p.y);
-      else if (typeof doc.caretPositionFromPoint === 'function') { const c = doc.caretPositionFromPoint(p.x, p.y); if (c) { r = document.createRange(); r.setStart(c.offsetNode, c.offset); r.collapse(true); } }
+      const r = textStelle(p.x, p.y);
       el.focus({ preventScroll: true });
+      // M527: eine Markierung aus der ruhenden Ansicht reicht bis zur zweiten Stelle
+      const bis = p.bis ? textStelle(p.bis.x, p.bis.y) : null;
+      if (r && bis && el.contains(bis.startContainer) && r.comparePoint(bis.startContainer, bis.startOffset) > 0) r.setEnd(bis.startContainer, bis.startOffset);
       if (r && el.contains(r.startContainer)) { const sel = window.getSelection(); sel?.removeAllRanges(); sel?.addRange(r); }
     };
     setzen();
@@ -487,6 +522,7 @@ export function NotizEditor({ id, data, startPunkt, sitzung }: {
       <div
         className="nodrag nowheel note-editor"
         ref={editorRef}
+        onDoubleClick={(e) => { const { clientX: x, clientY: y } = e; window.setTimeout(() => wortWaehlen(editorRef.current, x, y), 0); }}
         onKeyDownCapture={(e) => {
           // M390: Strg+Z / Strg+Y im Text — die Änderung, die gleich kommt, ist ein Rückgängig des Editors
           // M477: gemeinsam nicht — dort nimmt Yjs nur das Eigene zurück, das Board bekommt den Stand wie jede Änderung
@@ -564,7 +600,7 @@ export function NotizEditor({ id, data, startPunkt, sitzung }: {
 
 /** M477: Im Live-Board übernimmt die Hülle für gemeinsames Tippen (nachgeladen, nur wenn ein Kanal steht) */
 const NotizGemeinsam = lazy(() => import('./NotizGemeinsam'));
-function NotizEditorWahl(p: { id: string; data: NoteNode['data']; startPunkt: MutableRefObject<{ x: number; y: number } | null> }) {
+function NotizEditorWahl(p: { id: string; data: NoteNode['data']; startPunkt: MutableRefObject<StartPunkt | null> }) {
   const boardId = useBoard((s) => s.activeId);
   useTakt(TEILNEHMER_EREIGNIS);
   // Einmal live, bleibt die Hülle (sie geht selbst zurück zu „allein", wenn der Kanal fehlt — nie unter dem Cursor)
@@ -625,7 +661,7 @@ export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
   const einfach = useMemo(() => notizEinfach(data.blocks), [data.blocks]);
   const imFokus = useBoard((s) => s.focusCard === id);
   const [aktiv, setAktiv] = useState(() => !einfach);
-  const startPunkt = useRef<{ x: number; y: number } | null>(null);
+  const startPunkt = useRef<StartPunkt | null>(null);
   useEffect(() => { if (!einfach || imFokus) setAktiv(true); }, [einfach, imFokus]);
   useEffect(() => {
     if (aktiv) return;
@@ -640,6 +676,11 @@ export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
   }, [aktiv, id]);
   const verweilen = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(verweilen.current), []);
+  const wecken = (el: Element, x: number, y: number) => {
+    if (startPunkt.current?.bis) return;   // M527: das Loslassen hat schon mit der Markierung geweckt, der Klick danach nicht mehr
+    startPunkt.current = auswahlPunkte(el) ?? { x, y };
+    setAktiv(true);
+  };
   const hakenSetzen = useCallback((pfad: number[], an: boolean) => {
     const st = useBoard.getState();
     const n = st.boards.find((b) => b.id === st.activeId)?.nodes.find((k) => k.id === id);
@@ -695,11 +736,12 @@ export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
         <div
           className="nodrag nowheel note-editor"
           translate="no"
-          // Klick in den Text weckt den Editor; der Cursor landet an der Klickstelle
+          // Klick in den Text weckt den Editor; der Cursor landet an der Klickstelle.
+          // M527: … und eine Markierung (gezogen oder Doppelklick) zieht in den Editor mit — vorher war der erste Zug
+          // über den Text einer ruhenden Notiz verloren (keine Markierung, keine Formatier-Leiste).
           onClick={(e) => {
             if ((e.target as HTMLElement).closest('input')) return;
-            startPunkt.current = { x: e.clientX, y: e.clientY };
-            setAktiv(true);
+            wecken(e.currentTarget, e.clientX, e.clientY);
           }}
           // Maus ruht auf der Notiz: Editor vorwärmen — dann ist er da, bevor man klickt oder markiert
           onPointerEnter={(e) => {
@@ -708,7 +750,13 @@ export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
             verweilen.current = window.setTimeout(() => setAktiv(true), 260);
           }}
           onPointerLeave={() => window.clearTimeout(verweilen.current)}
-          onPointerDown={() => window.clearTimeout(verweilen.current)}
+          onPointerDown={(e) => {
+            window.clearTimeout(verweilen.current);
+            // M527: Endet der Zug außerhalb des Texts, kommt kein Klick — dann weckt das Loslassen, wenn etwas markiert ist
+            // (innen weckt der Klick: er wählt dabei auch die Karte, wie beim wachen Editor)
+            const el = e.currentTarget;
+            if (e.pointerType === 'mouse' && e.button === 0) window.addEventListener('pointerup', (u) => { if (!el.contains(u.target as Node) && auswahlPunkte(el)) wecken(el, u.clientX, u.clientY); }, { once: true });
+          }}
         >
           <NotizRuhend blocks={data.blocks as RuheBlock[]} onHaken={hakenSetzen} />
         </div>
