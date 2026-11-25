@@ -44,7 +44,8 @@ const MAX_AKTIV = 3;
 /**
  * M535: Steht die Maus so lange still über der Karte, hält die Flüssigkeit an (kein Rechnen, kein Zeichnen) — der
  * Magnet und „lebendig" ließen sie sonst dauernd rechnen, obwohl niemand etwas tut (M518, Befund 2). Die nächste
- * Bewegung weckt sie sofort. Einschwingen, Platzen und ein fallender Tropfen laufen erst zu Ende.
+ * Bewegung weckt sie sofort. Einschwingen, Platzen und ein fallender Tropfen laufen erst zu Ende; was ohne Magnet und
+ * ohne „lebendig" ohnehin ausschwingt, schläft wie bisher von selbst (ruht).
  */
 const ANHALTEN_MS = 2000;
 const SCHRIFT_REF = 100;
@@ -422,7 +423,9 @@ export class Flaeche {
   /** M535: Maus steht seit ANHALTEN_MS still über der Karte, und nichts ist gerade im Gang, das zu Ende laufen muss */
   angehalten(t: number): boolean {
     const p = this.pointer;
-    return this.mausDrueber && !p.down && p.id === -1 && p.last > 0 && t - p.last > ANHALTEN_MS
+    // Nur, was sonst nie zur Ruhe käme: „lebendig" oder der Magnet hält die Teilchen fest. Alles andere schwingt aus und
+    // schläft von selbst (ruht) – das soll es auch weiter, statt halb ausgeschwungen anzuhalten.
+    return (this.e.lebendig || this.magnetAn) && this.mausDrueber && !p.down && p.id === -1 && p.last > 0 && t - p.last > ANHALTEN_MS
       && t > this.settle.until && !this.burstUntil && !this.tropfen;
   }
 

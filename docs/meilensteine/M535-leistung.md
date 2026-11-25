@@ -47,14 +47,16 @@ einer Notiz; Board mit neun Diagrammen und 240 Notizen; CDP-Zähler `Performance
 Was der Nutzer merkt: Steht die Maus gut zwei Sekunden still über der Karte, hält die Flüssigkeit an (kein Rechnen, kein
 Zeichnen, das Bild bleibt stehen); die nächste Bewegung lässt sie sofort weiterfließen. Die Pause beim Ziehen aus M525
 bleibt. Einschwingen, Platzen und ein fallender Tropfen laufen erst zu Ende, damit nichts mitten in der Bewegung erstarrt.
-Gilt für die Maus, nicht für Finger und Stift.
+Angehalten wird nur, was sonst nie zur Ruhe käme – „lebendig" oder der Magnet (Maus über der Schrift, M518 Befund 2);
+eine gewöhnliche Schrift schwingt aus und schläft wie bisher von selbst (m500 E5). Gilt für die Maus, nicht für Finger und
+Stift.
 
 **Nebenbefund aus M525 – war ein Fehler, behoben:** Nach dem Neu-Abtasten ohne Übergang (`abtasten(false)`: Größe der
 Karte geändert, Web-Schrift nachgeladen) setzte der Motor `ruht = true` – auch bei „lebendig". Die Schrift stand dann,
 bis jemand sie berührte. Jetzt weckt `abtasten` eine lebendige Fläche gleich wieder (`aufwecken`).
 
 Wie: `lib/fluessig/motor.ts` — `ANHALTEN_MS` (2000), Feld `mausDrueber` (gesetzt in `bewegen` nur für
-`pointerType === 'mouse'`, gelöscht bei `pointerleave`), `angehalten(t)` (Maus darüber, nicht gedrückt, letzte Bewegung
+`pointerType === 'mouse'`, gelöscht bei `pointerleave`), `angehalten(t)` („lebendig" oder Magnet an, Maus darüber, nicht gedrückt, letzte Bewegung
 älter als `ANHALTEN_MS`, kein Einschwingen/Platzen/Tropfen) geht in `willLaufen()` ein. Damit setzt der gemeinsame Takt
 aus, sobald keine Fläche mehr laufen will; `bewegen` → `aufwecken` → `wecken` startet ihn wieder. `zustand()` meldet
 `angehalten` (Prüfreihe).
