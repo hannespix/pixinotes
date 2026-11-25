@@ -13,6 +13,8 @@
  *   B  144 Hz: ebenso viele Schritte je Sekunde wie bei 60 Hz (vorher fast keine), die Schrift bewegt sich.
  *   C  240 Hz: ebenso.
  *   D  Unruhiger Takt (Bilder abwechselnd 5 und 9 ms): ebenso.
+ *   F  M541: Maus bewegt sich laufend über der Schrift (60 und 144 Hz): weiter rund 120 Schritte je Sekunde. Jede
+ *      Bewegung weckt die Fläche; das setzte in M540 den gesammelten Rest auf 0 — bei 144 Hz fast keine Schritte mehr.
  */
 // Läuft aus dem Repository: `node pruefungen/m540-fluessig-bildrate.mjs` (braucht `npm run build`)
 import { fileURLToPath } from 'node:url';
@@ -109,6 +111,21 @@ async function messen(P, ms = 2500) {
   return { schritteJeS: Math.round((b.p - a.p) / s), bilderJeS: Math.round((b.b - a.b) / s), bewegt };
 }
 
+/** Wie `messen`, dabei fährt die Maus ununterbrochen über der Schrift hin und her */
+async function messenMitMaus(P, ms = 2500) {
+  const r = await P.evaluate(() => { const t = document.querySelector('.fl-treffer, canvas.fl-flaeche').getBoundingClientRect(); return { x: t.left, y: t.top, w: t.width, h: t.height }; });
+  let laeuft = true; let zuege = 0;
+  const fahren = (async () => {
+    for (let i = 0; laeuft; i++) {
+      await P.mouse.move(r.x + r.w * (0.3 + 0.4 * Math.abs(Math.sin(i / 9))), r.y + r.h * (0.5 + 0.1 * Math.sin(i / 4)));
+      zuege += 1;
+    }
+  })();
+  const m = await messen(P, ms);
+  laeuft = false; await fahren;
+  return { ...m, zuege };
+}
+
 const faelle = [
   { teil: 'A', name: '60 Hz', ab: [1000 / 60] },
   { teil: 'B', name: '144 Hz', ab: [1000 / 144] },
@@ -130,6 +147,18 @@ for (const f of faelle) {
   pruefe(`${f.teil}4 keine Seitenfehler`, fehler.length === 0, fehler);
   await ctx.close();
 }
+for (const f of [{ name: '60 Hz', ab: [1000 / 60] }, { name: '144 Hz', ab: [1000 / 144] }]) {
+  if (!laufe('F')) break;
+  console.log(`\n════ F: Maus bewegt sich über der Schrift, ${f.name} ════`);
+  const { ctx, P, fehler } = await seite(f.ab);
+  await P.waitForTimeout(1500);
+  const m = await messenMitMaus(P);
+  pruefe(`F ${f.name}: die Maus bewegt sich laufend (viele Ereignisse)`, m.zuege > 60, m);
+  pruefe(`F ${f.name}: rund 120 Physik-Schritte je Sekunde trotz Mausbewegung (110–130)`, m.schritteJeS >= 110 && m.schritteJeS <= 130, m);
+  pruefe(`F ${f.name}: keine Seitenfehler`, fehler.length === 0, fehler);
+  await ctx.close();
+}
+
 if (ergebnisse.A && ergebnisse.B) {
   const q = ergebnisse.B.schritteJeS / Math.max(1, ergebnisse.A.schritteJeS);
   pruefe('E1 144 Hz rechnet so schnell wie 60 Hz (Verhältnis 0,9–1,1)', q >= 0.9 && q <= 1.1, { q: +q.toFixed(2) });
