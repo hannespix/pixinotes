@@ -540,10 +540,7 @@ export async function bildBlockEinfuegen(editor: typeof noteSchema.BlockNoteEdit
 const FLOAT_FEST = { useFloatingOptions: { strategy: 'fixed' as const } };
 let formatSchichtEl: HTMLElement | null = null;
 function formatSchicht(): HTMLElement {
-  if (formatSchichtEl?.isConnected) return formatSchichtEl;
-  formatSchichtEl = document.createElement('div');
-  formatSchichtEl.className = 'pn-format-schicht nokey nodrag nopan nowheel';
-  document.body.appendChild(formatSchichtEl);
+  if (!formatSchichtEl?.isConnected) formatSchichtEl = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'pn-format-schicht nokey' }));
   return formatSchichtEl;
 }
 

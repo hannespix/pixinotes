@@ -57,11 +57,13 @@ Ohne Befund (in jeder Stufe gleich): Karten-Griff (46 × 17), Anschlusspunkte (2
   `.bn-formatting-toolbar { zoom: var(--pn-anz) }` holt sie für die Leiste zurück.
 - `src/components/nodes/CardShell.tsx` (Auto-Größe): Schrumpfen auch nicht, solange der Fokus in `.pn-format-schicht` liegt.
 - `src/components/nodes/NoteCard.tsx`: `auswahlPunkte(el)` (Bildschirmstellen von Anfang/Ende einer Markierung in der
-  ruhenden Ansicht), `textStelle(x, y)`, `wortWaehlen(el, x, y)`; `StartPunkt` hat `bis`. Die ruhende Notiz weckt per
-  Klick (wählt dabei die Karte) bzw. per Loslassen außerhalb (`pointerup` am Fenster, nur mit Markierung); der Editor
-  setzt die Markierung aus `startPunkt.bis`. Doppelklick auf eine eben geweckte Notiz: `onDoubleClick` am Editor wählt das
-  Wort, wenn die Auswahl danach leer ist. `10-karten-grundlagen.css`: `.notiz-ruhend .bn-editor { user-select: text }`
-  (nur Maus).
+  ruhenden Ansicht), `textStelle(x, y)`; `StartPunkt` hat `bis`. Der Klick, der die ruhende Notiz weckt (und dabei wie
+  bisher die Karte wählt), nimmt eine Markierung mit, der Editor setzt sie aus `startPunkt.bis`. Doppelklick auf eine eben
+  geweckte Notiz: `onDoubleClick` am Editor lädt `src/lib/wortWaehlen.ts` nach und wählt das Wort, wenn die Auswahl leer
+  blieb. `10-karten-grundlagen.css`: `.notiz-ruhend .bn-editor { user-select: text }` (nur Maus).
+- **Start-JS (M483/M502, Grenze 2 065 000 B):** Nach dem Einmischen von M528/M531 lag der Stand 486 B darüber. Dafür ist
+  `wortWaehlen` nachgeladen, die Markier-Hilfen sind knapp geschrieben, und ein Zug, der außerhalb des Texts endet,
+  weckt die Notiz nicht mehr eigens (dann markiert erst der zweite Zug). Stand: 2 064 874 B — nur gut 100 B Luft.
 - `src/components/Board.tsx`: `noDragClassName` im weiten Zoom `react-flow__handle` (statt aus).
 - `src/styles/62-greifen-tastatur-teilen.css`: `[data-weit]` schiebt `.pn-handle` und die Größen-Linien per `translate`
   um eine halbe Breite nach außen, die Ecken (React Flow skaliert sie per `scale`) um `--pn-eck` = 5 (Finger 8) × `--pn-inv`;
@@ -84,6 +86,7 @@ Ohne Befund (in jeder Stufe gleich): Karten-Griff (46 × 17), Anschlusspunkte (2
   Zeigen erscheinen? Braucht eine Entscheidung.
 - Finger (Tablet/Telefon): Ein Tipp öffnet dort den Fokus (M212); Verbinden am Finger auf dem Board wurde nicht neu
   untersucht. Die Finger-Größen der Griffe (28 / 16) gelten wie bisher in jeder Zoomstufe.
+- Ein Zug über den Text einer ruhenden Notiz, der **außerhalb** der Notiz endet, markiert beim ersten Mal nichts (Start-JS).
 - Rahmen größer als der Bildschirm (stark hineingezoomt): Der Titel liegt dann außerhalb des Bildes, der Rahmen lässt sich
   erst nach dem Herauszoomen verschieben (wie in Miro).
 - Nebenbefund (Prüfumgebung): Ein großer waagerechter Rad-Ausschlag über der Werkzeugleiste unten nimmt Chromium als
