@@ -18,8 +18,9 @@ import { zugLaeuft } from './zugAnzeige';
  *   · Ohne Rahmenpfeile: die Reihenfolge der Kartenfolge (lib/kartenFolge.ts — dieselbe wie im Vortrag).
  *   · Mit Rahmenpfeilen (gerichtete Verbindung von Rahmen zu Rahmen): den Pfeilen nach. Eine Kette beginnt an einem
  *     Rahmen, in den kein Pfeil führt; die Ketten (und Rahmen ohne Pfeile) kommen in der Kartenfolge ihres Anfangs.
- *   · Verzweigung: Es gewinnt der zuerst gezogene Pfeil (Reihenfolge der Verbindungen im Board). Führt er zu einem
- *     schon besuchten Rahmen, gilt der nächste — so laufen Kreise nicht endlos.
+ *   · Verzweigung: Es gewinnt der zuerst gezogene Pfeil (Reihenfolge der Verbindungen im Board) — oder die im
+ *     Rahmen-Menü festgelegte Reihenfolge der Ausgänge (M530, `data.folge`). Führt er zu einem schon besuchten Rahmen,
+ *     gilt der nächste — so laufen Kreise nicht endlos.
  */
 export function rahmenReise(nodes: AppNode[], edges: Edge[]): AppNode[] {
   const sichtbar = nodes.filter((n) => !n.archived);
@@ -45,14 +46,18 @@ export function rahmenReise(nodes: AppNode[], edges: Edge[]): AppNode[] {
 /** Rahmenpfeile: gerichtete Verbindungen von Rahmen zu Rahmen (ohne Selbstbezug), je Rahmen in Zieh-Reihenfolge */
 function rahmenPfeile(rahmen: AppNode[], edges: Edge[]) {
   const ids = new Set(rahmen.map((n) => n.id));
-  const aus = new Map<string, string[]>(); const rein = new Map<string, number>();
+  const aus = new Map<string, string[]>(); const rein = new Map<string, number>(); const folge = new Map<string, number>();
   for (const e of edges) {
     if (!ids.has(e.source) || !ids.has(e.target) || e.source === e.target) continue;
     const r = richtung(e);
     if (!r) continue;
     const l = aus.get(r.von); if (l) l.push(r.nach); else aus.set(r.von, [r.nach]);
     rein.set(r.nach, (rein.get(r.nach) ?? 0) + 1);
+    const f = (e.data as { folge?: unknown } | undefined)?.folge;
+    if (typeof f === 'number') folge.set(`${r.von}>${r.nach}`, f);
   }
+  // M530: eine von Hand festgelegte Reihenfolge der Ausgänge (Rahmen-Menü) geht der Zieh-Reihenfolge vor
+  if (folge.size) for (const [von, l] of aus) l.sort((a, b) => (folge.get(`${von}>${a}`) ?? 1e9) - (folge.get(`${von}>${b}`) ?? 1e9));
   return { aus, rein };
 }
 

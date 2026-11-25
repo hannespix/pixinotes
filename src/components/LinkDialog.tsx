@@ -1,5 +1,6 @@
 // M357: Ein Board per Link teilen — der Empfänger öffnet es direkt, ohne Konto (lib/linkTeilen.ts).
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { fensterDarueber } from '../lib/overlay';
 import { useBoard } from '../store';
 import { linkDesBoards, linkErstellen, linkLoeschen, linkMoeglich, LinkNichtEingerichtet, linkUrl, type LinkZeile } from '../lib/linkTeilen';
 import { IX } from './Icons';
@@ -7,6 +8,7 @@ import { IX } from './Icons';
 export function LinkDialog({ boardId, onClose, ohneKonto, alsDatei }: { boardId: string; onClose: () => void; ohneKonto: () => void; alsDatei: () => void }) {
   const board = useBoard((s) => s.boards.find((b) => b.id === boardId));
   const showToast = useBoard((s) => s.showToast);
+  const huelle = useRef<HTMLDivElement>(null);   // M530: das eigene Fenster für fensterDarueber
   const [zeile, setZeile] = useState<LinkZeile | null | undefined>(undefined);
   const [busy, setBusy] = useState('');
   const [fehler, setFehler] = useState('');
@@ -16,7 +18,8 @@ export function LinkDialog({ boardId, onClose, ohneKonto, alsDatei }: { boardId:
 
   useEffect(() => {
     if (mitKonto) linkDesBoards(boardId).then(setZeile).catch((e: Error) => { if (e instanceof LinkNichtEingerichtet) setFehlt(true); else setFehler(e.message); setZeile(null); });
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    // M530: Esc gehört dem obersten Fenster (lib/overlay.ts)
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !fensterDarueber(huelle.current, e)) onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -50,7 +53,7 @@ export function LinkDialog({ boardId, onClose, ohneKonto, alsDatei }: { boardId:
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="modal-backdrop" ref={huelle} onClick={onClose}>
       <div className="modal freigabe-dialog link-dialog" role="dialog" aria-modal="true" aria-label="Board per Link teilen" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2>Kopie per Link teilen</h2>

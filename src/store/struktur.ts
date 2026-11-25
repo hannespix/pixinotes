@@ -24,6 +24,8 @@ let ebenenUndo: {
   /** dabei von selbst angelegt, weil sonst nichts Sichtbares geblieben wäre */
   neuesBoard?: string; neuesProjekt?: string;
 } | null = null;
+/** M530: Das letzte Gelöschte war ein Board — „Rückgängig" in der Meldung holt es zurück (store/boardZurueck.ts) */
+let boardWeg = false;
 
 /** M480: Teil des Board-Speichers – Struktur */
 export function strukturScheibe(set: Setzen, get: Holen) {
@@ -135,6 +137,7 @@ export function strukturScheibe(set: Setzen, get: Holen) {
       }
     }
     ebenenUndo = { art, bereich, bereichIndex, projekt, projektIndex, boards: weg, activeId: s0.activeId, neuesBoard, neuesProjekt };
+    boardWeg = false;
     mutedHistory(() => set({ boards, spaces, activeId }));
     get().showToast(meldung, 'ebene', 12000);
   };
@@ -211,6 +214,8 @@ export function strukturScheibe(set: Setzen, get: Holen) {
     removeProject: (id, mit) => ebeneLoeschen('projekt', id, mit),
 
     ebeneZurueck: () => {
+      // M530: ein gelöschtes Board — der Weg zurück lädt nach (store/boardZurueck.ts)
+      if (boardWeg) { boardWeg = false; void import('./boardZurueck').then((m) => m.boardZurueck(set, get)); return true; }
       const u = ebenenUndo;
       if (!u) return false;
       ebenenUndo = null;
@@ -367,32 +372,8 @@ export function strukturScheibe(set: Setzen, get: Holen) {
       set({ boards, spaces: sortiereProjekte(get().spaces, boards) });
     },
 
-    removeBoard: (id) => {
-      const boards = get().boards;
-      if (boards.length <= 1) {
-        get().showToast('Das letzte Board bleibt offen');
-        return;
-      }
-      const rest = boards.filter((b) => b.id !== id);
-      // M390: Archivierte Boards zählen nicht als Arbeitsfläche. Vorher sprang die Ansicht nach dem Löschen auf
-      // ein archiviertes Board, und das letzte SICHTBARE ließ sich löschen (beim Archivieren war das verboten).
-      const weg = boards.find((b) => b.id === id);
-      if (weg && !weg.archived && !rest.some((b) => !b.archived)) {
-        get().showToast('Das letzte Board bleibt offen');
-        return;
-      }
-      let activeId = get().activeId;
-      if (activeId === id) {
-        const projekt = get().spaces.flatMap((sp) => sp.projects).find((p) => p.boardIds.includes(id));
-        activeId = projekt?.boardIds.find((x) => x !== id && rest.some((b) => b.id === x && !b.archived))
-          ?? rest.find((b) => !b.archived)?.id ?? rest[0].id;
-      }
-      set({
-        boards: rest,
-        spaces: stripBoardFromHierarchy(get().spaces, id),
-        activeId,
-      });
-    },
+    // M530: nachgeladen, mit „Rückgängig" in der Meldung (store/boardZurueck.ts) — wie Bereich und Projekt
+    removeBoard: (id) => { boardWeg = true; ebenenUndo = null; void import('./boardZurueck').then((m) => m.boardLoeschen(id, set, get)); },
 
     moveBoard: (boardId, targetProjectId, beforeBoardId) => {
       // Geister-Boards verhindern: Ziel muss existieren, sonst no-op

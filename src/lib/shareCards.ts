@@ -4,7 +4,7 @@
 // (html-to-image → JPEG → minimaler, handgeschriebener PDF-Container).
 import { uid, type AppNode } from '../types';
 import type { BoardDoc, Stroke } from '../store';
-import { nodesToHtml, nodesToWhatsapp, sicherKuerzen } from './serialize';
+import { nodesToHtml, nodesToWhatsapp, sicherKuerzen } from './serializeFormate';
 import { boardToShareUrl, downloadBoardFile, SHARE_URL_LIMIT } from './share';
 
 /** Auswahl als Mini-Board fürs Teilen: Karten + Verbindungen dazwischen +
