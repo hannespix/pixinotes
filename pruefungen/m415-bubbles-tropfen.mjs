@@ -135,11 +135,26 @@ const buehne = await P.locator('.bub-buehne').boundingBox();
 const frei0 = await P.evaluate(() => { const r = document.querySelector('.bub-buehne').getBoundingClientRect(); for (let y = r.bottom - 30; y > r.top + 40; y -= 20) for (let x = r.left + 30; x < r.right - 30; x += 20) { const el = document.elementFromPoint(x, y); if (el?.classList.contains('bub-buehne')) return [x, y]; } return null; });
 await P.mouse.dblclick(frei0[0], frei0[1]); await P.waitForTimeout(300);
 pruefe('E1 Doppelklick auf eine freie Stelle öffnet dort ein Feld', (await P.locator('[data-taste="bub-hier"]').count()) === 1 && /Neue Idee/.test(await P.locator('[data-taste="bub-hier"]').getAttribute('placeholder')));
+// Sie entsteht an der Stelle (und schwimmt dann zu den freien Ideen).
+// M518: Die Lage wird IN der Seite festgehalten, in dem Augenblick, in dem die Blase zum ersten Mal gezeichnet ist
+// (Beobachter vor dem Enter) – nicht mehr „60 ms nach dem Erscheinen" von außen: Unter Last kam diese Messung so
+// spät, dass die Blase schon 120 Punkte weit zu den freien Ideen geschwommen war (E2 rot, allein grün).
+await P.evaluate(() => {
+  window.__ersteLage = null;
+  const schau = () => {
+    if (window.__ersteLage) return;
+    const el = [...document.querySelectorAll('[data-taste="bub-blase"]')].find((e) => e.textContent === 'Kaffeebar');
+    if (!el || !el.style.transform) return;                      // noch nicht gezeichnet (die Bühne setzt die Lage je Bild)
+    const r = el.getBoundingClientRect();
+    window.__ersteLage = { x: r.left, y: r.top, width: r.width, height: r.height };
+    mo.disconnect();
+  };
+  const mo = new MutationObserver(schau);
+  mo.observe(document.querySelector('.bub-buehne'), { subtree: true, childList: true, attributes: true, attributeFilter: ['style'] });
+});
 await P.keyboard.type('Kaffeebar'); await P.keyboard.press('Enter');
-// sofort danach: Sie entsteht an der Stelle (und schwimmt dann zu den freien Ideen)
-await P.waitForFunction(() => [...document.querySelectorAll('[data-taste="bub-blase"]')].some((e) => e.textContent === 'Kaffeebar'), null, { timeout: 3000 });
-await P.waitForTimeout(60);
-const lageK = await blase(P, 'Kaffeebar').boundingBox();
+await P.waitForFunction(() => !!window.__ersteLage, null, { timeout: 15000 }).catch(() => {});
+const lageK = await P.evaluate(() => window.__ersteLage);
 await P.waitForTimeout(1200);
 let d = await daten(P);
 const kaffee = Object.values(d.ideen).find((i) => i.text === 'Kaffeebar');

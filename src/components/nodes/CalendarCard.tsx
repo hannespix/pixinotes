@@ -157,6 +157,9 @@ export function CalendarBody({ id, data: daten }: { id: string; data: CalendarDa
   const icsUrls = (data.icsUrls as string[] | undefined) ?? [];
   // M176: eigene Termine — direkt im Kalender eintragbar (Klick auf den Tag)
   const myEvents = (data.myEvents as MyEvent[] | undefined) ?? KEINE_EIGENEN;
+  // M531: Ein Tag zeigt seine Termine nach der Uhrzeit, ganztägige zuerst (vorher in der Reihenfolge des Eintragens).
+  // Gespeichert bleibt die Reihenfolge, wie sie ist — sortiert wird nur fürs Zeigen (stabil: gleiche Zeit bleibt in Folge).
+  const meineSortiert = useMemo(() => [...myEvents].sort((a, b) => (a.time ?? '').localeCompare(b.time ?? '')), [myEvents]);
   const [dayEdit, setDayEdit] = useState<string | null>(null);
   const [evTitle, setEvTitle] = useState('');
   const [evTime, setEvTime] = useState('');
@@ -352,7 +355,7 @@ export function CalendarBody({ id, data: daten }: { id: string; data: CalendarDa
     }
     // M176/M177: eigene Termine — eintägig als ★-Chip, mehrtägig als farbiger
     // Streifen; Klick öffnet jeweils den Tages-Editor
-    for (const ev of myEvents) {
+    for (const ev of meineSortiert) {
       if (ev.endDate && ev.endDate > ev.date) {
         const s = dayOf(ev.date);
         const e2 = dayOf(ev.endDate);
@@ -375,7 +378,7 @@ export function CalendarBody({ id, data: daten }: { id: string; data: CalendarDa
     }
     return { byDay, stripsByDay };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceBoards, scope, linkedIds, show.tasks, show.gantt, show.miles, show.ics, show.konto, show.notiz, icsSichtbar, accEvents, myEvents]);
+  }, [sourceBoards, scope, linkedIds, show.tasks, show.gantt, show.miles, show.ics, show.konto, show.notiz, icsSichtbar, accEvents, meineSortiert]);
 
   const nav = (delta: number) => {
     if (view === 'jahr') {
@@ -415,8 +418,10 @@ export function CalendarBody({ id, data: daten }: { id: string; data: CalendarDa
     updateNodeData(id, { myEvents: myEvents.filter((e) => e.id !== evId) });
 
   /** M177: Termin (neu oder geändert) speichern — bereinigt leere Felder */
+  /** M531: „Bis" vor „Von" am selben Tag ist kein Termin — vorher wurde er so gespeichert (Ende vor dem Anfang) */
+  const zeitFalsch = !!evEdit?.time && !!evEdit.end && evEdit.end < evEdit.time && !(evEdit.endDate && evEdit.endDate > evEdit.date);
   const saveEvent = () => {
-    if (!evEdit || !evEdit.title.trim()) return;
+    if (!evEdit || !evEdit.title.trim() || zeitFalsch) return;
     const clean: MyEvent = {
       ...evEdit,
       title: evEdit.title.trim().slice(0, 80),
@@ -576,7 +581,7 @@ export function CalendarBody({ id, data: daten }: { id: string; data: CalendarDa
     const eigeneIds = new Set(myEvents.map((e) => e.id));
 
     // Eigene Termine zuerst — nur sie tragen Uhrzeit, Ort und Notiz
-    for (const ev of myEvents) {
+    for (const ev of meineSortiert) {
       if (!drin(ev.date) && !(ev.endDate && drin(ev.endDate))) continue;
       events.push(alsIcs(ev));
     }
@@ -987,7 +992,7 @@ export function CalendarBody({ id, data: daten }: { id: string; data: CalendarDa
             />
             <button disabled={!evTitle.trim()} title="Termin eintragen" onClick={addMyEvent}>＋</button>
           </div>
-          {myEvents.filter((e) => e.date === dayEdit || (e.endDate && e.date <= dayEdit && e.endDate >= dayEdit)).map((ev) => (
+          {meineSortiert.filter((e) => e.date === dayEdit || (e.endDate && e.date <= dayEdit && e.endDate >= dayEdit)).map((ev) => (
             <div key={ev.id} className="cal-dayedit-row">
               <button
                 className="cal-dayedit-title"
@@ -1074,12 +1079,18 @@ export function CalendarBody({ id, data: daten }: { id: string; data: CalendarDa
               <input type="time" value={evEdit.time ?? ''} onChange={(e) => setEvEdit({ ...evEdit, time: e.target.value || undefined })} />
             </label>
             <label>Bis
-              <input type="time" value={evEdit.end ?? ''} onChange={(e) => setEvEdit({ ...evEdit, end: e.target.value || undefined })} />
+              <input type="time" value={evEdit.end ?? ''} aria-invalid={zeitFalsch || undefined} onChange={(e) => setEvEdit({ ...evEdit, end: e.target.value || undefined })} />
             </label>
             <label title="Enddatum für mehrtägige Termine – erscheint als farbiger Streifen">Bis-Datum
               <input type="date" value={evEdit.endDate ?? ''} onChange={(e) => setEvEdit({ ...evEdit, endDate: e.target.value || undefined })} />
             </label>
           </div>
+          {zeitFalsch && (
+            <div className="cal-evform-fehler" role="alert" data-taste="cal-zeit-fehler">
+              „Bis" liegt vor „Von". Zeiten tauschen oder für mehrere Tage ein Bis-Datum setzen.
+              <button onClick={() => setEvEdit({ ...evEdit, time: evEdit.end, end: evEdit.time })}>Tauschen</button>
+            </div>
+          )}
           <input
             placeholder="Ort (optional)"
             value={evEdit.place ?? ''}
@@ -1142,7 +1153,7 @@ export function CalendarBody({ id, data: daten }: { id: string; data: CalendarDa
             </div>
           )}
           <div className="cal-evform-actions">
-            <button className="cal-evform-save" disabled={!evEdit.title.trim()} onClick={saveEvent}>Speichern</button>
+            <button className="cal-evform-save" disabled={!evEdit.title.trim() || zeitFalsch} onClick={saveEvent}>Speichern</button>
             {!evIsNew && (
               <>
                 <button title="An Google Kalender übergeben" onClick={() => toGoogle(evEdit)}>→G</button>

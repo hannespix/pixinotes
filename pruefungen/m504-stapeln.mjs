@@ -87,6 +87,46 @@ const markiert = (P) => P.evaluate(() => [...document.querySelectorAll('.react-f
 const warteBis = async (P, fn, arg, ms = 6000) => { try { await P.waitForFunction(fn, arg, { timeout: ms }); return true; } catch { return false; } };
 /** Ziehen ohne Verweilen: alle 120 ms ein kleines Stück hin und her (mehr als die Ruhe-Toleranz) */
 const zappeln = async (P, x, y, ms) => { const bis = Date.now() + ms; let i = 0; while (Date.now() < bis) { i += 1; await P.mouse.move(x + (i % 2 ? 16 : 0), y); await P.waitForTimeout(110); } await P.mouse.move(x, y); };
+/**
+ * M518: wie `zappeln`, aber NEBEN dem Messen her – die Maus steht nie still, auch wenn eine Abfrage unter Last
+ * länger dauert als das Verweilen (450 ms). Vorher lagen zwischen dem letzten Schritt und dem Loslassen mehrere
+ * Abfragen; unter Last wurde daraus ein Stillhalten, die App stapelte (zu Recht) und A3 war rot.
+ */
+const zappler = (P, x, y) => {
+  let an = true;
+  // Fünf Stellen im Wechsel (je mindestens 24 Punkte auseinander) statt zwei: Der Browser fasst Mausbewegungen je
+  // Bild zusammen – bei zwei Stellen und langsamen Bildern sah die App zufällig immer dieselbe („hält still").
+  const lauf = (async () => { let i = 0; while (an) { i += 1; await P.mouse.move(x + ((i * 2) % 5) * 12, y); await P.waitForTimeout(60); } })();
+  return { stopp: async () => { an = false; await lauf; } };
+};
+/**
+ * M518: Die Seite schreibt selbst mit, wann der Zeiger zuletzt (um mehr als die Ruhe-Toleranz) bewegt wurde, wie
+ * lang die längste Pause zwischen zwei Bewegungen war und wie lange nach der letzten Bewegung eine
+ * Stapel-Markierung erschien. So lässt sich
+ * prüfen, ob die Voraussetzung eines Schritts („ohne stillzuhalten") auf dieser Maschine überhaupt galt, und die
+ * Verweildauer wird mit der Uhr der Seite gemessen statt mit der des Prüfprogramms.
+ */
+const uhrNeu = (P) => P.evaluate(() => {
+  if (!window.__zug) {
+    const u = window.__zug = { letzter: 0, pause: 0, marke: null, x: 0, y: 0 };
+    // „Bewegt" heißt wie in der App: mehr als 10 Punkte vom letzten Ruhepunkt (RUHE_PX) – gezählt werden die
+    // Ereignisse, wie sie die Seite erreichen (also nach dem Zusammenfassen durch den Browser)
+    const zeit = (e) => {
+      const t = performance.now();
+      if (e.type === 'pointermove' && Math.hypot(e.clientX - u.x, e.clientY - u.y) <= 10) return;
+      if (u.letzter) u.pause = Math.max(u.pause, t - u.letzter);
+      u.letzter = t; u.x = e.clientX; u.y = e.clientY;
+    };
+    window.addEventListener('pointermove', zeit, true);
+    window.addEventListener('pointerup', zeit, true);
+    new MutationObserver(() => {
+      const el = document.querySelector('.react-flow__node[data-stapel-ziel]');
+      if (u.marke === null && el) u.marke = { id: el.getAttribute('data-id'), nach: performance.now() - u.letzter };
+    }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['data-stapel-ziel'] });
+  }
+  const u = window.__zug; u.letzter = performance.now(); u.pause = 0; u.marke = null;
+});
+const uhrLesen = (P) => P.evaluate(() => { const u = window.__zug; return { pause: Math.round(u.pause), marke: u.marke && { id: u.marke.id, nach: Math.round(u.marke.nach) } }; });
 /** Greifen und anlaufen (React Flow verschluckt den ersten Schritt über der Schwelle) */
 async function greifen(P, id) {
   const g = await griff(P, id);
@@ -107,19 +147,36 @@ const nah = (a, b, t = 1.5) => Math.abs(a.x - b.x) < t && Math.abs(a.y - b.y) < 
   const ueberB = (g) => [g[0] + (b0.x - a0.x) + 50 * z, g[1] + 30 * z];
 
   console.log('\n════ A: ohne Verweilen weicht das Ziel aus ════');
-  await leer(P);
-  let g = await greifen(P, 'a');
-  let ziel = ueberB(g);
-  await P.mouse.move(ziel[0], ziel[1], { steps: 10 });
-  await zappeln(P, ziel[0], ziel[1], 1000);
-  const bA = await rahmen(P, 'b');
-  pruefe('A1 über b gezogen (ohne stillzuhalten) weicht b aus', Math.hypot(bA.x - b0.x, bA.y - b0.y) > 40 * z, { b0: [b0.x, b0.y], bA: [bA.x, bA.y] });
-  pruefe('A2 … keine Stapel-Markierung', (await markiert(P)).length === 0, await markiert(P));
-  await zappeln(P, ziel[0], ziel[1], 150);   // das Messen dauerte unter Last womöglich länger als das Verweilen
-  await P.mouse.up();
-  let sA = await standRuhig(P, (s) => s.a.x !== s0.a.x && s.b.y !== s0.b.y);
+  let g; let ziel; let bA; let marken; let uhr; let sA;
+  // M518: Der Abschnitt gilt für einen Zug OHNE Stillhalten. Ob das auf dieser Maschine geklappt hat, misst die
+  // Seite selbst (längste Pause zwischen zwei Bewegungen). Hat die Maschine den Zug länger angehalten, als die App
+  // als Verweilen wertet (450 ms), war die Voraussetzung verletzt – dann zurück (Strg+Z) und noch einmal, bis zu
+  // dreimal. Geprüft wird unverändert: ohne Stillhalten weicht b aus, nichts wird markiert, a liegt frei.
+  for (let versuch = 1; versuch <= 3; versuch += 1) {
+    await leer(P);
+    g = await greifen(P, 'a');
+    ziel = ueberB(g);
+    await P.mouse.move(ziel[0], ziel[1], { steps: 10 });
+    await uhrNeu(P);
+    const zap = zappler(P, ziel[0], ziel[1]);
+    await P.waitForTimeout(1000);
+    bA = await rahmen(P, 'b');
+    marken = await markiert(P);
+    await zap.stopp();
+    await P.mouse.move(ziel[0], ziel[1]); await P.mouse.up();   // (nicht in einem Zug abschicken: die App übernimmt dann die vorletzte Lage)
+    uhr = await uhrLesen(P);
+    sA = await standRuhig(P, (s) => s.a.x !== s0.a.x && s.b.y !== s0.b.y, uhr.pause < 400 ? 8000 : 2500);
+    if (uhr.pause < 400 || versuch === 3) break;
+    console.log(`  (Versuch ${versuch}: die Maschine hielt den Zug ${uhr.pause} ms an – das wäre Verweilen; noch einmal)`);
+    await leer(P); await P.keyboard.press('Control+z');
+    await standBis(P, (s) => s.a.x === s0.a.x && s.b.x === s0.b.x && s.b.y === s0.b.y);
+    await P.waitForTimeout(500);
+  }
+  console.log(`  (längste Pause zwischen zwei Bewegungen im Zug: ${uhr.pause} ms; Verweilen wäre ab 450 ms)`);
+  pruefe('A1 über b gezogen (ohne stillzuhalten) weicht b aus', Math.hypot(bA.x - b0.x, bA.y - b0.y) > 40 * z, { b0: [b0.x, b0.y], bA: [bA.x, bA.y], uhr });
+  pruefe('A2 … keine Stapel-Markierung', marken.length === 0 && uhr.marke === null, { marken, uhr });
   pruefe('A3 abgelegt: b bleibt beiseite, a liegt dort, wo sie losgelassen wurde (nicht im Stapel-Versatz)',
-    Math.hypot(sA.b.x - s0.b.x, sA.b.y - s0.b.y) > 40 && Math.abs(sA.a.x - (s0.b.x + 50)) < 20 && Math.abs(sA.a.y - 30) < 20, sA);
+    Math.hypot(sA.b.x - s0.b.x, sA.b.y - s0.b.y) > 40 && Math.abs(sA.a.x - (s0.b.x + 50)) < 20 && Math.abs(sA.a.y - 30) < 20, { ...sA, uhr });
   await leer(P);
   await P.keyboard.press('Control+z');
   sA = await standBis(P, (s) => s.a.x === s0.a.x && s.b.x === s0.b.x && s.b.y === s0.b.y);
@@ -131,11 +188,17 @@ const nah = (a, b, t = 1.5) => Math.abs(a.x - b.x) < t && Math.abs(a.y - b.y) < 
   g = await greifen(P, 'a');
   ziel = ueberB(g);
   await P.mouse.move(ziel[0], ziel[1], { steps: 10 });
-  await zappeln(P, ziel[0], ziel[1], 400);   // erst weicht b aus …
+  // M518: b wird gemessen, WÄHREND die Maus noch zappelt (sonst kam b unter Last schon zurück), und die Verweildauer
+  // misst die Seite selbst: Zeit zwischen der letzten Bewegung des Zeigers und dem Erscheinen der Markierung.
+  // Vorher lief die Uhr des Prüfprogramms erst nach einer Abfrage los – unter Last zeigte sie 288 ms statt 450.
+  await uhrNeu(P);
+  const zapB = zappler(P, ziel[0], ziel[1]);   // erst weicht b aus …
+  await P.waitForTimeout(400);
   const bAus = await rahmen(P, 'b');
-  const t0 = Date.now();
+  await zapB.stopp();
+  await P.mouse.move(ziel[0], ziel[1]);
   const markiertJa = await warteBis(P, () => !!document.querySelector('.react-flow__node[data-id="b"][data-stapel-ziel]'));
-  const dauer = Date.now() - t0;
+  const dauer = (await uhrLesen(P)).marke?.nach ?? -1;
   pruefe('B1 still gehalten wird b zum Ziel (Markierung) – nach rund einer halben Sekunde', markiertJa && dauer >= 300, { markiertJa, dauer });
   const bZurueck = await warteBis(P, ([x, y]) => { const r = document.querySelector('.react-flow__node[data-id="b"]').getBoundingClientRect(); return Math.abs(r.left - x) < 1 && Math.abs(r.top - y) < 1; }, [b0.x, b0.y]);
   pruefe('B2 … b hört auf auszuweichen und kommt zurück unter die Karte', Math.hypot(bAus.x - b0.x, bAus.y - b0.y) > 30 * z && bZurueck, { bAus: [bAus.x, bAus.y], b0: [b0.x, b0.y] });

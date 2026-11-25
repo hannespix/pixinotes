@@ -45,10 +45,15 @@ const fmtDayShort = (iso: string) =>
 // M390: Kalender-Rechnen bleibt in der Ortszeit. Über toISOString() lag der lokale Mittag ab UTC+13 (Neuseeland im
 // Sommer) am Vortag — „Weiter" blieb auf demselben Tag stehen, die Woche begann am Samstag.
 const addDaysIso = (iso: string, n: number) => { const d = new Date(`${iso}T12:00:00`); d.setDate(d.getDate() + n); return tagLokal(d); };
+/** M531: Der Tag bleibt beim Blättern in Monat/Jahr — oder wird der letzte des Monats (31.1. → 28.2.), statt der 15. */
+const tagImMonat = (monat: string, tag: number): string => {
+  const [j, m] = monat.split('-').map(Number);
+  return `${monat}-${String(Math.min(tag, new Date(j, m, 0).getDate())).padStart(2, '0')}`;
+};
 const addMonthsIso = (iso: string, n: number): string => {
   const d = new Date(`${iso.slice(0, 7)}-15T12:00:00`);
   d.setMonth(d.getMonth() + n);
-  return tagLokal(d);
+  return tagImMonat(tagLokal(d).slice(0, 7), Number(iso.slice(8, 10)) || 1);
 };
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
@@ -363,7 +368,7 @@ export function TimeBody({ id, data: daten }: { id: string; data: TimeData }) {
                   key={m}
                   className={`time-ymonth ${todayIso().slice(0, 7) === m ? 'is-today' : ''}`}
                   title={`${name} ${year}${total ? ` – ${fmtDur(total)} (ohne Pausen)` : ''} · Klick öffnet den Monat`}
-                  onClick={() => { setDay(`${m}-15`); setView('monat'); }}
+                  onClick={() => { setDay(tagImMonat(m, Number(day.slice(8, 10)) || 1)); setView('monat'); }}
                 >
                   <span>{name.slice(0, 3)}</span>
                   <b>{total ? fmtCell(total) : '—'}</b>

@@ -31,6 +31,7 @@ import { readFileSync, existsSync, mkdirSync } from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import { chromium } from 'playwright-core';
+import { ruhigeMaschine, RUHIG } from '../werkzeug/maschinen-last.mjs';
 const __repo = fileURLToPath(new URL('..', import.meta.url));
 const SD = path.join(__repo, 'pruefungen', 'ablage');
 mkdirSync(SD, { recursive: true });
@@ -196,7 +197,11 @@ pruefe('B3 will-change nur während der Bewegung – danach zeichnet der Browser
 // M448: Die Takt-Grenze (20 ms = 60 Hz mit Spiel) gilt für einen ruhigen Rechner. Laufen mehrere Prüfungen
 // oder Agenten gleichzeitig (Last über der Kernzahl), zeichnet Chromium auch ohne eigene Schuld nur jedes zweite
 // Bild – dann gilt 40 ms (30 Hz): ein echter Einbruch (100 ms je Bild) fällt weiter auf, Fremdlast nicht.
-const unterLast = os.loadavg()[0] > os.cpus().length;
+// M518: Der Minutenschnitt der Last hinkt nach (eine Lastspitze steht dort erst nach einer halben Minute) – darum
+// zusätzlich die Maschine selbst messen (werkzeug/maschinen-last.mjs): kurz auf einen ruhigen Moment warten, sonst
+// gilt die Grenze für Fremdlast. Der Läufer lässt diese Reihe damit allein laufen (Sperre „zeitmessung").
+const anteil = await ruhigeMaschine(6000);
+const unterLast = os.loadavg()[0] > os.cpus().length || anteil < RUHIG;
 const taktGrenze = unterLast ? 40 : 20;
 if (unterLast) console.log(`  (Rechner unter Last ${os.loadavg()[0].toFixed(1)} bei ${os.cpus().length} Kernen – Takt-Grenze ${taktGrenze} ms)`);
 const t = await takt(P, 'rad');
