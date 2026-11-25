@@ -169,13 +169,34 @@ export function karteGueltig(n: unknown): n is AppNode {
 }
 
 /**
+ * M522: Haken für die Gestalt-Prüfung (lib/sicherGestalt.ts). Die Regeln je Kartenart sind zu groß für den Start —
+ * sie laden mit dem, was Fremdes bringt (Abgleich, Sicherung, Link, Datei), und hängen sich hier ein. Bis dahin
+ * gehen Karte, Strich und Gespräch unverändert durch.
+ */
+export const gestalt = {
+  karte: <T extends AppNode>(n: T): T => n,
+  strich: <T,>(s: T): T => s,
+  gespraech: <T,>(c: T): T => c,
+};
+/** M522: die Gestalt-Prüfung laden (einmal) — vor jedem Weg, der Fremdes im Start-Paket annimmt */
+export const gestaltLaden = () => import('./sicherGestalt');
+/**
+ * M522: Einen ganzen Stand prüfen (Sync-Datei, WebDAV, „Stand laden"). Lässt sich die Prüfung nicht laden (offline,
+ * der Teil liegt nicht im Cache), geht der Stand durch wie vor M522 — „Datei unlesbar" hieße sonst für den Abgleich
+ * „es gibt keine", und er überschriebe sie mit dem hiesigen Stand.
+ */
+export const standGeprueft = <T extends { boards: BoardDoc[]; spaces: unknown[]; geloescht?: Record<string, string> }>(p: T): Promise<T | null> =>
+  gestaltLaden().then((m) => m.standVonAussen(p as never) as T | null, () => p);
+
+/**
  * Adressen in einer Karte entschärfen, die von außen kam: Eine „Live"-Seite, die keine fremde Webseite ist,
  * verliert ihre Adresse; Datei- und Bildquellen mit fremdem Schema werden geleert. Gibt dieselbe Karte zurück,
  * wenn nichts zu tun war.
  * M453: Zeitpunkte (angelegt/geaendert) müssen glaubhafte Zahlen sein und dürfen nicht in der Zukunft liegen.
+ * M522: Der Inhalt hat die Gestalt seiner Art (gestalt.karte → lib/sicherGestalt.ts) — sonst fiele an einer Karte die ganze App aus.
  */
 export function karteEntschaerfen<T extends AppNode>(n0: T): T {
-  const n = zeitSaeubern(n0);
+  const n = gestalt.karte(zeitSaeubern(n0));
   const d = n.data as Record<string, unknown>;
   if (n.type === 'htmlapp' && d.url !== undefined && !fremdeWebAdresse(d.url)) {
     const { url: _u, live: _l, ...rest } = d;
@@ -201,26 +222,6 @@ export function karteEntschaerfen<T extends AppNode>(n0: T): T {
     return { ...n, data: { ...d, attachments: d.attachments.map((a) => { const x = a as { dataUrl?: unknown }; return typeof x?.dataUrl === 'string' && !/^(data:|blob:)/i.test(x.dataUrl) ? { ...x, dataUrl: undefined } : a; }) } } as T;
   }
   return n;
-}
-
-/**
- * M470: Zeitpunkte eines Sync-Stands von außen (Ordner, WebDAV, Konto über fremdStandEinarbeiten): angelegt/geaendert
- * der Karten und `spalteSeit` der Tickets müssen glaubhaft sein (zeitSaeubern) — sonst stünde ein Ticket „seit -40
- * Tagen" in seiner Spalte oder ein Stempel aus der Zukunft gewönne jeden Abgleich. Sonst bleibt alles, wie es kam.
- */
-export function zeitenVonAussen<T extends { nodes?: unknown }>(boards: T[]): T[] {
-  if (!Array.isArray(boards)) return boards;
-  return boards.map((b) => {
-    if (!b || typeof b !== 'object' || !Array.isArray(b.nodes)) return b;
-    let anders = false;
-    const nodes = (b.nodes as AppNode[]).map((n) => {
-      if (!n || typeof n !== 'object') return n;
-      const s = zeitSaeubern(n);
-      if (s !== n) anders = true;
-      return s;
-    });
-    return anders ? { ...b, nodes } : b;
-  });
 }
 
 /** Karten eines fremden Boards: Ungültiges fällt weg, Adressen werden entschärft */
@@ -250,8 +251,9 @@ export function boardVonAussen(roh: unknown, id: string): BoardDoc | null {
     name: typeof b.name === 'string' ? b.name.slice(0, 200) : 'Board',
     nodes: kartenVonAussen(b.nodes),
     edges: liste<BoardDoc['edges'][number]>(b.edges, (e) => text(e.source) && text(e.target)),
-    ...(b.drawings !== undefined ? { drawings: liste<NonNullable<BoardDoc['drawings']>[number]>(b.drawings, (s) => Array.isArray(s.points)) } : {}),
-    ...(b.comments !== undefined ? { comments: liste<NonNullable<BoardDoc['comments']>[number]>(b.comments, (c) => Array.isArray(c.msgs)) } : {}),
+    // M522: Punkte eines Strichs sind Zahlenpaare, Beiträge eines Gesprächs Text — sonst fiel die Zeichen- bzw. Kommentar-Ebene aus
+    ...(b.drawings !== undefined ? { drawings: liste<NonNullable<BoardDoc['drawings']>[number]>(b.drawings, (s) => Array.isArray(s.points)).map(gestalt.strich) } : {}),
+    ...(b.comments !== undefined ? { comments: liste<NonNullable<BoardDoc['comments']>[number]>(b.comments, (c) => Array.isArray(c.msgs) && text(c.nodeId)).map(gestalt.gespraech) } : {}),
   };
 }
 

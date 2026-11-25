@@ -17,7 +17,7 @@ import {
 } from '../lib/syncFolder';
 import { AUTO_KEY, letzteSicherung, sicherungEinspielenOeffnen } from '../lib/sicherungTakt';
 import {
-  applyWebdav, clearWebdav, corsRequestText, loadWebdav, saveWebdav, webdavRead, webdavStamp,
+  applyWebdav, clearWebdav, loadWebdav, saveWebdav, webdavRead, webdavStamp,
   webdavTest, webdavWrite, type WebdavConfig,
 } from '../lib/webdav';
 import {
@@ -35,9 +35,11 @@ import {
   isStandalone, readSyncFile, saveViaFiles,
 } from '../lib/filesSync';
 import {
-  applyProjectPayload, buildInviteMailto, buildInviteText, connectProjectSync, disconnectProjectSync,
+  applyProjectPayload, connectProjectSync, disconnectProjectSync,
   joinProjectFolder, projectHandle, projectStamp, projectSyncMeta, readProjectFile, writeProjectSync,
 } from '../lib/projectSync';
+import { corsRequestText } from '../lib/webdavCorsText';
+import { buildInviteMailto, buildInviteText } from '../lib/projektEinladung';
 import {
   EINBETTUNGS_VORSCHLAEGE, VORSCHLAEGE, befrageServer, erlaubnisHilfe,
   istEinbettungsModell, zeigeGroesse, type Lage, type OllamaModell,

@@ -26,6 +26,7 @@ import {
 } from './syncFolder';
 import { triggerDownload } from './download';
 import { getWriterRole, inDerived, isImportedState, useBoard } from '../store';
+import { standGeprueft } from './sicher';
 import { nurAuswahlAnders } from './syncMerge';
 
 const ON_KEY = 'pixinotes:files-sync';
@@ -105,7 +106,7 @@ export async function readSyncFile(file: File): Promise<SyncPayload | null> {
   try {
     const p = JSON.parse(await file.text()) as SyncPayload;
     if (p?.app !== 'pixinotes' || !Array.isArray(p.boards) || p.boards.length === 0 || !Array.isArray(p.spaces)) return null;
-    return p;
+    return await standGeprueft(p);   // M522: Gestalt prüfen — null, wenn kein gültiges Board darin ist
   } catch {
     return null;
   }

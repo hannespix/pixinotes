@@ -314,8 +314,9 @@ const flach = (spaces: Space[]): Map<string, Platz> => {
 /**
  * Bereiche und Projekte zusammenführen. Jedes übrig gebliebene Board landet
  * in genau einem Projekt: Doppelte werden auf das erste Vorkommen reduziert,
- * Waisen (Projekt drüben gelöscht, Board hier bearbeitet) kommen ins erste
- * Projekt — lieber sichtbar am falschen Platz als unsichtbar.
+ * Waisen (drüben aus dem Projekt genommen, hier bearbeitet) bleiben in ihrem
+ * Projekt (M522); gibt es das nicht mehr, kommen sie ins erste Projekt —
+ * lieber sichtbar am falschen Platz als unsichtbar.
  */
 function mergeHierarchie(basis: Space[] | undefined, lokal: Space[], fremd: Space[], boardIds: string[], z: Zaehler): Space[] {
   const hB = basis ? byId(basis.map(huelle)) : undefined;
@@ -375,7 +376,21 @@ function mergeHierarchie(basis: Space[] | undefined, lokal: Space[], fremd: Spac
       return liste.length === p.boardIds.length && liste.every((id, i) => id === p.boardIds[i]) ? p : { ...p, boardIds: liste };
     });
   }
-  const waisen = boardIds.filter((id) => !gesehen.has(id));
+  let waisen = boardIds.filter((id) => !gesehen.has(id));
+  if (waisen.length) {
+    // M522: Eine Waise bleibt in IHREM Projekt, solange es das noch gibt (hier, sonst drüben). Vorher sprang ein
+    // Board, das drüben gelöscht und hier bearbeitet war, in das erste Projekt des ersten Bereichs.
+    const heim = new Map<string, string>();
+    for (const seite of [fremd, lokal]) for (const sp of seite) for (const p of sp.projects) for (const id of p.boardIds) heim.set(id, p.id);
+    const rest: string[] = [];
+    for (const id of waisen) {
+      const pid = heim.get(id);
+      const sp = pid ? bereiche.find((s) => s.projects.some((p) => p.id === pid)) : undefined;
+      if (!sp) { rest.push(id); continue; }
+      sp.projects = sp.projects.map((p) => (p.id === pid ? { ...p, boardIds: [...p.boardIds, id] } : p));
+    }
+    waisen = rest;
+  }
   if (waisen.length) {
     const ziel = bereiche.find((s) => s.projects.length > 0) ?? bereiche[0];
     if (ziel.projects.length === 0) ziel.projects.push({ id: `projekt-${ziel.id}`, name: 'Allgemein', boardIds: [] });

@@ -21,6 +21,16 @@ interface Props {
 }
 interface State { error: Error | null }
 
+/**
+ * M522: Scheitert die Darstellung, kann es am gespeicherten Stand liegen (eine Karte ohne Lage, ein Board ohne
+ * Kartenliste — von außen hereingekommen). Dann half weder „Nochmal versuchen" noch „Seite neu laden": Der Stand
+ * kommt mit jedem Start wieder. Jetzt wird er beim ersten Fehler gerichtet (lib/sicherGestalt.ts, nachgeladen); war
+ * etwas zu richten, baut die Grenze ihren Teil von selbst neu auf. Mehrere Grenzen teilen sich einen Lauf.
+ */
+let richtLauf: Promise<boolean> | null = null;
+const standRichten = (): Promise<boolean> => (richtLauf ??= import('../lib/sicherGestalt').then((m) => m.standRichten(), () => false)
+  .finally(() => { setTimeout(() => { richtLauf = null; }, 500); }));
+
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { error: null };
 
@@ -32,6 +42,7 @@ export class ErrorBoundary extends Component<Props, State> {
     // Bewusst nur in die Konsole: keine Fehler-Telemetrie nach außen, das
     // widerspräche dem „alles bleibt lokal"-Versprechen der App.
     console.error('[PixiNotes] Fehler abgefangen:', error, info.componentStack);
+    void standRichten().then((gerichtet) => { if (gerichtet) this.setState({ error: null }); });
   }
 
   render() {

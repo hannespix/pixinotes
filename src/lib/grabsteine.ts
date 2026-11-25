@@ -46,6 +46,25 @@ function verschwunden(vor: BoardDoc[], nach: BoardDoc[]): string[] {
   return out;
 }
 
+/**
+ * M522: Bereiche und Projekte, die es in `vor` gab und in `nach` nirgends mehr. Bisher bekamen nur Boards, Karten,
+ * Pfeile, Striche und Gespräche einen Grabstein — die Zusammenführung fragt aber auch bei Bereichen und Projekten
+ * „hat die andere Seite das gelöscht oder nur nie gesehen?" (syncMerge → entscheide). Ohne Grabstein hieß die Antwort
+ * immer „nie gesehen": Ein gelöschtes Projekt blieb auf dem zweiten Gerät stehen und kam von dort (leer) zurück.
+ * „geteilt" ist kein eigener Bereich (ihn führt das Konto, er kommt und geht mit den Freigaben).
+ */
+function ebenenVerschwunden(vor: Space[], nach: Space[]): string[] {
+  const da = new Set<string>();
+  for (const sp of nach) { da.add(sp.id); for (const p of sp.projects) da.add(p.id); }
+  const out: string[] = [];
+  for (const sp of vor) {
+    if (sp.id === 'geteilt') continue;
+    if (!da.has(sp.id)) out.push(sp.id);
+    for (const p of sp.projects) if (!da.has(p.id)) out.push(p.id);
+  }
+  return out;
+}
+
 export function grabsteineAufnehmen(ids: Iterable<string>, wann = new Date().toISOString()): void {
   let neu = false;
   for (const id of ids) if (!steine[id]) { steine[id] = wann; neu = true; }
@@ -80,8 +99,9 @@ export function initGrabsteine(): void {
   if (gestartet) return;
   gestartet = true;
   useBoard.subscribe((s, prev) => {
-    if (s.boards === prev.boards) return;
-    const weg = verschwunden(prev.boards, s.boards);
+    if (s.boards === prev.boards && s.spaces === prev.spaces) return;
+    const weg = s.boards === prev.boards ? [] : verschwunden(prev.boards, s.boards);
+    if (s.spaces !== prev.spaces) weg.push(...ebenenVerschwunden(prev.spaces, s.spaces));   // M522
     if (weg.length) grabsteineAufnehmen(weg);
   });
 }

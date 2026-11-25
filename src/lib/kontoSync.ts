@@ -14,6 +14,7 @@
 //   SyncWeg + fremdStandEinarbeiten. Abgleich alle zehn Sekunden über einen
 //   Mini-Abruf (eTag / Version von umgebung.json); erst eine Änderung lädt.
 import { boardVonAussen } from './sicher';
+import './sicherGestalt';   // M522: hängt die Gestalt-Prüfung in lib/sicher.ts ein
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc, type Space } from '../store';
 import {
   alsBase64, anhangKarte, base64AlsBlob, basisLesen, basisMerken, basisVergessen, buildSyncPayloadMitDateien, DATEI_BUDGET_MB,

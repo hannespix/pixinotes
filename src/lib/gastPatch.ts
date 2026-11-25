@@ -8,7 +8,7 @@
 // M472: Zeit- und Merkfelder (lib/abgleichZeiten.ts) zählen hier bewusst MIT – eine Karte, die nur einen späteren
 // Stempel bekam (nach dem Zusammenführen), reist so zu den anderen. Ob zwei Fassungen sich wirklich widersprechen,
 // entscheidet allein der Drei-Wege-Abgleich (syncMerge.ts), in den jede Abweichung mündet (gastSync → mischen).
-import { karteEntschaerfen, karteGueltig } from './sicher';
+import { gestalt, karteEntschaerfen, karteGueltig } from './sicher';
 import type { BoardDoc } from '../store';
 
 export type Art = 'nodes' | 'edges' | 'drawings' | 'comments';
@@ -85,8 +85,9 @@ export function patchSaeubern(p: Patch): Patch {
     if (set) {
       if (a === 'nodes') set = set.filter(karteGueltig).map((n) => karteEntschaerfen(n));
       else if (a === 'edges') set = set.filter((e) => text((e as { source?: unknown }).source) && text((e as { target?: unknown }).target));
-      else if (a === 'drawings') set = set.filter((s) => Array.isArray((s as { points?: unknown }).points));
-      else if (a === 'comments') set = set.filter((c) => Array.isArray((c as { msgs?: unknown }).msgs));
+      // M522: Punkte und Beiträge selbst prüfen (lib/sicherGestalt.ts, über den Haken in lib/sicher.ts)
+      else if (a === 'drawings') set = set.filter((s) => Array.isArray((s as { points?: unknown }).points)).map((s) => gestalt.strich(s));
+      else if (a === 'comments') set = set.filter((c) => Array.isArray((c as { msgs?: unknown }).msgs)).map((c) => gestalt.gespraech(c));
     }
     (aus as Record<string, unknown>)[a] = { ...(set ? { set } : {}), ...(t.del ? { del: t.del } : {}) };
   }
