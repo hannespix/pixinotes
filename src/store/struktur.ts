@@ -12,6 +12,7 @@ import type { Stroke, BoardDoc, Project, EbeneLoeschen, Space, BoardState, Setze
 import { HISTORY_LIMIT, mutedHistory, tippBuendelEnde, NOTIZ_EXTERN } from './verlauf';
 import { nextName, defaultHierarchy, START_BOARD_NAME, ohneVorsatz, istStartName, leererStart, leeresStartboard, ohneStartboard } from './start';
 import { anhaengeMitnehmen } from './karten';
+import type { BoardUndo } from './boardZurueck';
 
 /** M398: Stand vor dem letzten Löschen eines Projekts oder Bereichs – wie der Import nur für die laufende Sitzung */
 let ebenenUndo: {
@@ -25,7 +26,7 @@ let ebenenUndo: {
   neuesBoard?: string; neuesProjekt?: string;
 } | null = null;
 /** M530: Stand vor dem Löschen eines Boards — „Rückgängig" in der Meldung (vorher Browser-Rückfrage ohne Weg zurück) */
-let boardUndo: { board: BoardDoc; index: number; projektId?: string; stelle: number; activeId: string } | null = null;
+let boardUndo: BoardUndo | null = null;
 
 /** M480: Teil des Board-Speichers – Struktur */
 export function strukturScheibe(set: Setzen, get: Holen) {
@@ -214,28 +215,9 @@ export function strukturScheibe(set: Setzen, get: Holen) {
     removeProject: (id, mit) => ebeneLoeschen('projekt', id, mit),
 
     ebeneZurueck: () => {
-      // M530: ein gelöschtes Board — es kommt an seine Stelle im Projekt zurück, mit Inhalt und Kennung. Auf anderen
-      // Geräten kommt es mit dem nächsten Abgleich wieder: Seine Grabsteine reisen nur, solange es fehlt (lib/grabsteine.ts)
+      // M530: ein gelöschtes Board — der Weg zurück lädt nach (store/boardZurueck.ts)
       const bu = boardUndo;
-      if (bu) {
-        boardUndo = null;
-        const s1 = get();
-        if (s1.boards.some((b) => b.id === bu.board.id)) return false;
-        const boards = [...s1.boards];
-        boards.splice(Math.min(bu.index, boards.length), 0, bu.board);
-        let drin = false;
-        let spaces = s1.spaces.map((sp) => ({ ...sp, projects: sp.projects.map((p) => {
-          if (p.id !== bu.projektId) return p;
-          drin = true;
-          const ids = [...p.boardIds]; ids.splice(Math.min(bu.stelle, ids.length), 0, bu.board.id);
-          return { ...p, boardIds: ids };
-        }) }));
-        // Das Projekt gibt es nicht mehr: ins erste
-        if (!drin && bu.projektId !== undefined) spaces = spaces.map((sp, i) => (i === 0 && sp.projects[0] ? { ...sp, projects: sp.projects.map((p, j) => (j === 0 ? { ...p, boardIds: [...p.boardIds, bu.board.id] } : p)) } : sp));
-        mutedHistory(() => set({ boards, spaces: sortiereProjekte(spaces, boards), activeId: bu.activeId === bu.board.id ? bu.board.id : s1.activeId }));
-        get().showToast(t(`„${bu.board.name}" ist wieder da.`));
-        return true;
-      }
+      if (bu) { boardUndo = null; void import('./boardZurueck').then((m) => m.boardZurueck(bu, set, get)); return true; }
       const u = ebenenUndo;
       if (!u) return false;
       ebenenUndo = null;

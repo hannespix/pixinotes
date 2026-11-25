@@ -236,10 +236,20 @@ export function kartenScheibe(set: Setzen, get: Holen, patchActive: AufsOffene) 
       let k = 1;
       const belegt = (kk: number) => wahl.some((n) => b.nodes.some((x) => x.type === n.type && Math.abs(x.position.x - (n.position.x + 30 * kk)) < 2 && Math.abs(x.position.y - (n.position.y + 30 * kk)) < 2));
       while (k < 40 && belegt(k)) k += 1;
+      let dx = 30 * k; let dy = 30 * k;
+      // M530: Ein Rahmen landet daneben, nicht 30 Punkte versetzt darüber — zwei Rahmen übereinander fingen gegenseitig
+      // die Karten des anderen ein (Mittelpunkt im Rahmen, lib/arrange.ts) und zögen sie beim Verschieben mit
+      if (istRahmen.size) {
+        const xs = wahl.map((n) => n.position.x); const ys = wahl.map((n) => n.position.y);
+        const x0 = Math.min(...xs); const y0 = Math.min(...ys);
+        const w = Math.max(...wahl.map((n) => n.position.x + sizeOf(n).w)) - x0; const h = Math.max(...wahl.map((n) => n.position.y + sizeOf(n).h)) - y0;
+        const frei = findFreeSpot(b.nodes, { x: x0 + w + 60, y: y0 }, { w, h });
+        dx = frei.x - x0; dy = frei.y - y0;
+      }
       const karte = new Map(wahl.map((n) => [n.id, uid()]));
       const neu = wahl.map((n) => frisch({
         ...n, id: karte.get(n.id) as string, selected: true,
-        position: { x: n.position.x + 30 * k, y: n.position.y + 30 * k },
+        position: { x: n.position.x + dx, y: n.position.y + dy },
         data: JSON.parse(JSON.stringify(n.data)),
       }) as AppNode);
       // M530: Rahmenpfeile (Rahmen → Rahmen) nicht: Die Kopie legte sonst eine zweite Rahmen-Reise neben die erste

@@ -15,7 +15,9 @@
  *   F  Präsentation: Strg+K, Esc schließt nur die Suche; das nächste Esc die Präsentation.
  *   G  Esc-Stapel: Bild-Export und „Per Link teilen" unter der Hilfe — Esc schließt erst die Hilfe.
  *   H  Board löschen: keine Browser-Rückfrage, sondern ein Hinweis mit „Rückgängig"; das Board kommt mit Inhalt an
- *      seine Stelle zurück. Das letzte sichtbare Board bleibt.
+ *      seine Stelle zurück.
+ *   K  … auch im Konto-Abgleich: zwei Geräte desselben Kontos (Supabase nachgebaut wie in m524), A löscht, B verliert
+ *      das Board, A holt es zurück — es kommt im Konto und auf B wieder und bleibt dort.
  */
 // Läuft aus dem Repository: `node pruefungen/m530-board-praesentation.mjs [A B …]` (gegen einen anderen Build: PN_DIST=…)
 import { fileURLToPath } from 'node:url';
@@ -97,6 +99,12 @@ const waehle = async (P, id) => { const g = await griff(P, id); await P.mouse.cl
 const nah = (a, b, t = 1.5) => Math.abs(a - b) <= t;
 const gleicheAnsicht = (a, b, t = 2) => !!a && !!b && nah(a.x, b.x, t) && nah(a.y, b.y, t) && nah(a.zoom, b.zoom, 0.01);
 const ansichtBis = async (P, v0, ms = 8000) => { const bis = Date.now() + ms; let v = await ansicht(P); while (Date.now() < bis && !gleicheAnsicht(v, v0)) { await P.waitForTimeout(150); v = await ansicht(P); } return v; };
+/** Die Ansicht, sobald die Kamera ruht (eine Weile unverändert) */
+const ansichtRuhig = async (P, ms = 8000) => {
+  let alt = JSON.stringify(await ansicht(P)); const bis = Date.now() + ms;
+  for (let gleich = 0; gleich < 5 && Date.now() < bis;) { await P.waitForTimeout(150); const neu = JSON.stringify(await ansicht(P)); gleich = neu === alt ? gleich + 1 : 0; alt = neu; }
+  return JSON.parse(alt);
+};
 const hinweise = (P) => P.evaluate(() => window.__hinweise.slice());
 /** Einfügen wie Strg+V: ein paste-Ereignis am Element mit dem Fokus (der Weg, den der Browser nimmt) */
 const einfuegen = (P, text, bild = false) => P.evaluate(([text, bild]) => {
@@ -188,8 +196,12 @@ if (will('B')) {
   const neueKanten = b.edges.filter((e) => neuIds.has(e.source) || neuIds.has(e.target));
   pruefe('B3 … die Verbindung zwischen den Karten kommt mit', neueKanten.some((e) => neuIds.has(e.source) && neuIds.has(e.target)), neueKanten);
   pruefe('B4 … der Rahmenpfeil nicht doppelt', b.edges.filter((e) => e.target === 'G' || e.source === kopieF?.id).length === 1, b.edges);
-  pruefe('B5 … die Kopie liegt versetzt, die Karten bleiben in ihrem Rahmen', !!kopieF && kopieF.position.x === 30 && kopieF.position.y === 30
-    && neu.filter((n) => n.type === 'note').every((n) => n.position.x > kopieF.position.x && n.position.x < kopieF.position.x + 700));
+  // Neben dem Original, nicht darüber: Zwei Rahmen übereinander fingen gegenseitig die Karten des anderen ein
+  const ueberlappt = (a, b) => a.position.x < b.position.x + b.width && b.position.x < a.position.x + a.width && a.position.y < b.position.y + b.height && b.position.y < a.position.y + a.height;
+  pruefe('B5 … die Kopie liegt frei neben dem Original (kein Rahmen überdeckt einen anderen), die Karten in ihrem Rahmen', !!kopieF
+    && b.nodes.filter((n) => n.type === 'frame' && n.id !== kopieF.id).every((f) => !ueberlappt(f, kopieF))
+    && neu.filter((n) => n.type === 'note').every((n) => n.position.x > kopieF.position.x && n.position.x < kopieF.position.x + 700 && n.position.y > kopieF.position.y && n.position.y < kopieF.position.y + 420),
+    { kopie: kopieF?.position, rahmen: b.nodes.filter((n) => n.type === 'frame').map((n) => [n.id, n.position]) });
   await P.keyboard.press('Control+z');
   b = await standBis(P, (b) => b.nodes.length === 6);
   pruefe('B6 ein Strg+Z nimmt die ganze Kopie zurück', b.nodes.length === 6 && b.edges.length === 2, { n: b.nodes.length, e: b.edges.length });
@@ -231,7 +243,7 @@ if (will('C')) {
   pruefe('C2 … die Oberfläche ist wieder da, keine Reise-Leiste', await P.evaluate(() => !('nurBoard' in document.documentElement.dataset) && !document.querySelector('.rahmen-reise-leiste')));
   // F in der Reise
   await P.keyboard.press('Alt+Shift+P'); await reiseGelandet(P);
-  const vRahmen = await ansicht(P);
+  const vRahmen = await ansichtRuhig(P);
   await P.mouse.move(700, 450);
   await P.mouse.wheel(0, 300);                           // weggeschwenkt
   await P.waitForTimeout(500);
@@ -247,7 +259,7 @@ if (will('C')) {
   // 0 im Karten-Fokus
   await fokusAuf(P, 'c');
   await P.evaluate(() => (document.activeElement)?.blur?.());
-  const vFokus = await ansicht(P);
+  const vFokus = await ansichtRuhig(P);
   await P.keyboard.press('+'); await P.waitForTimeout(250); await P.keyboard.press('+'); await P.waitForTimeout(600);
   const vGross = await ansicht(P);
   await P.keyboard.press('0');
@@ -419,6 +431,175 @@ if (will('H')) {
   await P.waitForSelector('.react-flow__node[data-id="a"]');
   pruefe('H5 die Karten stehen wieder auf der Fläche', await P.locator('.react-flow__node').count() === 2);
   await ctx.close();
+}
+
+/* ═══════════════════════ K: Board zurückgeholt — auch auf dem zweiten Gerät (Konto) ═══════════════════════ */
+// Supabase im Node-Prozess nachgebaut (Gerüst aus m524, ohne Steuerung): Konto-Dateien, konto_schreiben, Realtime.
+if (will('K')) {
+  console.log('\n════ K: Board löschen und zurückholen — zwei Geräte am selben Konto ════');
+  const SB_URL = 'https://test.supabase.co';
+  const SB_KEY = 'anon-test-key';
+  const sb = { nutzer: new Map(), tokens: new Map(), refresh: new Map(), zeilen: new Map(), sockets: [], objekte: new Map(), n: 0 };
+  const b64url = (s) => Buffer.from(s).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const jwt = (u, bis) => `${b64url('{"alg":"HS256"}')}.${b64url(JSON.stringify({ sub: u.id, email: u.email, exp: Math.floor(bis / 1000) }))}.sig${++sb.n}`;
+  const sitzungFuer = (u) => {
+    const bis = Date.now() + 3600 * 1000;
+    const t = jwt(u, bis), r = `rt-${++sb.n}`;
+    sb.tokens.set(t, { uid: u.id, bis }); sb.refresh.set(r, u.id);
+    return { access_token: t, refresh_token: r, expires_in: 3600, token_type: 'bearer', user: { id: u.id, email: u.email } };
+  };
+  const uidAus = (req) => { const t = /^Bearer (.+)$/.exec(req.headers()['authorization'] ?? '')?.[1]; const e = t && sb.tokens.get(t); return e && e.bis >= Date.now() ? e.uid : null; };
+  const nutzerVon = (uid) => [...sb.nutzer.values()].find((x) => x.id === uid);
+  const zeile = (uid, name) => sb.zeilen.get(`${uid}/${name}`);
+  const melden = (uid, name, type) => {
+    for (const s of sb.sockets) {
+      if (s.uid !== uid || !(s.filter ?? []).some((f) => f.table === 'konto_dateien')) continue;
+      try { s.ws.send(JSON.stringify({ topic: 'realtime:konto', event: 'postgres_changes', payload: { ids: [1], data: { type, schema: 'public', table: 'konto_dateien', record: { name, user_id: uid }, old_record: { name, user_id: uid } } }, ref: null })); } catch { /* zu */ }
+    }
+  };
+  const schreib = (uid, name, inhalt, mime, groesse) => {
+    const z = zeile(uid, name);
+    const neu = z ? Object.assign(z, { inhalt, mime, groesse, version: z.version + 1, updated_at: new Date().toISOString() })
+      : { user_id: uid, name, inhalt, mime, groesse, version: 1, updated_at: new Date().toISOString() };
+    sb.zeilen.set(`${uid}/${name}`, neu);
+    melden(uid, name, z ? 'UPDATE' : 'INSERT');
+    return neu;
+  };
+  const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
+  const dienste = async (ctx) => {
+    const json = (route, status, obj) => route.fulfill({ status, contentType: 'application/json', headers: cors, body: JSON.stringify(obj) }).catch(() => {});
+    await ctx.route(`${SB_URL}/**`, async (route) => {
+      const req = route.request(); const url = new URL(req.url()); const m = req.method(); const pfad = decodeURIComponent(url.pathname);
+      if (m === 'OPTIONS') return route.fulfill({ status: 204, headers: cors, body: '' });
+      const body = () => { try { return JSON.parse(req.postData() ?? '{}'); } catch { return {}; } };
+      const eq = (k) => /^eq\.(.+)$/.exec(url.searchParams.get(k) ?? '')?.[1];
+      if (pfad === '/auth/v1/signup' && m === 'POST') {
+        const { email, password } = body();
+        const u = { id: sb.nutzer.get(email)?.id ?? `uid-${++sb.n}`, email, passwort: password };
+        sb.nutzer.set(email, u);
+        return json(route, 200, sitzungFuer(u));
+      }
+      if (pfad === '/auth/v1/token' && m === 'POST') {
+        if (url.searchParams.get('grant_type') === 'password') {
+          const { email, password } = body(); const u = sb.nutzer.get(email);
+          return !u || u.passwort !== password ? json(route, 400, { error: 'invalid_grant' }) : json(route, 200, sitzungFuer(u));
+        }
+        const uid = sb.refresh.get(body().refresh_token);
+        return uid ? json(route, 200, sitzungFuer(nutzerVon(uid))) : json(route, 400, { error: 'invalid_grant' });
+      }
+      if (pfad === '/auth/v1/user' && m === 'GET') { const uid = uidAus(req); return uid ? json(route, 200, { id: uid, email: nutzerVon(uid)?.email }) : json(route, 401, {}); }
+      if (pfad === '/auth/v1/logout') return route.fulfill({ status: 204, body: '' });
+      const uid = uidAus(req);
+      if (!uid) return json(route, 401, { message: 'JWT expired' });
+      const t = /^\/storage\/v1\/object\/(?:authenticated\/)?pixinotes\/(.+)$/.exec(pfad);
+      if (t) {
+        if (m === 'POST' || m === 'PUT') { sb.objekte.set(t[1], { body: req.postDataBuffer() ?? Buffer.alloc(0), mime: req.headers()['content-type'] ?? 'application/octet-stream' }); return json(route, 200, { Key: `pixinotes/${t[1]}` }); }
+        if (m === 'GET') { const o = sb.objekte.get(t[1]); return o ? route.fulfill({ status: 200, contentType: o.mime, headers: cors, body: o.body }) : json(route, 400, { error: 'not found' }); }
+        if (m === 'DELETE') { sb.objekte.delete(t[1]); return json(route, 200, {}); }
+      }
+      if (pfad.startsWith('/storage/v1/')) return json(route, 200, []);
+      if (pfad === '/rest/v1/rpc/konto_schreiben' && m === 'POST') {
+        const b = body(); const alt = zeile(uid, 'umgebung.json'); const wenn = b.p_wenn_version;
+        if ((wenn === null && alt) || (wenn !== null && String(alt?.version ?? '') !== String(wenn))) return json(route, 400, { code: 'P0001', message: 'vorbedingung' });
+        for (const d of b.p_dateien ?? []) schreib(uid, d.name, d.inhalt ?? '', d.mime ?? 'application/json', d.groesse ?? 0);
+        for (const n of b.p_loeschen ?? []) { if (sb.zeilen.delete(`${uid}/${n}`)) melden(uid, n, 'DELETE'); }
+        return json(route, 200, schreib(uid, 'umgebung.json', b.p_umgebung, 'application/json', String(b.p_umgebung ?? '').length).version);
+      }
+      if (pfad === '/rest/v1/rpc/board_aendern' && m === 'POST') return json(route, 400, { code: 'P0002', message: 'im Nachbau nicht' });
+      if (pfad === '/rest/v1/rpc/freigaben_annehmen' && m === 'POST') return json(route, 200, 0);
+      if (pfad === '/rest/v1/rpc/freigaben_fuer_mich' && m === 'POST') return json(route, 200, []);
+      if (pfad === '/rest/v1/rpc/board_kanal' && m === 'POST') return json(route, 200, null);
+      if (pfad === '/rest/v1/board_freigaben' || pfad === '/rest/v1/board_einladungen') return json(route, 200, []);
+      if (pfad === '/rest/v1/konto_dateien') {
+        const fName = eq('name');
+        const select = (url.searchParams.get('select') ?? '*').split(',');
+        const projiziere = (z) => (select.includes('*') ? z : Object.fromEntries(select.map((k) => [k, z[k]])));
+        let x = [...sb.zeilen.values()].filter((z) => z.user_id === uid);
+        if (fName !== undefined) x = x.filter((z) => z.name === fName);
+        if (m === 'GET') return json(route, 200, x.map(projiziere));
+        if (m === 'DELETE') { for (const z of x) { sb.zeilen.delete(`${uid}/${z.name}`); melden(uid, z.name, 'DELETE'); } return route.fulfill({ status: 204, headers: cors, body: '' }); }
+      }
+      return json(route, 404, { message: `unbekannt: ${m} ${pfad}` });
+    });
+    await ctx.routeWebSocket(/realtime\/v1\/websocket/, (ws) => {
+      const eintrag = { ws, uid: null, filter: [] };
+      sb.sockets.push(eintrag);
+      ws.onMessage((roh) => {
+        const j = JSON.parse(String(roh));
+        if (typeof j.topic === 'string' && j.topic.startsWith('realtime:pn-')) return;
+        if (j.event === 'phx_join') {
+          eintrag.uid = sb.tokens.get(j.payload?.access_token)?.uid ?? null;
+          eintrag.filter = j.payload?.config?.postgres_changes ?? [];
+          ws.send(JSON.stringify({ topic: j.topic, event: 'phx_reply', payload: { status: 'ok', response: { postgres_changes: eintrag.filter.map((_, i) => ({ id: i + 1 })) } }, ref: j.ref }));
+        } else if (j.event === 'heartbeat') ws.send(JSON.stringify({ topic: 'phoenix', event: 'phx_reply', payload: { status: 'ok', response: {} }, ref: j.ref }));
+        else if (j.event === 'access_token') { const e = sb.tokens.get(j.payload?.access_token); if (e) eintrag.uid = e.uid; }
+      });
+      ws.onClose(() => { sb.sockets = sb.sockets.filter((s) => s !== eintrag); });
+    });
+  };
+  const notiz = (id, text, x = 60, y = 60) => ({ id, type: 'note', width: 130, position: { x, y }, data: { color: 'yellow', blocks: [{ type: 'paragraph', content: text }] } });
+  const brettK = (id, name, nodes) => ({ id, name, edges: [], drawings: [], comments: [], nodes });
+  const geraet = async (st) => {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+    await dienste(ctx);
+    await ctx.addInitScript(({ st, konfig }) => {
+      if (localStorage.getItem('pixinotes-board')) return;
+      localStorage.setItem('pixinotes-onboarded', '1');
+      localStorage.setItem('pixinotes-einstellungen', JSON.stringify({ schliff: 2 }));
+      localStorage.setItem('pixinotes-supabase', JSON.stringify(konfig));
+      localStorage.setItem('pixinotes-board', JSON.stringify({ version: 5, state: st }));
+    }, { st, konfig: { url: SB_URL, key: SB_KEY } });
+    const P = await ctx.newPage();
+    P.on('pageerror', (e) => fehler.push(e.message));
+    P.on('dialog', (d) => d.accept());
+    await P.goto(`http://localhost:${PORT}/`, { waitUntil: 'networkidle' });
+    await P.waitForTimeout(1200);
+    return { ctx, P };
+  };
+  const anmelden = async (P, neu) => {
+    await P.locator('[data-taste="einstellungen"]').click();
+    await P.waitForSelector('.modal-tabs'); await P.waitForTimeout(300);
+    await P.locator('.modal-tabs button', { hasText: 'Daten' }).click(); await P.waitForTimeout(300);
+    await P.locator('.seg-weg button', { hasText: 'Konto' }).click(); await P.waitForTimeout(300);
+    await P.locator('[data-taste="konto-email"]').fill('anna@example.de');
+    if ((await P.locator('[data-taste="konto-mail"] details[open]').count()) === 0) { await P.locator('[data-taste="konto-mail"] details summary').click(); await P.waitForTimeout(150); }
+    await P.locator('[data-taste="konto-pass"]').fill('geheim123');
+    await P.locator(`[data-taste="${neu ? 'konto-neu' : 'konto-passwort'}"]`).click();
+    await warteBis(P, () => !!document.querySelector('[data-taste="konto-stand"]'), null, 10000);
+    await P.waitForTimeout(400);
+    await P.keyboard.press('Escape'); await P.waitForTimeout(500);
+  };
+  const zustand = (P) => P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state);
+  const bis = async (fn, ms = 25000) => { const ende = Date.now() + ms; while (Date.now() < ende) { if (await fn()) return true; await new Promise((r) => setTimeout(r, 200)); } return !!(await fn()); };
+  const hatIdeen = async (P) => (await zustand(P)).boards.some((b) => b.id === 'by' && b.nodes.some((n) => n.id === 'y1'));
+  const A = await geraet({
+    boards: [brettK('bx', 'Planung', [notiz('x1', 'Planung Notiz')]), brettK('by', 'Ideen', [notiz('y1', 'Ideen Notiz'), notiz('y2', 'Zweite Idee', 300)])],
+    spaces: [{ id: 's1', name: 'Arbeit', projects: [{ id: 'p1', name: 'Allgemein', boardIds: ['bx', 'by'] }] }], activeId: 'bx', view: 'board',
+  });
+  await anmelden(A.P, true);
+  const uid = sb.nutzer.get('anna@example.de')?.id ?? '';
+  await bis(() => !!zeile(uid, 'board-by.json'));
+  const B = await geraet({ boards: [brettK('leer', 'Neu', [])], spaces: [{ id: 'sl', name: 'Privat', projects: [{ id: 'pl', name: 'Eigenes', boardIds: ['leer'] }] }], activeId: 'leer', view: 'board' });
+  await anmelden(B.P, false);
+  pruefe('K1 beide Geräte haben das Board „Ideen"', await bis(() => hatIdeen(B.P)) && await hatIdeen(A.P));
+  // A löscht „Ideen" — über das Menü der Navigation
+  await A.P.evaluate(() => [...document.querySelectorAll('.side-board')].find((e) => e.querySelector('.side-board-name')?.textContent === 'Ideen')?.querySelector('.ebenen-menu-knopf')?.click());
+  await warteBis(A.P, () => [...document.querySelectorAll('[role="menuitem"]')].some((b) => /Löschen/.test(b.textContent)), null, 4000);
+  await A.P.evaluate(() => [...document.querySelectorAll('[role="menuitem"]')].find((b) => /Löschen/.test(b.textContent))?.click());
+  const geloescht = await bis(async () => !zeile(uid, 'board-by.json') && !(await hatIdeen(B.P)), 11000);
+  pruefe('K2 gelöscht: auch im Konto und auf dem zweiten Gerät weg', geloescht, { server: !!zeile(uid, 'board-by.json'), b: await hatIdeen(B.P) });
+  // … und vor Ablauf des Hinweises zurückgeholt
+  const knopf = await A.P.evaluate(() => !!document.querySelector('.toast.show .toast-undo'));
+  if (knopf) await A.P.click('.toast.show .toast-undo');
+  pruefe('K3 der Hinweis bot „Rückgängig", das Board ist auf dem ersten Gerät wieder da', knopf && await bis(() => hatIdeen(A.P), 5000));
+  pruefe('K4 … im Konto wieder da', await bis(() => !!zeile(uid, 'board-by.json')));
+  pruefe('K5 … und auf dem zweiten Gerät wieder da (nicht gelöscht geblieben)', await bis(() => hatIdeen(B.P)));
+  // Ein paar Abgleich-Runden später: niemand löscht es erneut (Grabsteine reisen nur, solange es fehlt)
+  await B.P.keyboard.press('n'); await A.P.waitForTimeout(12000);
+  const zA = await zustand(A.P); const zB = await zustand(B.P);
+  pruefe('K6 nach weiteren Abgleichen bleibt es auf beiden Geräten und im Konto', zA.boards.some((b) => b.id === 'by') && zB.boards.some((b) => b.id === 'by') && !!zeile(uid, 'board-by.json')
+    && zB.spaces.some((sp) => sp.projects.some((p) => p.boardIds.includes('by'))), { a: zA.boards.map((b) => b.id), b: zB.boards.map((b) => b.id) });
+  await A.ctx.close(); await B.ctx.close();
 }
 
 async function standBisAlle(P, bed, ms = 9000) {

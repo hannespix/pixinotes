@@ -175,6 +175,7 @@ export function HelpOverlay() {
             <section id="help-neu">
               <p>Die letzten Ausbaustufen in Kürze, neueste zuerst. Welche Fassung gerade läuft, steht am Fuß der Hilfe.</p>
               <ul><NeuesteZuerst>
+                <li><b>Board, Rahmen und Präsentation, nachgeschärft (M530):</b> <b>Strg+V</b> bei geöffneter Karte legt nichts mehr unsichtbar dahinter ab: In eine Notiz kommt das Eingefügte ans Ende ihres Texts, bei anderen Karten sagt ein Hinweis, dass dort nichts eingefügt wird. <b>Strg+D</b> dupliziert einen Rahmen <b>samt Inhalt</b>; ein Rahmen allein lässt sich über sein Menü duplizieren und mit Inhalt auf ein anderes Board verschieben. Führen von einem Rahmen mehrere Rahmenpfeile weg, legt das Rahmen-Menü unter <b>„Reihenfolge der Ausgänge"</b> fest, welcher in der Rahmen-Reise zuerst drankommt. In der Reise passt <b>F</b> den aktuellen Rahmen ein; <b>0</b> im Fokus passt die Karte wieder ein. <b>Board löschen</b> fragt nicht mehr mit einem Browser-Fenster, sondern bietet im Hinweis <b>„Rückgängig"</b> – auch auf anderen Geräten am selben Konto kommt das Board zurück. Und <b>Esc</b> schließt immer nur das oberste: erst die Suche, dann die Präsentation; erst das Fenster, dann den Stift.</li>
                 <li><b>Mehrere Geräte am selben Board: Nichts springt mehr zurück (M524):</b> Wer mit dem Konto auf mehreren Geräten dasselbe Board offen hatte, sah verschobene oder geänderte Karten manchmal auf einen älteren Stand zurückfallen. Ursache war ein Gerät, das nur offen stand: Es hielt einen übernommenen Stand später für seine eigene Änderung und schrieb ihn zurück. Das ist behoben. Ein Gerät, das nur offen steht, <b>schreibt weder Lage noch Inhalt</b> ins Konto; arbeiten zwei Geräte an derselben Karte, wird <b>Feld für Feld</b> entschieden (eines verschiebt, das andere ergänzt etwas – beides bleibt); wer ohne Pause weiterarbeitet, <b>lädt trotzdem hoch</b>; und ein Abgleich ersetzt nur noch die Karten, die sich wirklich geändert haben – laufende Tools laufen weiter. Boards mit vielen eigenen HTML-Tools gleichen sich deutlich schneller ab.</li>
                 <li><b>Schwere Boards bleiben flüssig (M525):</b> Boards mit viel Inhalt – eigene Tools, große Bilder, lange Kanbans – reagieren beim Ziehen und Tippen spürbar schneller: Gespeichert wird nur noch, was sich geändert hat (vorher schrieb jede Mausbewegung den ganzen Stand aller Boards mit), und beim Ziehen zeichnen unbeteiligte Karten, die Auswahl-Leiste und die Kanbans nicht mehr mit. Die <b>Flüssige Schrift</b> hält an, solange du eine Karte ziehst, und fließt mit dem Ablegen weiter. Beim Schließen oder Verdecken der Seite wird weiterhin sofort gespeichert.</li>
                 <li><b>Als App installieren – mit Diagnose (M516):</b> Im <b>⋯ der Leiste unten</b> und in der Suche (Strg+K) steht <b>„Als App installieren“</b>. Bietet der Browser die Installation an, öffnet sich sein Dialog. Bietet er sie nicht an, erklärt ein Fenster in Klartext, woran es liegt: Läuft PixiNotes schon als App? Ist sie auf diesem Browser schon installiert (dann heißt es „In App öffnen“)? Dazu der Weg im Menü deines Browsers (Chrome, Edge, Safari, iPhone, Android) und die häufigsten Gründe – vor allem ein <b>vom Arbeitgeber verwalteter Browser</b>, in dem die IT das Installieren abgeschaltet hat („Von deiner Organisation verwaltet“ unten im Menü, nachzusehen unter chrome://policy). Als Ausweg nennt es „Verknüpfung erstellen …“ mit dem Häkchen „Als Fenster öffnen“. Das Manifest hat jetzt eine feste Kennung (bestehende Installationen bleiben dieselben) und Bildschirmfotos für den Installations-Dialog am Computer.</li>
@@ -479,21 +480,21 @@ export function HelpOverlay() {
               <ul>
                 <li><b>Doppelklick</b> auf die Fläche legt eine Notiz an.</li>
                 <li><b>＋</b> im Dock öffnet die Modul-Palette: alle Module als Kacheln in fünf Gruppen (Notieren &amp; Rechnen · Planen · Ablauf · Einfügen · Ordnen), darunter deine Vorlagen. Oben suchen („excel", „gantt" …), Enter legt den ersten Treffer an.</li>
-                <li><b>Strg+V</b> fügt Bilder und Screenshots ein. E-Mails, PDFs, Bilder und Dateien einfach aufs Board ziehen.</li>
+                <li><b>Strg+V</b> fügt Bilder und Screenshots ein. E-Mails, PDFs, Bilder und Dateien einfach aufs Board ziehen. Ist eine Notiz im Fokus geöffnet, landet Eingefügtes am Ende ihres Texts.</li>
               </ul>
               <h4>Bewegen, Größe, Zoom</h4>
               <ul>
                 <li>Karten am <b>Griff</b> über der Oberkante oder an der Titelzeile ziehen, am Rand die Größe ändern.</li>
                 <li>Karten wachsen mit ihrem Inhalt. Wer selbst zieht, bestimmt die Größe; läuft der Inhalt über, bietet ein <b>⤢-Chip</b> einmaliges Anpassen an.</li>
                 <li>Die zuletzt angefasste Karte liegt vorn.</li>
-                <li>Zoomen mit <b>Strg+Rad</b>, Pinch oder Mausrad (Einstellungen → Darstellung). <b>F</b> passt die Auswahl ein, <b>Esc</b> beendet den Fokus.</li>
+                <li>Zoomen mit <b>Strg+Rad</b>, Pinch oder Mausrad (Einstellungen → Darstellung). <b>F</b> passt die Auswahl ein, <b>0</b> stellt 100 % ein (im Fokus: die Karte wieder eingepasst), <b>Esc</b> beendet den Fokus.</li>
                 <li>Die <b>Minimap</b> erscheint ab zehn Karten; ein Klick darauf springt an die Stelle.</li>
               </ul>
               <h4>Auswahl-Leiste</h4>
               <ul>
                 <li>Karte anklicken → die Leiste sitzt an der Karte: <b>Duplizieren · Teilen · ⋯ · Löschen</b>.</li>
                 <li>Im <b>⋯</b>: Kommentar, Eigenschaften, In Board verschieben, Schrift &amp; Größe, KI, Ausrichten &amp; Verteilen, Als Kachel zeigen, Auto-Größe, Nachschlagen, Als Vorlage speichern, Archivieren. „Formatiert kopieren" steht im Teilen-Dialog.</li>
-                <li>Bei einem Rahmen kommt <b>„Rahmen"</b> dazu: Umbenennen, Tönung, Inhalt anordnen.</li>
+                <li>Bei einem Rahmen kommt <b>„Rahmen"</b> dazu: Umbenennen, Tönung, Inhalt anordnen, Duplizieren und In Board verschieben (samt Inhalt), bei mehreren Rahmenpfeilen die Reihenfolge der Ausgänge.</li>
               </ul>
               <h4>Board</h4>
               <ul>
@@ -519,7 +520,7 @@ export function HelpOverlay() {
               </ul>
               <h4>⋯ an Board und Projekt</h4>
               <ul>
-                <li><b>Board:</b> Umbenennen · Duplizieren · In Projekt verschieben · Teilen-Link · Sicherung herunterladen · Präsentieren · Archivieren · Löschen.</li>
+                <li><b>Board:</b> Umbenennen · Duplizieren · In Projekt verschieben · Teilen-Link · Sicherung herunterladen · Präsentieren · Archivieren · Löschen. Nach dem Löschen holt <b>„Rückgängig"</b> im Hinweis das Board zurück.</li>
                 <li><b>Projekt:</b> Umbenennen · Neues Board · Duplizieren · Reihenfolge (manuell, alphabetisch, nach Erstellung) · Alle Boards archivieren · Löschen. Manuell heißt: Boards im Baum oder als Kachel ziehen.</li>
                 <li>Archivierte Boards verschwinden aus Navigation und Übersicht, ihre Fristen ruhen. „Archiv einblenden" am Fuß der Navigation zeigt sie; dort ⋯ → Zurückholen.</li>
               </ul>
@@ -568,7 +569,7 @@ export function HelpOverlay() {
                 <li><b>Pixi:</b> ＋ → Ordnen → Pixi legt das kleine Maskottchen aufs Board. Seine Augen folgen Maus und Finger, zwischendurch blinzelt, hüpft, winkt, tanzt oder pfeift es; ein Klick bringt Herzchen. Nach langer Ruhe schläft es ein (abschaltbar mit dem Mond unter der Figur), dort auch Farbe und Name.</li>
                 <li><b>Kontakt:</b> ＋ → Ordnen → Kontakt, eine .vcf-Datei aufs Board ziehen (je Kontakt eine Karte) oder an einer markierten E-Mail im ⋯ „Absender als Kontakt“. Rufnummer und E-Mail sind Links, „Karte“ öffnet die Anschrift bei OpenStreetMap. Stift = bearbeiten, Pfeil = als .vcf herunterladen.</li>
                 <li><b>Flüssige Schrift:</b> ＋ → Ordnen → Flüssige Schrift. Liegt ohne Rahmen auf dem Board und lässt sich auf der Schrift greifen. Maus drüber schubst, markiert ziehen, gedrückt halten lässt platzen. Text, Zähigkeit, Akzent und Lebendig unten in der Karte, wenn sie markiert ist.</li>
-                <li><b>Rahmen:</b> ＋ → Weitere Module → Rahmen. Er fängt Karten ein, deren Mittelpunkt in ihm liegt, und nimmt sie beim Ziehen mit.</li>
+                <li><b>Rahmen:</b> ＋ → Weitere Module → Rahmen. Er fängt Karten ein, deren Mittelpunkt in ihm liegt, und nimmt sie beim Ziehen mit. <b>Strg+D</b> dupliziert ihn samt Inhalt.</li>
               </ul>
               <h4>Verbinden &amp; Präsentieren</h4>
               <ul>
@@ -583,7 +584,7 @@ export function HelpOverlay() {
                 <li><b>Stift schreibt, Finger bedient:</b> Der Stift schreibt auf Fläche und Notizen sofort, ein Tipp klickt, die Seitentaste greift Karten, das Radierer-Ende radiert. Getippten Text: Kritzel oder Durchstreichen löscht Wörter, kleine Schleife markiert. Zweiter Finger beim Halten = Form sofort.</li>
                 <li><b>Finger-Gesten (Procreate):</b> Zwei-Finger-Tipp = Rückgängig, Drei-Finger-Tipp = Wiederholen, halten = schnell; schnelles Zusammenziehen = Alles einpassen (noch einmal: zurück); Vier-Finger-Tipp = Vollbild; drei Finger nach unten = Duplizieren, ohne Auswahl ＋-Palette. Schalter: Einstellungen → Darstellung.</li>
                 <li><b>Stift-Gesten:</b> Umkreisen markiert Karten, Durchstreichen löscht Striche, kurz stillhalten rastet Formen ein. Strichstärke und Radierer-Art (Teil · Strich) in der Palette.</li>
-                <li><b>✎</b> im Dock: Stift, Textmarker, Radierer; Esc zurück. Der Stift zeichnet druckempfindlich; am Ende kurz halten rastet Linien, Pfeile, Kreise, Rechtecke und Dreiecke sauber ein. Mit Stift am Gerät schiebt und zoomt die Hand, der Stift zeichnet – auch ohne Zeichenmodus auf der freien Fläche.</li>
+                <li><b>✎</b> im Dock: Stift, Textmarker, Radierer; Esc zurück (liegt ein Fenster darüber, schließt Esc erst das). Der Stift zeichnet druckempfindlich; am Ende kurz halten rastet Linien, Pfeile, Kreise, Rechtecke und Dreiecke sauber ein. Mit Stift am Gerät schiebt und zoomt die Hand, der Stift zeichnet – auch ohne Zeichenmodus auf der freien Fläche.</li>
                 <li>Striche, die eine Karte überlappen, kleben an ihr und wandern mit. Lösen: ⋯ → „Markierungen lösen".</li>
               </ul>
               <h4>Wissen</h4>

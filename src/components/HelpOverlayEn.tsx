@@ -18,6 +18,7 @@ export function NeuEn() {
             <section id="help-neu">
               <p>The latest releases in brief, newest first. Which version is currently running is shown at the bottom of the help.</p>
               <ul><NeuesteZuerst>
+                <li><b>Board, frames and presentation, sharpened (M530):</b> <b>Ctrl+V</b> with a card open no longer drops anything invisibly behind it: in a note, what you paste goes to the end of its text; for other cards a notice says nothing can be pasted there. <b>Ctrl+D</b> duplicates a frame <b>with its contents</b>; a frame on its own can be duplicated and moved with its contents to another board from its menu. If several frame arrows lead away from a frame, the frame menu sets under <b>“Order of exits”</b> which comes first in the frame tour. During the tour, <b>F</b> fits the current frame; <b>0</b> in Focus fits the card again. <b>Deleting a board</b> no longer asks in a browser dialog but offers <b>“Undo”</b> in the notice – the board also comes back on other devices with the same account. And <b>Esc</b> always closes only the topmost thing: first the search, then the presentation; first the window, then the pen.</li>
                 <li><b>Several devices on the same board: nothing jumps back any more (M524):</b> With the account on several devices and the same board open, moved or edited cards sometimes fell back to an older state. The cause was a device that was merely open: it later mistook a state it had received for its own change and wrote it back. This is fixed. A device that is merely open <b>writes neither position nor content</b> to the account; when two devices work on the same card it is decided <b>field by field</b> (one moves it, the other adds something – both stay); if you keep working without a pause it <b>still uploads</b>; and a sync now replaces only the cards that really changed – running tools keep running. Boards with many own HTML tools sync noticeably faster.</li>
                 <li><b>Heavy boards stay smooth (M525):</b> Boards with a lot of content – your own tools, large images, long Kanbans – respond noticeably faster while you drag and type: only what changed is saved (every mouse move used to write the whole state of all boards), and while you drag, cards that are not involved, the selection bar and the Kanbans no longer redraw. <b>Liquid type</b> pauses while you drag a card and flows on when you drop it. Closing or hiding the page still saves at once.</li>
                 <li><b>Install as an app – with diagnosis (M516):</b> The <b>⋯ in the bar at the bottom</b> and the search (Ctrl+K) now offer <b>“Install as app”</b>. If the browser offers installation, its dialog opens. If it doesn’t, a window explains in plain words why: Is PixiNotes already running as an app? Is it already installed in this browser (then it says “Open in app”)? It also shows where to find it in your browser’s menu (Chrome, Edge, Safari, iPhone, Android) and the most common reasons – above all a <b>browser managed by your employer</b>, where IT has switched installing off (“Managed by your organization” at the bottom of the menu, see chrome://policy). As a way out it names “Create shortcut …” with the “Open as window” tick. The manifest now has a fixed ID (existing installations stay the same) and screenshots for the install dialog on computers.</li>
@@ -278,21 +279,21 @@ export function HilfeEn() {
               <ul>
                 <li><b>Double-click</b> the canvas to create a note.</li>
                 <li><b>＋</b> in the dock opens the module palette: all modules as tiles in five groups (Write &amp; Calculate · Plan · Flow · Insert · Organize), with your templates below. Search at the top (“excel”, “gantt” …); Enter creates the first match.</li>
-                <li><b>Ctrl+V</b> pastes images and screenshots. Simply drag emails, PDFs, images and files onto the board.</li>
+                <li><b>Ctrl+V</b> pastes images and screenshots. Simply drag emails, PDFs, images and files onto the board. With a note open in Focus, what you paste goes to the end of its text.</li>
               </ul>
               <h4>Moving, resizing, zooming</h4>
               <ul>
                 <li>Drag cards by the <b>handle</b> above the top edge or by the title bar; resize them at the edge.</li>
                 <li>Cards grow with their content. If you resize a card yourself, you set its size; if the content overflows, a <b>⤢ chip</b> offers to fit it once.</li>
                 <li>The card you touched last sits in front.</li>
-                <li>Zoom with <b>Ctrl+wheel</b>, pinch or the mouse wheel (Settings → Appearance). <b>F</b> fits the selection, <b>Esc</b> exits Focus.</li>
+                <li>Zoom with <b>Ctrl+wheel</b>, pinch or the mouse wheel (Settings → Appearance). <b>F</b> fits the selection, <b>0</b> sets 100 % (in Focus: fits the card again), <b>Esc</b> exits Focus.</li>
                 <li>The <b>minimap</b> appears once there are ten cards; click it to jump to that spot.</li>
               </ul>
               <h4>Selection bar</h4>
               <ul>
                 <li>Click a card → the bar sits on the card: <b>Duplicate · Share · ⋯ · Delete</b>.</li>
                 <li>Under <b>⋯</b>: Comment, Properties, Move to board, Font &amp; size, AI, Align &amp; distribute, Show as tile, Auto-size, Look up, Save as template, Archive. “Copy with formatting” is in the Share dialog.</li>
-                <li>For a frame, <b>“Frame”</b> is added: Rename, Tint, Arrange contents.</li>
+                <li>For a frame, <b>“Frame”</b> is added: Rename, Tint, Arrange contents, Duplicate and Move to board (with its contents), and with several frame arrows the order of the exits.</li>
               </ul>
               <h4>Board</h4>
               <ul>
@@ -318,7 +319,7 @@ export function HilfeEn() {
               </ul>
               <h4>⋯ on boards and projects</h4>
               <ul>
-                <li><b>Board:</b> Rename · Duplicate · Move to project · Share link · Download backup · Present · Archive · Delete.</li>
+                <li><b>Board:</b> Rename · Duplicate · Move to project · Share link · Download backup · Present · Archive · Delete. After deleting, <b>“Undo”</b> in the notice brings the board back.</li>
                 <li><b>Project:</b> Rename · New board · Duplicate · Order (manual, alphabetical, by creation date) · Archive all boards · Delete. Manual means: drag boards in the tree or as tiles.</li>
                 <li>Archived boards disappear from the navigation and the Overview, and their due dates are paused. “Show archive” at the bottom of the navigation shows them; use ⋯ → Restore there.</li>
               </ul>
@@ -367,7 +368,7 @@ export function HilfeEn() {
                 <li><b>Pixi:</b> ＋ → Organize → Pixi puts the little mascot on the board. Its eyes follow mouse and finger; now and then it blinks, hops, waves, dances or whistles, and a click brings hearts. After a long quiet spell it falls asleep (switch off with the moon below the figure, where you also set colour and name).</li>
                 <li><b>Contact:</b> ＋ → Organize → Contact, drag a .vcf file onto the board (one card per contact) or choose “Sender as contact” in the ⋯ of a selected email. Phone number and email are links, “Map” opens the address on OpenStreetMap. Pen = edit, arrow = download as .vcf.</li>
                 <li><b>Liquid type:</b> ＋ → Organize → Liquid type. Sits on the board without a frame; grab it on the letters. Hovering nudges, drag when selected, press and hold to burst. Text, viscosity, Accent and Alive at the bottom of the card when it is selected.</li>
-                <li><b>Frame:</b> ＋ → More modules → Frame. It captures cards whose center lies inside it and takes them along when dragged.</li>
+                <li><b>Frame:</b> ＋ → More modules → Frame. It captures cards whose center lies inside it and takes them along when dragged. <b>Ctrl+D</b> duplicates it with its contents.</li>
               </ul>
               <h4>Connecting &amp; presenting</h4>
               <ul>
@@ -382,7 +383,7 @@ export function HilfeEn() {
                 <li><b>Pen writes, finger operates:</b> The pen writes on the canvas and on notes right away, a tap clicks, the side button grabs cards, the eraser end erases. Typed text: a scribble or strikethrough deletes words, a small loop selects. A second finger while holding = shape right away.</li>
                 <li><b>Finger gestures (Procreate):</b> two-finger tap = Undo, three-finger tap = Redo, hold = fast; quick pinch = Fit all (once more: back); four-finger tap = full screen; three fingers down = Duplicate, without a selection the ＋ palette. Toggle: Settings → Appearance.</li>
                 <li><b>Pen gestures:</b> circling selects cards, striking through deletes strokes, holding still briefly snaps shapes into place. Stroke width and eraser type (Part · Stroke) in the palette.</li>
-                <li><b>✎</b> in the dock: pen, highlighter, eraser; Esc to go back. The pen draws pressure-sensitively; holding briefly at the end snaps lines, arrows, circles, rectangles and triangles cleanly into shape. On a device with a pen, the hand pans and zooms and the pen draws – even without drawing mode on the empty canvas.</li>
+                <li><b>✎</b> in the dock: pen, highlighter, eraser; Esc to go back (if a window is on top, Esc closes that first). The pen draws pressure-sensitively; holding briefly at the end snaps lines, arrows, circles, rectangles and triangles cleanly into shape. On a device with a pen, the hand pans and zooms and the pen draws – even without drawing mode on the empty canvas.</li>
                 <li>Strokes that overlap a card stick to it and move with it. To detach: ⋯ → “Detach marks”.</li>
               </ul>
               <h4>Knowledge</h4>
