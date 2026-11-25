@@ -4,6 +4,7 @@
 import { lesefolge } from './boardTasten';
 import { useMemo, useState } from 'react';
 import { selectActiveBoard, useBoard } from '../store';
+import { useEscSchliesst } from '../lib/useEscSchliesst';
 import { nodesToHtml, nodesToText, sicherKuerzen } from '../lib/serialize';
 import { cardsShareUrl, cardsToBoardDoc, cardsToPdf, printCards, whatsappNachricht } from '../lib/shareCards';
 import { ICopy, IDownload, IFolder, IMail, IX, IComment, IDrucker } from './Icons';
@@ -23,6 +24,7 @@ export function ShareCardsModal() {
   );
   // M341: Die WhatsApp-Nachricht steht fest, sobald der Dialog offen ist — der Knopf ist ein echter Link
   const wa = useMemo(() => (nodes.length ? whatsappNachricht(nodes) : null), [nodes]);
+  useEscSchliesst(!!ids, () => setShareCards(null));   // M523: Esc schließt den Dialog
   if (!ids) return null;
   const close = () => setShareCards(null);
   if (nodes.length === 0) { close(); return null; }

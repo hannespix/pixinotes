@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useBoard, type BoardSortierung } from '../store';
+import { useEscSchliesst } from '../lib/useEscSchliesst';
 import { boardToShareUrl, downloadBoardFile, hatAblageInhalt, SHARE_URL_LIMIT } from '../lib/share';
 import { FreigabeDialogSpaet } from './FreigabeHost';
 // M459: „Per Link teilen" (mit Konto-Anfragen) kommt erst beim Öffnen
@@ -88,6 +89,7 @@ export function MenuHuelle({ titel, klasse, kinder }: {
     window.addEventListener('pointerdown', zu, true);
     return () => window.removeEventListener('pointerdown', zu, true);
   }, [pos]);
+  useEscSchliesst(!!pos, () => setPos(null), knopfRef);   // M523: Esc schließt das Menü, der Fokus kehrt auf ⋯ zurück
   return (
     <span className="ebenen-menu-wrap" ref={box}>
       <button
@@ -250,6 +252,9 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
             role="menuitem"
             className="ebenen-menu-gefahr"
             onClick={() => {
+              // M523: Das letzte sichtbare Board bleibt — das sagt der Hinweis gleich, statt erst nach der Rückfrage
+              const alle = useBoard.getState().boards;
+              if (alle.length <= 1 || (!board.archived && !alle.some((b) => b.id !== boardId && !b.archived))) { removeBoard(boardId); zu(); return; }
               const frage = board.nodes.length > 0
                 ? `Board „${board.name}" mit ${zahlWort(board.nodes.length, 'Karte', 'Karten')} wirklich LÖSCHEN? Archivieren legt es stattdessen nur zur Seite.`
                 : `Board „${board.name}" wirklich löschen?`;

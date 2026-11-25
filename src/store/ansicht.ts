@@ -107,7 +107,9 @@ export function ansichtScheibe(set: Setzen, get: Holen) {
     settingsSection: null,
     setSettingsOpen: (open, section = null) => set({ settingsOpen: open, settingsSection: section }),
     tasksOpen: false,
-    setTasksOpen: (open) => set({ tasksOpen: open }),
+    // M523: Die Zentrale liegt in der Board-Ansicht. Aus der Übersicht geöffnet (Alt+T, Strg+K) blieb sie unsichtbar
+    // und sprang erst beim nächsten Board-Wechsel auf — sie holt sich ihre Ansicht jetzt selbst.
+    setTasksOpen: (open) => set(open ? { tasksOpen: true, view: 'board' } : { tasksOpen: false }),
     shareCards: null,
     setShareCards: (ids) => set({ shareCards: ids }),
 
@@ -131,9 +133,9 @@ export function ansichtScheibe(set: Setzen, get: Holen) {
         && !['portal', 'frame', 'shape'].includes(node.type ?? '')
         && !node.archived;
       if (st.cardFocus && blattfaehig) {
-        set({ activeId: boardId, view: 'board', focusCard: nodeId, focusHerkunft: herkunft });
+        set({ activeId: boardId, view: 'board', focusCard: nodeId, focusHerkunft: herkunft, tasksOpen: false });
       } else {
-        set({ pendingFocus: { boardId, nodeId }, activeId: boardId, view: 'board', focusCard: null, focusHerkunft: null });
+        set({ pendingFocus: { boardId, nodeId }, activeId: boardId, view: 'board', focusCard: null, focusHerkunft: null, tasksOpen: false });
       }
     },
     cardFocus: true,

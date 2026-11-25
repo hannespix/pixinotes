@@ -897,7 +897,7 @@ export function CalendarBody({ id, data: daten }: { id: string; data: CalendarDa
                         key={iso}
                         className={`cal-jahr-tag ${anzahl ? `voll v${Math.min(anzahl, 3)}` : ''} ${iso === todayIso ? 'heute' : ''}`}
                         title={anzahl
-                          ? `${new Date(`${iso}T12:00:00`).toLocaleDateString('de-DE')} – ${anzahl} Eintrag/Einträge:\n${namen.join('\n')}`
+                          ? `${new Date(`${iso}T12:00:00`).toLocaleDateString('de-DE')} – ${zahlWort(anzahl, 'Eintrag', 'Einträge')}:\n${namen.join('\n')}`
                           : `${new Date(`${iso}T12:00:00`).toLocaleDateString('de-DE')} – Klick öffnet den Monat`}
                         onClick={() => updateNodeData(id, { view: 'month', month: `${year}-${String(m + 1).padStart(2, '0')}` })}
                       >

@@ -625,7 +625,8 @@ export function kartenScheibe(set: Setzen, get: Holen, patchActive: AufsOffene) 
       }),
 
     focusNode: (boardId, nodeId, opt) => {
-      set({ pendingFocus: { boardId, nodeId, markieren: opt?.markieren }, activeId: boardId, view: 'board' });
+      // M523: Wer zu einer Karte springt (Suche, Baum, Verweis), will sie sehen — die Aufgaben-Zentrale lag sonst weiter davor
+      set({ pendingFocus: { boardId, nodeId, markieren: opt?.markieren }, activeId: boardId, view: 'board', tasksOpen: false });
     },
 
     clearPendingFocus: () => set({ pendingFocus: null }),

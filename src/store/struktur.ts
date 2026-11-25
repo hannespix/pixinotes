@@ -166,7 +166,8 @@ export function strukturScheibe(set: Setzen, get: Holen) {
     setView: (view) => set({ view }),
 
     openBoard: (id) => {
-      if (get().boards.some((b) => b.id === id)) set({ activeId: id, view: 'board' });
+      // M523: Wer ein Board öffnet (Baum, Reiter, Suche, Alt+→), will es sehen — die Aufgaben-Zentrale blieb sonst davor stehen
+      if (get().boards.some((b) => b.id === id)) set({ activeId: id, view: 'board', tasksOpen: false });
     },
 
     setSearchOpen: (open) => set({ searchOpen: open }),

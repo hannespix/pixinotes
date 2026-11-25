@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { useBoard } from '../store';
 import { useRandZiehen } from '../lib/randZiehen';
 import { useOutsideClose } from '../lib/useOutsideClose';
+import { useEscSchliesst } from '../lib/useEscSchliesst';
+import { fensterDarueber } from '../lib/overlay';
 import { collectTasks } from '../lib/tasks';
 import { useFristenStand } from '../lib/dates';
 import { InlineName } from './InlineName';
@@ -56,6 +58,8 @@ export function Tabs() {
   const [neuMenu, setNeuMenu] = useState(false);
   const neuRef = useRef<HTMLDivElement | null>(null);
   useOutsideClose(neuMenu, neuRef, () => setNeuMenu(false));
+  const neuKnopf = useRef<HTMLButtonElement | null>(null);
+  useEscSchliesst(neuMenu, () => setNeuMenu(false), neuKnopf);   // M523
   // Offene Aufgaben über alle Boards — die Zahl am Eintrag „Aufgaben"
   // M459: die Fristen-Erkennung lädt bei Bedarf — danach neu zählen (überfällig hängt an ihr)
   const fristenStand = useFristenStand();
@@ -234,7 +238,8 @@ export function Tabs() {
   // Esc schließt die Ausstülpung (der Backdrop fängt Klicks ohnehin ab)
   useEffect(() => {
     if (!navOpen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setNavOpen(false); };
+    // M523: nicht, solange ein anderes Fenster über der Ausstülpung liegt
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !fensterDarueber(document.querySelector('.nav-backdrop'), e)) setNavOpen(false); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [navOpen]);
@@ -474,6 +479,7 @@ export function Tabs() {
           </div>
         )}
         <button
+          ref={neuKnopf}
           className={`tab-add ${neuMenu ? 'active' : ''}`}
           title="Neu: Board, Projekt, Bereich"
           aria-label="Neu"

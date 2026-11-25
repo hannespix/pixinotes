@@ -50,7 +50,7 @@ const merk = new Map<string, string | null>();
 /** Deutsche Texte ohne Eintrag (für die Prüfreihe und die Pflege des Wörterbuchs) */
 const luecken = new Set<string>();
 
-const TASTEN: Record<string, string> = { Strg: 'Ctrl', Umschalt: 'Shift', Entf: 'Del', Leertaste: 'Space', Eingabe: 'Enter', Rücktaste: 'Backspace', Pos1: 'Home', Ende: 'End', 'Bild↑': 'PgUp', 'Bild↓': 'PgDn', Einfg: 'Ins', Pfeiltasten: 'Arrow keys', Pfeil: 'Arrow' };
+const TASTEN: Record<string, string> = { Strg: 'Ctrl', Umschalt: 'Shift', Entf: 'Del', Leertaste: 'Space', Eingabe: 'Enter', Rücktaste: 'Backspace', Pos1: 'Home', Ende: 'End', 'Bild↑': 'PgUp', 'Bild↓': 'PgDn', Einfg: 'Ins', Pfeiltasten: 'Arrow keys', Pfeiltaste: 'Arrow key', Pfeil: 'Arrow' };
 const TASTE = /Strg|Umschalt|Entf|Leertaste|Eingabe|Rücktaste|Pos1|Bild[↑↓]|Einfg|Pfeil/;
 const maskiert = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 function ladeWoerterbuch(wb: Record<string, string>): void {
@@ -103,7 +103,7 @@ function schlageNach(kern: string): string | null {
   }
   // Tastenkürzel werden zusammengesetzt („Strg+Umschalt+Z") — die Namen der Tasten einzeln übersetzen
   if (en === null && TASTE.test(kern) && /^[^a-zäöü]*([A-ZÄÖÜ][A-Za-zäöü0-9↑↓]*|[^A-Za-zäöü])([+ /,·–-]+([A-ZÄÖÜ][A-Za-zäöü0-9↑↓]*|[^A-Za-zäöü]))*$/.test(kern)) {
-    en = kern.replace(/Strg|Umschalt|Entf|Leertaste|Eingabe|Rücktaste|Pos1|Ende|Bild↑|Bild↓|Einfg|Pfeiltasten|Pfeil/g, (w) => TASTEN[w] ?? w);
+    en = kern.replace(/Strg|Umschalt|Entf|Leertaste|Eingabe|Rücktaste|Pos1|Ende|Bild↑|Bild↓|Einfg|Pfeiltasten|Pfeiltaste|Pfeil/g, (w) => TASTEN[w] ?? w);   // M523: „Pfeiltaste" wurde „Arrowtaste"
   }
   if (merk.size > 6000) merk.clear();
   merk.set(kern, en);
