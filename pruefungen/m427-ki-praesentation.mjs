@@ -105,10 +105,15 @@ const quelltext = (P, id) => P.evaluate(async (i) => {
   const db = await new Promise((ok, nein) => { const r = indexedDB.open('pixinotes-sync'); r.onsuccess = () => ok(r.result); r.onerror = () => nein(r.error); });
   return new Promise((ok) => { const q = db.transaction('kv').objectStore('kv').get(`happ:${i}`); q.onsuccess = () => ok(q.result ?? ''); q.onerror = () => ok(''); });
 }, id);
-const vibeRahmen = async (P, ms = 12000) => {
+// M518: Rahmen am Inhalt erkennen statt an der Adresse, 30 s Geduld – unter Last meldet Playwright für den
+// srcdoc-Rahmen zeitweise "" statt "about:srcdoc" (M484, docs/AGENTEN.md); derselbe Fehler machte m425 im
+// Gesamtlauf rot
+const vibeRahmen = async (P, ms = 30000) => {
   for (let t = 0; t < ms; t += 250) {
-    const f = P.frames().find((x) => x !== P.mainFrame() && x.url().startsWith('about:srcdoc'));
-    if (f && await f.locator('#edit').count().catch(() => 0)) return f;
+    for (const f of P.frames()) {
+      if (f === P.mainFrame()) continue;
+      if (await f.locator('#edit').count().catch(() => 0)) return f;
+    }
     await P.waitForTimeout(250);
   }
   return null;
