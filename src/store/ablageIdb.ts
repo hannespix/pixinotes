@@ -5,9 +5,10 @@
  * bewusst ohne lib/syncFolder, damit die Speicherschicht nicht am ganzen Abgleich hängt. Datenbankname, Version und
  * Tabelle müssen mit lib/syncFolder.ts übereinstimmen.
  */
-import { A, AUSLAGERN_AB, VERWEIS_MUSTER, ablageErsetzer, abarbeiten as planeLauf, alsGesichertMerken, planen } from './ablage';
-import { runDerived, speicherAuswahl } from './speicher';
-import type { BoardDoc, BoardState } from './typen';
+import { A, AUSLAGERN_AB, VERWEIS_MUSTER, ablageErsetzer, abarbeiten as planeLauf, alsGesichertMerken, planen, pruefsumme } from './ablage';
+import { reserve, RESERVE_MARKE, runDerived, speicherAuswahl, vollText } from './speicher';
+import { t } from '../lib/sprache';
+import type { BoardDoc, BoardState, Space } from './typen';
 import { useBoard } from '../store';
 /** M397 (nachgeladen, siehe start.ts → alteNamenOhneEmoji) */
 export { namenOhneEmoji } from './ohneEmoji';
@@ -23,8 +24,24 @@ const inhaltsFelder = (s: BoardState): Record<string, unknown> => ({ ...speicher
  * ersetzen — per runDerived (kein Hochladen, kein Rückgängig-Schritt), Unverändertes bleibt dasselbe Objekt. Ein
  * alter Stand mit eingebetteten Bildern zieht im Leerlauf in die Ablage um (ohne den Start zu verzögern).
  */
-export async function nachDemLaden(roh: string): Promise<void> {
-  const verweise = verweiseIn(roh);
+export async function nachDemLaden(gelesen: string): Promise<void> {
+  // M532: Liegt im Ersatzspeicher ein neuerer Stand (der localStorage war voll), gilt er — er wird hier übernommen
+  const ersatz = await reserveHolen(gelesen);
+  const roh = ersatz ?? gelesen;
+  if (ersatz) {
+    try {
+      const st = (JSON.parse(ersatz) as { state?: Record<string, unknown> }).state;
+      if (st && Array.isArray(st.boards) && st.boards.length) {
+        const inhalte = await inhalteLaden(verweiseIn(ersatz));
+        for (const [v, x] of inhalte) alsGesichertMerken(v, x);
+        // KEIN runDerived: Das ist eigene, neuere Arbeit — der Abgleich soll sie weitertragen
+        useBoard.setState(verweiseEinsetzen(st, inhalte) as Partial<BoardState>);
+        reserve.da = true;
+        useBoard.getState().showToast(t('Neuester Stand aus dem Ersatzspeicher geladen – der Browser-Speicher war voll.'), false, 8000);
+      }
+    } catch { /* unlesbar: der Stand aus dem localStorage bleibt */ }
+  }
+  const verweise = ersatz ? new Set<string>() : verweiseIn(roh);
   if (verweise.size) {
     const inhalte = await inhalteLaden(verweise);
     for (const [v, x] of inhalte) alsGesichertMerken(v, x);
@@ -40,6 +57,15 @@ export async function nachDemLaden(roh: string): Promise<void> {
     const umziehen = () => vormerken(inhaltsFelder(useBoard.getState()));
     if (typeof requestIdleCallback === 'function') requestIdleCallback(umziehen, { timeout: 4000 }); else setTimeout(umziehen, 1500);
   }
+}
+/** Mitlese-Fenster und Nachfolger (speicher.ts → adoptPersistedState): den gelesenen Stand übernehmen, Bilder eingesetzt */
+export async function uebernehmen(raw: string): Promise<void> {
+  try {
+    const st = (JSON.parse(raw) as { state?: { boards?: BoardDoc[]; spaces?: Space[]; activeId?: string } }).state;
+    if (!st || !Array.isArray(st.boards) || st.boards.length === 0 || !Array.isArray(st.spaces)) return;
+    const boards = raw.includes('"pixinotes-ablage:') ? await mitInhalten(raw, st.boards).catch(() => st.boards!) : st.boards;
+    useBoard.getState().importSync(boards, st.spaces, st.activeId ?? boards[0].id);
+  } catch { /* unlesbar: der eigene Stand bleibt */ }
 }
 /** Mitlese-Fenster (adoptPersistedState): Boards eines rohen Stands mit eingesetzten Inhalten */
 export async function mitInhalten(roh: string, boards: BoardDoc[]): Promise<BoardDoc[]> {
@@ -175,4 +201,73 @@ export function vormerken(wert: unknown): void {
 export async function vorab(wert: unknown): Promise<void> {
   vormerken(wert);
   for (let i = 0; i < 50 && (A.offen.size || A.lauf); i++) await (A.lauf ?? planeLauf());
+}
+
+/* ───── M532: Ersatzspeicher für den Stand, wenn der localStorage voll ist ─────
+   Scheitert das Schreiben des Stands am vollen localStorage, geht derselbe Text in die IndexedDB (dort zählt der Platz
+   der Platte). Mit ihm liegt die Prüfsumme dessen, was in dem Moment im localStorage stand (`basis`). Beim Start gilt:
+   Stimmt der localStorage noch mit `basis` überein, ist der Ersatz neuer und wird übernommen; wurde der localStorage
+   seitdem geschrieben, ist der Ersatz überholt und wird gelöscht. Ein gelungenes Schreiben räumt ihn ohnehin weg
+   (speicher.ts → reserve.da). Eine kleine Marke im localStorage sagt dem Start, dass er nachsehen muss. */
+const RESERVE = 'pixinotes-stand-reserve';
+const SPEICHER_KEY = 'pixinotes-board';
+type Ersatz = { text: string; basis: string; at: number };
+let reserveLauf: Promise<void> | null = null;
+let reserveNaechster: string | null = null;
+let gemeldet = false;
+
+async function kv<T>(art: 'get' | 'put' | 'delete', wert?: Ersatz): Promise<T | undefined> {
+  const d = await db();
+  return new Promise<T | undefined>((resolve, reject) => {
+    const tx = d.transaction('kv', art === 'get' ? 'readonly' : 'readwrite', { durability: 'strict' } as IDBTransactionOptions);
+    const os = tx.objectStore('kv');
+    const req = art === 'get' ? os.get(RESERVE) : art === 'put' ? os.put(wert, RESERVE) : os.delete(RESERVE);
+    tx.oncomplete = () => resolve(req.result as T | undefined);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
+/** Den Stand in den Ersatzspeicher legen (der jeweils neueste; ein laufendes Schreiben wird nicht gestapelt) */
+export function reserveSchreiben(text: string): Promise<void> {
+  reserveNaechster = text;
+  reserveLauf ??= (async () => {
+    try {
+      while (reserveNaechster !== null) {
+        const t = reserveNaechster; reserveNaechster = null;
+        await kv('put', { text: t, basis: pruefsumme(localStorage.getItem(SPEICHER_KEY) ?? ''), at: Date.now() });
+        reserve.da = true;
+        try { localStorage.setItem(RESERVE_MARKE, '1'); } catch { /* voll trotz gleicher Länge: der Start sieht beim Laden der Ablage trotzdem nach */ }
+      }
+    } catch { /* keine IndexedDB: es bleibt beim Hinweis „Speicher voll" */ } finally { reserveLauf = null; }
+    if (reserve.da && !gemeldet) { gemeldet = true; reserveMelden(); }
+  })();
+  return reserveLauf;
+}
+
+/** Einmal je Sitzung: sagen, dass nichts verloren geht, und wo der Platz steckt (die größten Boards) */
+function reserveMelden(): void {
+  const s = useBoard.getState();
+  const mb = (n: number) => `${(n / 1_000_000).toLocaleString('de-DE', { maximumFractionDigits: 1 })} MB`;
+  const liste = s.boards.map((b) => ({ name: b.name, n: vollText(b).length })).sort((a, b) => b.n - a.n).slice(0, 3)
+    .map((b) => `${b.name} (${mb(b.n)})`).join(', ');
+  s.showToast(t(`Browser-Speicher voll – die Arbeit liegt sicher im Ersatzspeicher. Größte Boards: ${liste}.`), false, 12000);
+}
+
+/** Nach einem gelungenen Schreiben in den localStorage: der Ersatz ist überholt */
+export async function reserveLoeschen(): Promise<void> {
+  if (reserveLauf) await reserveLauf;
+  if (reserve.da) return;   // dazwischen wieder voll geworden: der neue Ersatz gilt
+  try { await kv('delete'); } catch { /* egal */ }
+  try { localStorage.setItem(RESERVE_MARKE, '0'); } catch { /* egal */ }
+}
+
+/** Beim Start: der Text aus dem Ersatzspeicher, wenn er neuer ist als der localStorage — sonst null (und weg damit) */
+async function reserveHolen(gelesen: string): Promise<string | null> {
+  let r: Ersatz | undefined;
+  try { r = await kv<Ersatz>('get'); } catch { return null; }
+  if (r && typeof r.text === 'string' && r.basis === pruefsumme(gelesen) && r.text !== gelesen) return r.text;
+  if (r) { try { await kv('delete'); } catch { /* egal */ } }
+  try { localStorage.setItem(RESERVE_MARKE, '0'); } catch { /* egal */ }
+  return null;
 }
