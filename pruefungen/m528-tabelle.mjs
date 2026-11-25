@@ -82,6 +82,9 @@ if (m) {
   const bisWeihnacht = Math.round((Date.UTC(2026, 11, 24) - Date.UTC(heute.getFullYear(), heute.getMonth(), heute.getDate())) / 864e5);
   pruefe('A1e =HEUTE()-A2 (Zahl) ist ein Datum, =A1-HEUTE() die Zahl der Tage; mit halbem Tag eine Uhrzeit', a.C5 === deu(vorDreissig) && a.C6 === bisWeihnacht.toLocaleString('de-DE') && a.C9 === '25.11.2026 12:00', [a.C5, a.C6, bisWeihnacht, a.C9]);
   pruefe('A1f HEUTE() selbst bleibt der Wert „JJJJ-MM-TT" (Vergleiche, Filter, Export unverändert)', m.rechneBlatt({ A1: '=HEUTE()' }).A1 === iso(heute));
+  let leer = 'Fehler';
+  try { leer = m.zeigeWert(undefined); } catch (e) { leer = String(e); }
+  pruefe('A1g eine leere Zelle, die als undefined hereinkommt, bricht die Anzeige nicht (Tabelle in der Notiz, m283)', leer === undefined, leer);
 
   // A2 ganze Spalten/Zeilen — A: 10, 20, 30, „x" (Text), leer, 5 → Summe 65, Mittelwert 65/4 = 16,25, Anzahl 4, Anzahl2 5
   const b = r({
@@ -249,6 +252,7 @@ await abschnitt(async () => {
   const menue = await P.waitForSelector('[data-taste="sheet-umbau-menu"]', { timeout: 5000 }).then(() => true).catch(() => false);
   const texte = menue ? await P.locator('[data-taste="sheet-umbau-menu"] button').allInnerTexts() : [];
   pruefe('B1a Rechtsklick auf den Zeilenkopf öffnet das eigene Menü (nicht das Karten-Menü)', menue && gleich(texte.map((t) => t.trim()), ['Zeile oberhalb einfügen', 'Zeile unterhalb einfügen', 'Zeile löschen']) && !(await P.locator('.karten-menue, [data-taste="karten-menue"]').count()), texte);
+  await P.screenshot({ path: path.join(BILDER, 'm528-menue.png') }).catch(() => {});
   if (menue) await P.locator('[data-taste="sheet-zeile-oben"]').click();
   await warteBis(async () => (await h.werte()).A4 === 'Wasser');
   let w = await h.werte();
@@ -301,7 +305,6 @@ await abschnitt(async () => {
   pruefe('B3 zwei Zeilen gewählt → „2 Zeilen oberhalb einfügen": alles rutscht um 2, Summe in B6', t3 === '2 Zeilen oberhalb einfügen' && w.A3 === 'Miete' && w.B6 === '1.364,4' && w.C3 === '2.469', { t3, w });
   await P.keyboard.press('Control+z');
   await warteBis(async () => (await h.werte()).A1 === 'Miete');
-  await P.screenshot({ path: path.join(BILDER, 'm528-menue.png') }).catch(() => {});
 
   // B4 Bereich ziehen, Strg+C, woanders Strg+V
   await h.ziehen('A1', 'C2');
@@ -340,6 +343,7 @@ await abschnitt(async () => {
   await h.ziehen('B1', 'B2');
   await P.keyboard.press('Control+x');
   const gestrichelt = await P.evaluate(() => [...document.querySelectorAll('td.ausgeschnitten')].map((t) => t.dataset.zelle));
+  await P.screenshot({ path: path.join(BILDER, 'm528-ausschneiden.png') }).catch(() => {});
   await h.zelle('D3').click(); await P.keyboard.press('Escape');
   await P.keyboard.press('Control+v');
   await warteBis(async () => (await h.werte()).D3 === '1.234,5');

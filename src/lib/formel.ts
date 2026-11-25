@@ -510,5 +510,6 @@ export function zeigeWert(v: ZellWert): string {
     const gerundet = Math.round(v * 1e10) / 1e10;
     return gerundet.toLocaleString('de-DE', { maximumFractionDigits: 10 });
   }
-  return plus.zeige?.(v) ?? v;
+  // (manche Aufrufer reichen für eine leere Zelle `undefined` herein — das bleibt, wie es war)
+  return typeof v === 'string' ? plus.zeige?.(v) ?? v : v;
 }

@@ -356,7 +356,7 @@ export function HilfeEn() {
               </ul>
               <h4>More modules</h4>
               <ul>
-                <li><b>Σ Spreadsheet:</b> “=” starts a formula (<code>=SUMME(B2:B9)</code>, <code>=WENN(A1&gt;100;"über Plan";"im Rahmen")</code>), German and English names. Σ inserts auto-sums; drag an <code>.xlsx</code> onto the board, CSV back out. Right-click a row or column header: insert and delete (formulas follow). Shift+click or dragging selects cells; Ctrl+C/X/V copies, also to and from Excel. Calculate with dates (<code>=TODAY()+7</code>), sum whole columns (<code>=SUM(B:B)</code>).</li>
+                <li><b>Σ Spreadsheet:</b> “=” starts a formula (<code>=SUMME(B2:B9)</code>, <code>=WENN(A1&gt;100;"über Plan";"im Rahmen")</code>), German and English names. Σ inserts auto-sums; drag an <code>.xlsx</code> onto the board, CSV back out. Right-click a header: insert or delete rows and columns; Ctrl+C/X/V also with Excel; <code>=TODAY()+7</code>, <code>=SUM(B:B)</code>.</li>
                 <li><b>Calendar:</b> month/week with tasks, timelines and milestones; add your own events by clicking a day; ICS import, subscription and export. Google / Microsoft 365 under Settings → Services (read only).</li>
                 <li><b>Diagram (Mermaid):</b> eight templates, edit everything right in the picture, the tools float below the diagram; the AI button changes it from a description in plain language.</li>
                 <li><b>▢ Process shapes:</b> step, decision, start/end; double-click to label.</li>

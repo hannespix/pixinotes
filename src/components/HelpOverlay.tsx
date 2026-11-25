@@ -557,7 +557,7 @@ export function HelpOverlay() {
               </ul>
               <h4>Weitere Module</h4>
               <ul>
-                <li><b>Σ Rechen-Tabelle:</b> „=" beginnt eine Formel (<code>=SUMME(B2:B9)</code>, <code>=WENN(A1&gt;100;"über Plan";"im Rahmen")</code>), deutsche und englische Namen. Σ setzt Auto-Summen; <code>.xlsx</code> aufs Board ziehen, CSV zurück. Rechtsklick auf einen Zeilen- oder Spaltenkopf: einfügen und löschen (Formeln ziehen mit). Umschalt+Klick oder Ziehen wählt Zellen; Strg+C/X/V kopiert, auch von und nach Excel. Mit Datum rechnen (<code>=HEUTE()+7</code>), ganze Spalten summieren (<code>=SUMME(B:B)</code>).</li>
+                <li><b>Σ Rechen-Tabelle:</b> „=" beginnt eine Formel (<code>=SUMME(B2:B9)</code>, <code>=WENN(A1&gt;100;"über Plan";"im Rahmen")</code>), deutsche und englische Namen. Σ setzt Auto-Summen; <code>.xlsx</code> aufs Board ziehen, CSV zurück. Rechtsklick auf einen Kopf: Zeilen und Spalten einfügen oder löschen; Strg+C/X/V auch mit Excel; <code>=HEUTE()+7</code>, <code>=SUMME(B:B)</code>.</li>
                 <li><b>Kalender:</b> Monat/Woche mit Aufgaben, Zeitplänen und Meilensteinen; eigene Termine per Klick auf den Tag; ICS-Import, -Abo und -Export. Google / Microsoft 365 unter Einstellungen → Dienste (nur lesen).</li>
                 <li><b>Diagramm (Mermaid):</b> acht Vorlagen, alles direkt im Bild bearbeiten, die Werkzeuge schweben unter dem Diagramm; der KI-Knopf ändert es per Sprache.</li>
                 <li><b>▢ Prozess-Formen:</b> Schritt, Entscheidung, Start/Ende; Doppelklick beschriftet.</li>
