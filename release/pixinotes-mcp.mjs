@@ -7385,7 +7385,7 @@ function schlageNach(kern) {
     }
   }
   if (en === null && TASTE.test(kern) && /^[^a-zäöü]*([A-ZÄÖÜ][A-Za-zäöü0-9↑↓]*|[^A-Za-zäöü])([+ /,·–-]+([A-ZÄÖÜ][A-Za-zäöü0-9↑↓]*|[^A-Za-zäöü]))*$/.test(kern)) {
-    en = kern.replace(/Strg|Umschalt|Entf|Leertaste|Eingabe|Rücktaste|Pos1|Ende|Bild↑|Bild↓|Einfg|Pfeiltasten|Pfeil/g, (w) => TASTEN[w] ?? w);
+    en = kern.replace(/Strg|Umschalt|Entf|Leertaste|Eingabe|Rücktaste|Pos1|Ende|Bild↑|Bild↓|Einfg|Pfeiltasten|Pfeiltaste|Pfeil/g, (w) => TASTEN[w] ?? w);
   }
   if (merk.size > 6e3) merk.clear();
   merk.set(kern, en);
@@ -7424,7 +7424,7 @@ var init_sprache = __esm({
     eigene = /* @__PURE__ */ new Set();
     merk = /* @__PURE__ */ new Map();
     luecken = /* @__PURE__ */ new Set();
-    TASTEN = { Strg: "Ctrl", Umschalt: "Shift", Entf: "Del", Leertaste: "Space", Eingabe: "Enter", R\u00FCcktaste: "Backspace", Pos1: "Home", Ende: "End", "Bild\u2191": "PgUp", "Bild\u2193": "PgDn", Einfg: "Ins", Pfeiltasten: "Arrow keys", Pfeil: "Arrow" };
+    TASTEN = { Strg: "Ctrl", Umschalt: "Shift", Entf: "Del", Leertaste: "Space", Eingabe: "Enter", R\u00FCcktaste: "Backspace", Pos1: "Home", Ende: "End", "Bild\u2191": "PgUp", "Bild\u2193": "PgDn", Einfg: "Ins", Pfeiltasten: "Arrow keys", Pfeiltaste: "Arrow key", Pfeil: "Arrow" };
     TASTE = /Strg|Umschalt|Entf|Leertaste|Eingabe|Rücktaste|Pos1|Bild[↑↓]|Einfg|Pfeil/;
     HAT_BUCHSTABEN = /[A-Za-zÄÖÜäöüß]{2}/;
     REGEL_DE = new Intl.PluralRules("de-DE");

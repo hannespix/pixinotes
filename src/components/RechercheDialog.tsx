@@ -16,6 +16,7 @@ import { fuehreRechercheAus, planeRecherche, type RecherchePlan } from '../lib/r
 import { nodesToText } from '../lib/serialize';
 import { selectActiveBoard } from '../store';
 import { IX } from './Icons';
+import { useEscSchliesst } from '../lib/useEscSchliesst';
 import { zahlWort } from '../lib/sprache';
 
 type Phase = 'eingabe' | 'plane' | 'fragen' | 'laeuft';
@@ -36,6 +37,9 @@ export function RechercheDialog() {
   useEffect(() => {
     if (offen) { setPhase('eingabe'); setFehler(''); setSchritt(''); setPlan(null); }
   }, [offen]);
+
+  // M523: Esc schließt den Dialog (nicht mitten im Lauf — dafür gibt es „Abbrechen" am Hinweis)
+  useEscSchliesst(offen, schliessen, undefined, () => phase !== 'laeuft');
 
   if (!offen) return null;
 

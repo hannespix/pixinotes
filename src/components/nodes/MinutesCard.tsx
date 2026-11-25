@@ -784,7 +784,8 @@ export function MinutesBody({ id, data: daten }: { id: string; data: MinutesData
                         data-taste="pr-beschluss-top"
                         onChange={(ev) => beschlussZuordnen(d.id, ev.target.value === '' ? null : sitzungsTops[Number(ev.target.value)] ?? null)}
                       >
-                        <option value="">ohne TOP</option>
+                        {/* M523: die Liste gilt als Inhalt (translate="no", TOP-Texte des Nutzers) — der feste Eintrag wird hier übersetzt */}
+                        <option value="">{t('ohne TOP')}</option>
                         {sitzungsTops.map((tp, i) => <option key={`${tp.id ?? ''}${i}`} value={String(i)}>{tp.text}</option>)}
                       </select>
                     );

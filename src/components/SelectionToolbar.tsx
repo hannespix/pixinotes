@@ -762,7 +762,7 @@ export function SelectionToolbar() {
                 <button
                   className="sel-typo-reset"
                   onClick={() => setCardTypo(ids, { font: null, fontSize: null })}
-                  title="Schriftart und Textgröße dieser Karte(n) zurück auf Standard"
+                  title={ids.length === 1 ? 'Schriftart und Textgröße dieser Karte zurück auf Standard' : 'Schriftart und Textgröße dieser Karten zurück auf Standard'}
                 >
                   <IUndo size={13} /> Zurück auf Standard
                 </button>

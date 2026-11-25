@@ -10,11 +10,15 @@
 //   · Beim Schließen kehrt der Fokus dorthin zurück, wo er vorher war.
 // M447: auch die Bild-Lupe (.pdf-backdrop) ist ein Fenster
 // M456: und die ausklappbare Navigation am Telefon (.nav-backdrop, Tabs.tsx) — Fokus hinein, Tab im Kreis, zurück
+import { obenauf } from './overlay';
+
 const FENSTER = '.modal-backdrop, .ticket-modal-backdrop, .search-backdrop, .onb-backdrop, .lookup-backdrop, .pdf-backdrop, .nav-backdrop';
 const ZIELE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"]), [contenteditable="true"]';
 
 const zieleIn = (w: Element): HTMLElement[] => [...w.querySelectorAll<HTMLElement>(ZIELE)].filter((el) => el.getClientRects().length > 0);
-const oberstes = (): Element | null => { const alle = document.querySelectorAll(FENSTER); return alle.length ? alle[alle.length - 1] : null; };
+// M523: das oberste nach z-index, dann nach Reihenfolge im Dokument (vorher: das letzte im Dokument — die Hilfe über den
+// Einstellungen stand im Dokument davor, Tab lief dann im verdeckten Fenster)
+const oberstes = (): Element | null => obenauf(document.querySelectorAll(FENSTER));
 const istTextfeld = (el: Element | null): boolean => !!el && (el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && !['checkbox', 'radio', 'button', 'range', 'color', 'file'].includes(el.type)) || (el as HTMLElement).isContentEditable);
 
 export function fensterFokusStarten(): () => void {
@@ -22,6 +26,14 @@ export function fensterFokusStarten(): () => void {
 
   const geoeffnet = (w: Element) => {
     if (vorher.has(w)) return;
+    /* M523: Was zuletzt aufgeht, liegt obenauf. Einstellungen, Hilfe und Suche teilen sich eine Ebene und stehen in
+       fester Reihenfolge im Dokument — die Hilfe (Alt+H) öffnete sich deshalb HINTER den offenen Einstellungen, die
+       Suche (Strg+K) hinter beiden. Liegt schon ein Fenster darüber, hebt sich das neue genau eine Stufe darüber. */
+    // … auch über einer laufenden Präsentation (z-index 95): Alt+E und Alt+H öffneten Einstellungen und Hilfe sonst
+    // unsichtbar dahinter, und das nächste Esc schloss scheinbar nichts
+    const andere = [...document.querySelectorAll(`${FENSTER}, .presenter`)].filter((x) => x !== w && !x.contains(w) && !w.contains(x));
+    const oben = obenauf(andere);
+    if (oben && obenauf([oben, w]) === oben && w instanceof HTMLElement) w.style.zIndex = String((Number(getComputedStyle(oben).zIndex) || 0) + 1);
     vorher.set(w, document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null);
     // Ein Bild später: Fenster mit eigenem autoFocus (Suche, Umbenennen) haben ihr Feld dann schon angewählt
     requestAnimationFrame(() => {

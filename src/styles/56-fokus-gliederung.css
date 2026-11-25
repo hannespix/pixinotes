@@ -205,7 +205,8 @@ body:has(.app.focus-mode) .sel-toolbar-dock button { flex: none; }
   padding: 9px 12px; min-height: 44px; border: none; background: none;
   border-radius: var(--r); text-align: left; font: inherit; color: var(--ink); cursor: pointer;
 }
-.search-cmd:hover { background: var(--accent-soft); }
+/* M523: `.active` = die Zeile, die Enter ausführt, wenn es keine Kartentreffer gibt (wie .search-hit.active) */
+.search-cmd:hover, .search-cmd.active { background: var(--accent-soft); }
 
 /* ================= M217: Begrüßung beim ersten Start ================= */
 .onb-backdrop {

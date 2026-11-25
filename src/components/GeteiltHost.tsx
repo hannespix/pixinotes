@@ -23,7 +23,8 @@ export function GeteiltHost() {
   useEffect(() => {
     const marke = geteiltMarkeAbholen();
     void leseGeteiltes().then((g) => {
-      if (!g) return;
+      // M523: Aus dem Teilen-Menü gekommen, aber nichts liegt bereit (Annahme fehlgeschlagen) — das sagen, statt stumm zu starten
+      if (!g) { if (marke) useBoard.getState().showToast('Das Geteilte ist nicht angekommen – bitte noch einmal teilen.', false, 6000); return; }
       // Ohne Marke nur übernehmen, was frisch ist (max. 5 Minuten alt)
       const frisch = Date.now() - new Date(g.wann).getTime() < 5 * 60_000;
       if (!marke && !frisch) { void loescheGeteiltes(); return; }
