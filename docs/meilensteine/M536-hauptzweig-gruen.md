@@ -1,14 +1,15 @@
 # M536 — Hauptzweig wieder grün: Prüfreihen nach M529/M532, board_aendern räumt jede alte Fassung ab
-PR: siehe Merge-Titel „… (M536)" · Prüfreihe: keine neue (kein App-Fehler gefunden) · Datum: 2026-11-25
+PR: #232 · Prüfreihen: m525 (S0c, S2b neu), m383b (1d–1f neu); keine eigene m536 · Datum: 2026-11-25
 
 ## Warum
-Nach M529 und M532 waren auf dem Hauptzweig m374 (E), m395 (A5, B5, B12), m299 (A1) und m383b rot.
+Nach M529 und M532 waren auf dem Hauptzweig m374 (E), m395 (A5, B5, B12), m299 (A1) und m383b rot; m525 S1 flatterte (gemeldet aus M534/M535).
 
 ## Was
 - **Rettungskopie-Hinweis** (M529, `lib/rettung.ts`) ist kürzer: „Gespeicherter Stand nicht lesbar – PixiNotes
   startet leer. Rettungskopie: Einstellungen → Daten." (96 Zeichen; m299 A1 verlangt höchstens 110), englisch
   „Stored state unreadable – PixiNotes starts empty. Rescue copy: Settings → Data."
-- Sonst merkt der Nutzer nichts: Die übrigen Befunde waren Fehler der Prüfreihen, nicht der App.
+- Das erste Verschieben einer Sitzung ruckelt nicht mehr: Die Sicherung „Sitzung" (Stand vor der ersten Änderung) entsteht nach dem Ablegen im Leerlauf, und ein Board, das nur von selbst einsammelt, legt beim Start keine solche Version mehr an.
+- Die übrigen Befunde waren Fehler der Prüfreihen, nicht der App.
 
 ## Befunde
 ### m383b — „function public.board_aendern(…) is not unique"
@@ -45,21 +46,30 @@ nicht im Repository): zwei Fenster, Mitleser, Schreiber schließt (auch 150 ms n
 Bildes), Nachfolger übernimmt, neu laden, drittes Fenster — alle Bilder überall geladen, im localStorage nur Verweise.
 Kein App-Fehler, daher keine neue Prüfreihe.
 
-### m525 S1 — „1,0 Stände" JSON beim Ziehen (gemeldet aus M534)
-Kein Rückschritt beim Ziehen, sondern **ein** einmaliges Schreiben nach dem Start, das ins Messfenster fiel: Seit M532
-lädt beim Start die Ablage nach, setzt Bilder ein bzw. lagert sie aus und schreibt den Stand einmal neu — mit leerem
-Gedächtnis (M525) ist das ein voller Stand. Auf einer ausgelasteten Maschine (mehrere Agenten, parallele Reihen) kam
-dieses Schreiben erst nach den 2,5 s Wartezeit der Reihe, also während der 30 Mausbewegungen von S1. Nachgestellt:
-misst S1 direkt nach dem Laden, steht genau `{"zeichen":482318,"staende":"1.0"}` mit **einem** großen Text da; nach dem
-Start-Schreiben gemessen 0,02 Mio. Zeichen.
-- `pruefungen/m525-grosse-boards.mjs`: vor S1 wartet die Reihe, bis der Start fertig geschrieben hat (kein großes Bild
-  mehr im gespeicherten Text, Zähler `pixinotesSpeicher.geschrieben` 1,5 s ruhig).
-- **Gegenprobe:** ein Build, der wie vor M525 bei jeder Store-Änderung den ganzen Stand als JSON baut (eine Zeile in
-  `speicherAblage.setItem`, nur zum Messen gebaut, nicht im Repository) → S1 rot mit 36,3 Ständen. Die Wartezeit
-  verdeckt also keinen Rückschritt beim Ziehen.
-- Ein Versuch, das Gedächtnis nach dem Sichern eines Bildes nur für Texte mit data-URL zu verwerfen statt ganz, brachte
-  gemessen nichts (beim Einfügen eines Bildes stammt der volle Stand JSON aus `canEmbed` in `lib/nodes.ts`, siehe
-  M532 „Grenzen") und wurde verworfen.
+### m525 S1 — „1,0 Stände" JSON beim Ziehen (gemeldet aus M534/M535) — echter Ruckler, behoben
+Je Mausbewegung entsteht weiter kein ganzer Stand. Der eine volle Stand JSON kam aus der **Version „Sitzung"** (M449,
+`lib/boardVersionen.ts → initBoardVersionen`): Sie sichert den Stand vor der ersten Änderung der Sitzung und baute dafür
+das ganze Board als JSON (`versionSichern` → `JSON.stringify(stand)`). Ist die erste Änderung der erste Schritt eines
+Zugs, geschah das **mitten im Zug** — ein Ruckler beim ersten Verschieben jeder Sitzung. In der Reihe entschied die
+Taktung, ob es S1 traf: Das Kanban des Prüf-Boards sammelt rund 4,4 s nach dem Start von selbst ein (`runDerived`),
+und auch das löste die Version aus — kam das vor dem Zug, war S1 grün, kam es (ausgelastete Maschine) gleichzeitig mit
+dem Zug, war S1 rot. Gemessen mit Stapel im Build: Auslöser `updateNodeDataOnBoard` aus `fluss-*.js`, `inDerived()` =
+true, t = 4 400 ms.
+- **Version „Sitzung" nach dem Zug:** `spaeter(a)` merkt den Stand vor der Änderung (unveränderliches Store-Objekt) und
+  sichert ihn 1,5 s später im Leerlauf (`requestIdleCallback`, höchstens 5 s); läuft gerade ein Zug (`zugLaeuft`), erst
+  1,5 s nach dem Ablegen (`nachZug`). Wird die Seite verdeckt, sofort (`nachholen` im `visibilitychange`).
+- **Was von selbst entsteht, löst die Version „Sitzung" nicht aus** (`inDerived()`), wie es der Kommentar zu `bereitAb`
+  schon für die ersten 2,5 s wollte („sonst entstünde bei jedem Start eine Version"). Die Markierung `geaendert` für die
+  automatischen Versionen bleibt wie bisher.
+- Prüfreihe m525: neu **S0c** (der Start mit einsammelndem Kanban legt keine Version „Sitzung" an) und **S2b** (nach dem
+  Zug entsteht die Version „Sitzung" trotzdem). Vor S1 wartet die Reihe außerdem, bis der Start fertig geschrieben hat
+  (M532: einmaliges Schreiben mit Verweisen; kein großes Bild mehr im Text, Zähler 1,5 s ruhig).
+- **Gegenproben** (Builds nur zum Messen, nicht im Repository): (1) neuer Stand, aber Version „Sitzung" sofort wie
+  vorher → S1 rot mit genau `{"zeichen":482148,"staende":"1.0"}` (das gemeldete Bild); (2) ein Build, der wie vor M525
+  bei jeder Store-Änderung den ganzen Stand als JSON baut → S1 rot mit 36,3 Ständen. Die Wartezeit vor S1 verdeckt also
+  nichts.
+- Ein Versuch, nach dem Sichern eines Bildes nur gemerkte Texte mit data-URL zu verwerfen statt das ganze Gedächtnis
+  (`store/speicher.ts`), brachte gemessen nichts und wurde verworfen.
 
 Nebenbei: Mehrere Agenten auf derselben Maschine teilen die festen Ports der Reihen (5525 …); läuft dieselbe Reihe
 gleichzeitig in einem anderen Arbeitsbaum, scheitert sie mit `EADDRINUSE` (das Werkzeug wiederholt sie allein).
