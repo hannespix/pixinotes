@@ -1,6 +1,7 @@
 // M364/M391: Die Live-Leiste oben rechts — Kürzel der Anwesenden; antippen zeigt alle und die Werkzeuge der Gruppe.
 // M477: eigene Datei, nachgeladen von LiveLeiste.tsx, sobald das Board live ist (vorher Teil des Start-Pakets).
 import { useEffect, useState } from 'react';
+import { fensterDarueber } from '../lib/overlay';
 import { GRUPPE_EREIGNIS, gruppeVon, useBoard, useNurLesen } from '../store';
 import { EINLADUNG_EREIGNIS, einladungVon, ichIn, liveAuf, liveVerbunden, TEILNEHMER_EREIGNIS, teilnehmerVon } from '../lib/liveStand';
 import { qrZeigen } from '../lib/qr';
@@ -30,7 +31,8 @@ export default function LiveLeisteVoll() {
   useEffect(() => {
     if (!offen) return;
     const zu = (e: Event) => { if (!(e.target as HTMLElement | null)?.closest?.('.live-leiste')) setOffen(false); };
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOffen(false); };
+    // M530: Liegt ein Fenster über der Liste (Einstellungen, Hilfe), schließt Esc erst das
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape' && !fensterDarueber(null, e)) setOffen(false); };
     window.addEventListener('pointerdown', zu, true);
     window.addEventListener('keydown', esc);
     return () => { window.removeEventListener('pointerdown', zu, true); window.removeEventListener('keydown', esc); };

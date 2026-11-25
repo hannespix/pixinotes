@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { fensterDarueber } from '../lib/overlay';
 import { selectActiveBoard, useBoard } from '../store';
 import { exportBoard } from '../lib/exporter';
 
@@ -19,10 +20,12 @@ export function BildExport() {
   const [header, setHeader] = useState(true);
   const [selOnly, setSelOnly] = useState(false);
   const [busy, setBusy] = useState(false);
+  const huelle = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    // M530: Esc gehört dem obersten Fenster — liegt eines darüber (Hilfe, Einstellungen), schließt erst das
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !fensterDarueber(huelle.current, e)) setOpen(false); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, setOpen]);
@@ -46,7 +49,7 @@ export function BildExport() {
   };
 
   return (
-    <div className="modal-backdrop" onClick={() => setOpen(false)}>
+    <div className="modal-backdrop" ref={huelle} onClick={() => setOpen(false)}>
       <div className="modal bild-export" role="dialog" aria-modal="true" aria-label="Als Bild exportieren" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2>Als Bild exportieren</h2>

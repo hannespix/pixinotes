@@ -8,6 +8,7 @@ import { de as blockNoteDe, en as blockNoteEn } from '@blocknote/core/locales';
 import { sprache } from '../../lib/sprache';
 import { notizSchrift } from '../../lib/lesbareSchrift';
 import { kamVonAussen, NOTIZ_EXTERN, selectActiveBoard, useBoard, useKarteFest } from '../../store';
+import { notizEditoren } from '../../lib/notizEditoren';
 import { liveVerbunden, TEILNEHMER_EREIGNIS } from '../../lib/liveStand';
 import { useTakt } from '../LiveLeiste';
 import type { NotizSitzung } from '../../lib/notizGemeinsamKern';
@@ -310,6 +311,9 @@ export function NotizEditor({ id, data, startPunkt, sitzung }: {
     window.addEventListener(NOTIZ_EXTERN, auf);
     return () => window.removeEventListener(NOTIZ_EXTERN, auf);
   }, [id, editor, sitzung]);
+
+  // M530: Strg+V im Karten-Fokus ohne Cursor im Text fügt über diesen Editor ein (lib/fokusEinfuegen.ts)
+  useEffect(() => { notizEditoren.set(id, editor); return () => { if (notizEditoren.get(id) === editor) notizEditoren.delete(id); }; }, [id, editor]);
 
   // Frische, leere Notiz: sofort den Cursor reinsetzen — lostippen ohne Extra-Klick
   // M365: … aber nur in der selbst angelegten. Eine leere Notiz, die jemand anderes gerade angelegt hat und die

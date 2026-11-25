@@ -222,32 +222,8 @@ export function kartenScheibe(set: Setzen, get: Holen, patchActive: AufsOffene) 
       patchActive((b) => ({ nodes: [...b.nodes, frisch(node)] }));
     },
 
-    dupliziere: (ids) => {
-      // M390: EIN Schritt für alle gewählten Karten (vorher je Karte einer — Strg+Z ließ Kopien zurück), die
-      // Verbindungen ZWISCHEN den Kopierten kommen mit, große Dateien und Tool-Quelltexte ebenfalls, und die
-      // Kopien landen nie deckungsgleich auf einer früheren Kopie.
-      const b = selectActiveBoard(get());
-      const wahl = b.nodes.filter((n) => ids.includes(n.id));
-      if (!wahl.length) return 0;
-      let k = 1;
-      const belegt = (kk: number) => wahl.some((n) => b.nodes.some((x) => x.type === n.type && Math.abs(x.position.x - (n.position.x + 30 * kk)) < 2 && Math.abs(x.position.y - (n.position.y + 30 * kk)) < 2));
-      while (k < 40 && belegt(k)) k += 1;
-      const karte = new Map(wahl.map((n) => [n.id, uid()]));
-      const neu = wahl.map((n) => frisch({
-        ...n, id: karte.get(n.id) as string, selected: true,
-        position: { x: n.position.x + 30 * k, y: n.position.y + 30 * k },
-        data: JSON.parse(JSON.stringify(n.data)),
-      }) as AppNode);
-      const kanten = b.edges.filter((e) => karte.has(e.source) && karte.has(e.target))
-        .map((e) => ({ ...e, id: uid(), source: karte.get(e.source) as string, target: karte.get(e.target) as string, selected: false }));
-      get().pushHistory();
-      patchActive((bb) => ({
-        nodes: [...bb.nodes.map((n) => (n.selected ? ({ ...n, selected: false } as AppNode) : n)), ...neu],
-        edges: [...bb.edges, ...kanten],
-      }));
-      anhaengeMitnehmen(wahl, karte);
-      return neu.length;
-    },
+    // M530: nachgeladen (store/duplizieren.ts, Start-JS) — Rückgabe: Anzahl der Kopien, sobald sie liegen
+    dupliziere: (ids) => import('./duplizieren').then((m) => m.dupliziere(get, patchActive, ids)),
 
     addNodeToBoard: (boardId, node) => {
       // M388: gesichert wird das ZIEL-Board (wie bei updateNodeDataOnBoard) — vorher das gerade offene: Ein
