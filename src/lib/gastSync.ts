@@ -253,6 +253,15 @@ export async function sicherungZurueck(boardId: string): Promise<boolean> {
 // von selbst, wenn jemand die Karte verlässt oder die Verbindung verliert. Greifen zwei im selben Augenblick
 // zu, gewinnt der frühere Zeitpunkt (bei Gleichstand die kleinere Kennung) — auf allen Geräten gleich.
 const meine = new Map<string, { karte: string; seit: number }>();   // boardId → Karte, die ich halte
+/** M533: Karten, die zuletzt ein ANDERER in der Hand hatte — „boardId\nKarte" → Zeitpunkt des Loslassens */
+const fremdLos = new Map<string, number>();
+const FREMD_FRISCH_MS = 30_000;
+/** Hält gerade ein anderer die Karte, liest man sie mit, oder hat er sie eben erst losgelassen? */
+function fremdFrisch(boardId: string, nodeId: string): boolean {
+  if (sperren.get(boardId)?.has(nodeId) || originale.get(boardId)?.has(nodeId)) return true;
+  const t = fremdLos.get(`${boardId}\n${nodeId}`);
+  return t !== undefined && Date.now() - t < FREMD_FRISCH_MS;
+}
 const meineKarte = (boardId: string): { karte?: string; seit?: number } => meine.get(boardId) ?? {};
 function sperrenRechnen(boardId: string): void {
   const selbst = ich().id;
@@ -280,6 +289,8 @@ function sperrenRechnen(boardId: string): void {
   for (const karte of vorher?.keys() ?? []) {
     if (fremd.has(karte)) continue;
     const key = `${boardId}\n${karte}`;
+    fremdLos.set(key, Date.now());   // M533: vor dem nächsten eigenen Schreiben dieser Karte erst nachsehen
+    if (fremdLos.size > 500) fremdLos.delete(fremdLos.keys().next().value!);
     clearTimeout(endeTimer.get(key));
     endeTimer.set(key, setTimeout(() => { endeTimer.delete(key); if (!sperren.get(boardId)?.has(karte)) mitschriftBeenden(boardId, karte); }, MITLESEN_ENDE_MS));
   }
@@ -407,6 +418,26 @@ function mitschriftVergessen(boardId: string, nodeId: string): void {
   originale.get(boardId)?.delete(nodeId);
   liveStaende.get(boardId)?.delete(nodeId);
 }
+/**
+ * M533: Die eigene Änderung `live → jetzt` auf den gesicherten Stand `orig` übertragen: Was sich hier geändert hat
+ * (Felder der Karte, eine Ebene tiefer die Felder ihres Inhalts), kommt aus `jetzt`, alles andere aus `orig` — vor allem
+ * der Text, den hier nur das Mitlesen zeigte. Auswahl und Maße gehören dem Gerät.
+ */
+function aufGesichertem(orig: AppNode, live: AppNode, jetzt: AppNode): AppNode {
+  type Satz = Record<string, unknown>;
+  const gleich = (x: unknown, y: unknown): boolean => x === y || JSON.stringify(x) === JSON.stringify(y);
+  const uebertragen = (O: Satz, L: Satz, J: Satz, ohne: ReadonlySet<string>): Satz => {
+    const aus: Satz = { ...O };
+    for (const k of new Set([...Object.keys(L), ...Object.keys(J)])) {
+      if (ohne.has(k) || gleich(J[k], L[k])) continue;
+      if (J[k] === undefined) delete aus[k]; else aus[k] = J[k];
+    }
+    return aus;
+  };
+  const karte = uebertragen(orig as unknown as Satz, live as unknown as Satz, jetzt as unknown as Satz, new Set(['data', 'selected', 'dragging', 'measured']));
+  karte.data = uebertragen((orig.data ?? {}) as Satz, (live.data ?? {}) as Satz, (jetzt.data ?? {}) as Satz, new Set());
+  return mitAnsichtVon(karte as unknown as AppNode, jetzt);
+}
 const gleicherInhalt = (a: AppNode, b: AppNode): boolean => a === b
   || ((a.data === b.data || JSON.stringify(a.data) === JSON.stringify(b.data)) && a.position.x === b.position.x && a.position.y === b.position.y);
 /** Mitlesen ohne gesicherten Stand beenden: zurück zum letzten gesicherten */
@@ -512,13 +543,15 @@ function mischen(boardId: string, basis: BoardDoc | undefined, fremd: BoardDoc):
 }
 
 /** Server-Stand holen und einarbeiten; schreibt danach, wenn hier Eigenes dazukam */
-async function holen(boardId: string): Promise<void> {
+async function holen(boardId: string, vorSchreiben = false): Promise<void> {
   const e = lesen()[boardId];
   if (!e) return;
   const st0 = useBoard.getState();
   if (!st0.boards.some((b) => b.id === boardId)) { beendetStill(boardId); return; }
-  // Mitten im Tippen auf genau diesem Board: gleich noch einmal (der Editor liest seinen Text nur beim Aufbau)
-  if (st0.activeId === boardId && Date.now() - letzteAenderung < 1500) { setTimeout(() => void abgleichen(boardId), 1600); return; }
+  // Mitten im Tippen auf genau diesem Board: gleich noch einmal (der Editor liest seinen Text nur beim Aufbau).
+  // M533: Nicht vor dem eigenen Schreiben — die Tipp-Pause ist dann schon vorbei, und warten hieße, den älteren Stand
+  // zu schreiben. Eine Notiz unter dem Cursor übernimmt den Text an Ort und Stelle (NOTIZ_EXTERN, M364).
+  if (!vorSchreiben && st0.activeId === boardId && Date.now() - letzteAenderung < 1500) { setTimeout(() => void abgleichen(boardId), 1600); return; }
   let g: Gelesen | null;
   try { g = await rpc<Gelesen | null>('gast_lesen', { p_token: e.token }); } catch { return; }
   if (!g) { beendet(boardId); return; }
@@ -538,8 +571,33 @@ async function holen(boardId: string): Promise<void> {
   if (m[boardId]) { m[boardId] = { ...m[boardId], version: g.version, rolle: g.rolle, recht: rechtAus(g.optionen), ...(g.kanal ? { kanal: g.kanal } : {}) }; schreiben(m); }
   setzeGruppe(boardId, { ich: meineKennung(true), recht: rechtAus(g.optionen), gast: true });
   void dateienHolen(fremd, g.dateien);
-  // Hier ist etwas dazugekommen, das der Server noch nicht hat → hinaus
-  if (g.rolle === 'bearbeiten' && kern(neu) !== kern(fremd)) await hinaus(boardId);
+  // Hier ist etwas dazugekommen, das der Server noch nicht hat → hinaus (vor dem Schreiben schreibt das Schreiben selbst)
+  if (!vorSchreiben && g.rolle === 'bearbeiten' && kern(neu) !== kern(fremd)) await hinaus(boardId);
+}
+/** Bis zu welcher Version kennt dieses Gerät den Stand (eingearbeitet oder selbst geschrieben)? */
+const bekannteVersion = (boardId: string): number => {
+  let v = lesen()[boardId]?.version ?? -1;
+  for (const g of kette(boardId).wartend.values()) if (g.eigen && g.v > v) v = g.v;
+  return v;
+};
+/**
+ * M533: Vor dem Schreiben einer Karte, die eben noch ein anderer in der Hand hatte, nachsehen, ob er inzwischen
+ * gespeichert hat — und das erst einarbeiten. Geschrieben wird je Karte als Ganzes (gast_aendern ersetzt sie): Ohne
+ * diesen Blick ersetzte ein Punkt, den man gleich nach dem Loslassen vergab, den eben gespeicherten Text des anderen
+ * durch den, den dieses Gerät noch kannte — sein Speichern war schon auf dem Server, aber hier noch unterwegs.
+ * Wie M524 beim Konto (Mini-Abruf vor board_aendern): Es bleibt das Fenster einer Anfrage.
+ *   'gleich' — nichts Neues; 'neu' — eingearbeitet, der Schritt ist neu zu berechnen
+ */
+async function vorSchreibenNachsehen(boardId: string, token: string): Promise<'gleich' | 'neu'> {
+  let s: { version: number } | null;
+  try { s = await rpc<{ version: number } | null>('gast_stand', { p_token: token }); } catch { return 'gleich'; }
+  if (!s) return 'gleich';
+  const sv = Number(s.version);
+  if (!(sv > bekannteVersion(boardId))) return 'gleich';
+  await kettenLauf(boardId);                  // kam es schon über den Kanal?
+  if (sv <= bekannteVersion(boardId)) return 'neu';
+  await holen(boardId, true);                // sonst den ganzen Stand (einmal — kein Warten auf Ruhe)
+  return 'neu';
 }
 /** Board lokal nicht mehr da (gelöscht): Eintrag still entfernen */
 function beendetStill(boardId: string): void {
@@ -645,7 +703,7 @@ function nochmalBald(boardId: string): void {
 }
 
 /** Eigene Änderungen zum Server: nur, was sich geändert hat (M366) */
-async function hinaus(boardId: string): Promise<void> {
+async function hinaus(boardId: string, nachgesehen = false): Promise<void> {
   if (ohnePatch) { await hinausGanz(boardId); return; }
   const e = lesen()[boardId];
   if (!e || e.rolle !== 'bearbeiten') return;
@@ -660,6 +718,11 @@ async function hinaus(boardId: string): Promise<void> {
   const zuSchreiben = ohneAuswahl(rein(mitMassenVon(liveHaken.vor(lokal), basis)));
   const p = patchAus(ohneAuswahl(rein(stand)), zuSchreiben);
   if (!p) return;
+  // M533: Eine Karte, die eben noch ein anderer in der Hand hatte → erst nachsehen, ob er inzwischen gespeichert hat
+  if (!nachgesehen && (p.nodes?.set ?? []).some((n) => fremdFrisch(boardId, n.id))) {
+    const r = await vorSchreibenNachsehen(boardId, e.token);
+    if (r === 'neu') { await hinaus(boardId, true); return; }
+  }
   try {
     const r = await rpc<{ version: number; vor: number }>('gast_aendern', { p_token: e.token, p_patch: p });
     const v = Number(r.version); const vor = Number(r.vor);
@@ -1198,13 +1261,21 @@ export function initGastSync(): void {
         if (b && a && b !== a) eigenesMerken(id, a, b);
       }
     }
-    // Eine mitgeschriebene Karte wurde hier anders ersetzt (Abgleich, eigene Bearbeitung) → ab jetzt gilt das
+    // Eine mitgeschriebene Karte wurde hier anders ersetzt: Ein Abgleich brachte den neuen gesicherten Stand → ab jetzt
+    // gilt der. M533: Eine EIGENE Änderung (Punkt, Farbe, Lage, auch was von selbst nachgezogen wird) baut dagegen auf
+    // dem gesicherten Stand auf — das Mitgelesene bleibt Anzeige. Vorher galt danach der ganze mitgelesene Stand als
+    // eigene Änderung: Ihm fehlten die letzten Zeichen des Schreibers (die gingen erst mit dessen Speichern hinaus),
+    // im Abgleich gewann er als „hier geändert“ gegen dessen gespeicherten Text, und der ältere Text ging an alle.
+    const eigen = !isImportedState(s.boards, s.spaces);
     for (const [boardId, l] of liveStaende) {
       if (l.size === 0) continue;
       const b = s.boards.find((x) => x.id === boardId);
       for (const [nodeId, live] of [...l]) {
         const n = b?.nodes.find((x) => x.id === nodeId);
-        if (!n || !gleicherInhalt(n, live)) mitschriftVergessen(boardId, nodeId);
+        if (n && gleicherInhalt(n, live)) continue;
+        const orig = originale.get(boardId)?.get(nodeId);
+        if (eigen && n && orig) { originale.get(boardId)!.set(nodeId, aufGesichertem(orig, live, n)); l.set(nodeId, n); continue; }
+        mitschriftVergessen(boardId, nodeId);
       }
     }
     const m = lesen();
