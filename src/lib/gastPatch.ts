@@ -9,6 +9,7 @@
 // Stempel bekam (nach dem Zusammenführen), reist so zu den anderen. Ob zwei Fassungen sich wirklich widersprechen,
 // entscheidet allein der Drei-Wege-Abgleich (syncMerge.ts), in den jede Abweichung mündet (gastSync → mischen).
 import { gestalt, karteEntschaerfen, karteGueltig } from './sicher';
+import { kanonText } from './abgleichZeiten';
 import type { BoardDoc } from '../store';
 
 export type Art = 'nodes' | 'edges' | 'drawings' | 'comments';
@@ -29,7 +30,8 @@ export function patchAus(basis: BoardDoc, neu: BoardDoc): Patch | null {
     const set: Obj[] = [];
     for (const o of B) {
       const v = alt.get(o.id);
-      if (!v || (v !== o && JSON.stringify(v) !== JSON.stringify(o))) set.push(o);
+      // M524: … und nicht, wenn nur die Reihenfolge der Schlüssel anders ist (derselbe Inhalt reiste sonst hin und her)
+      if (!v || (v !== o && JSON.stringify(v) !== JSON.stringify(o) && kanonText(v) !== kanonText(o))) set.push(o);
       alt.delete(o.id);
     }
     const del = [...alt.keys()];

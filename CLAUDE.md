@@ -123,6 +123,7 @@ Chromium: `/opt/pw-browsers/chromium` (sonst `PW_CHROMIUM=…`).
 - Eigene Mauszeiger nur über `--zeiger-*` im ersten `:root` von `src/styles/00-tokens.css` bzw. `lib/zeiger.ts`, immer mit Kontur und System-Fallback; kein nacktes `crosshair`, `cursor: none` nur mit sichtbarem Ersatz (M464).
 - Zähl-Texte über `zahlWort(n, 'Karte', 'Karten')` in `lib/sprache.ts` — nie `${n} Karten` oder „Karte(n)" (M461).
 - Neue Zeit-/Merkfelder, die jedes Gerät selbst stempelt (wie `geaendert`, `spalteSeit`), in die Listen von `lib/abgleichZeiten.ts` eintragen — sonst erzeugen sie im Abgleich Schein-Konflikte (M472).
+- Abgleich (M524): Was ein Gerät vom Server einarbeitet, wird im selben Zug seine Basis (`basisMerken` vor dem eigenen Schreiben) — sonst hält es Übernommenes später für eigene Änderungen und schreibt Altes zurück. Was von selbst entsteht (erkannter Text, gemessene Höhen, Eingesammeltes), läuft in `runDerived` und löst kein Hochladen aus; Karten vergleicht man mit `kanonText`/`vergleichsText`, nie nach Schlüsselfolge oder `measured`. Neue Wege mit `pruefungen/m524-konto-ruecksetzer.mjs` (steuerbarer Konto-Server, drei Geräte) gegenprüfen.
 - Daten von außen (Links, Dateien, Sync, Live-Kanal) laufen durch
   `lib/sicher.ts`. Die Gestalt-Prüfung dazu (`lib/sicherGestalt.ts`, M522) lädt nach: Ein neuer Weg, der im
   Start-Paket Fremdes annimmt, ruft vorher `await gestaltLaden()`; eine neue Kartenart oder ein neues Listen-Feld

@@ -25,6 +25,13 @@ export const SYNC_DIRTY_KEY = 'pixinotes:sync-dirty';
 export const WEBDAV_DIRTY_KEY = 'pixinotes:webdav-dirty';
 /** M317: Konto-Sync (Google Drive / OneDrive) — eigener Dirty-Schlüssel wie bei WebDAV */
 export const KONTO_DIRTY_KEY = 'pixinotes:konto-dirty';
+/**
+ * M524: Das Merkzeichen „hier liegt Ungesichertes" setzen — nur, wenn es noch nicht steht. Die Zuhörer von Ordner,
+ * WebDAV und Konto schrieben es bei JEDER Store-Änderung neu (sechs Speicher-Schreibvorgänge je Mausbewegung im Zug).
+ */
+export function merkeUngesichert(...schluessel: string[]): void {
+  for (const k of schluessel) if (localStorage.getItem(k) !== '1') localStorage.setItem(k, '1');
+}
 
 // Sync-Status für die Kopfleisten-Anzeige (M85): Der Auto-Sync arbeitete
 // bisher komplett unsichtbar — schlief er (Freigabe nach Neustart weg,
@@ -127,6 +134,16 @@ export async function idbGet<T>(key: string): Promise<T | undefined> {
   return new Promise((resolve, reject) => {
     const req = db.transaction('kv', 'readonly').objectStore('kv').get(key);
     req.onsuccess = () => resolve(req.result as T | undefined);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/** M524: Gibt es den Eintrag? — ohne seinen Inhalt zu laden (Quelltexte und Dateien sind oft Megabyte groß) */
+export async function idbHat(key: string): Promise<boolean> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const req = db.transaction('kv', 'readonly').objectStore('kv').count(key);
+    req.onsuccess = () => resolve(req.result > 0);
     req.onerror = () => reject(req.error);
   });
 }
@@ -512,6 +529,29 @@ export const notiereAenderung = (): void => { letzteAenderung = Date.now(); };
 const tippt = (): boolean => Date.now() - letzteAenderung < 2500;
 
 /**
+ * M524: Fiele der Abgleich dem Nutzer gerade in die Hand? Nur dann wartet er („später").
+ *
+ * Vorher wartete er, sobald IRGENDETWAS auf dem offenen Board anders würde und in den letzten 2,5 s irgendeine eigene
+ * Änderung lag. Wer zügig arbeitete (alle ein, zwei Sekunden eine Karte verschob), während ein zweites Gerät etwas
+ * schrieb, kam nie an die Reihe: nichts wurde eingearbeitet — und nichts hochgeladen, minutenlang. Seit M364 baut
+ * der Abgleich das Board nicht mehr neu auf; er ersetzt nur die geänderten Karten. Gewartet wird darum nur noch,
+ *   · solange in einem Textfeld geschrieben wird (wie bisher: ein Text ist vielleicht noch nicht im Speicher, und
+ *     eine neue Karte daneben soll nicht mitten ins Wort fallen),
+ *   · wenn eine Karte, die gerade gezogen wird, selbst anders würde,
+ *   · wenn das offene Board selbst kommt oder geht (dann wird neu aufgebaut).
+ * Wer Karten verschiebt, anordnet, löscht, bekommt fremde Änderungen sofort — und wird sein Eigenes sofort los.
+ */
+function trifftEingabe(hier: BoardDoc | undefined, neu: BoardDoc | undefined): boolean {
+  if (!hier || !neu) return true;
+  const el = typeof document === 'undefined' ? null : document.activeElement;
+  if (el instanceof HTMLElement && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return true;
+  const gezogen = hier.nodes.filter((n) => (n as { dragging?: boolean }).dragging);
+  if (gezogen.length === 0) return false;
+  const N = new Map(neu.nodes.map((n) => [n.id, n]));
+  return gezogen.some((n) => { const m = N.get(n.id); return !m || (m !== n && JSON.stringify(m) !== JSON.stringify(n)); });
+}
+
+/**
  * Fremden Stand einarbeiten. `nebenkopie` = eine Konfliktkopie des Cloud-
  * Clients: Sie liefert nur Inhalte, trägt aber nie Stempel oder Basis —
  * beides gehört der Hauptdatei; was aus der Kopie übernommen wurde, wird
@@ -536,7 +576,8 @@ export async function fremdStandEinarbeiten(remote0: SyncPayload, weg: SyncWeg, 
   const s = useBoard.getState();
   const erg = dreiWegeMerge(basis, { boards: s.boards.map((b) => liveHaken.vor(b)), spaces: s.spaces }, remote);
   if (erg.lokalNeu) {
-    if (erg.geaendert.includes(s.activeId) && tippt()) return 'spaeter';
+    if (erg.geaendert.includes(s.activeId) && tippt()
+      && trifftEingabe(s.boards.find((b) => b.id === s.activeId), erg.boards.find((b) => b.id === s.activeId))) return 'spaeter';
     useBoard.getState().importSync(erg.boards.map((b) => liveHaken.nach(b)), erg.spaces, s.activeId, { geaendert: erg.geaendert });
     if (!flushPersist()) return 'fehler';
     // Beipack (M269) nachgelagert — Karten holen ihre Vorschau, sobald er da ist
@@ -553,6 +594,12 @@ export async function fremdStandEinarbeiten(remote0: SyncPayload, weg: SyncWeg, 
     return erg.lokalNeu ? 'zusammengefuehrt' : 'gleich';
   }
   if (erg.fremdNeu) {
+    // M524: Der fremde Stand steckt jetzt im lokalen — ab hier ist ER der gemeinsame Vorfahre, auch wenn das
+    // Schreiben gleich scheitert (ein anderes Gerät war schneller, das Netz reißt ab, der Server lehnt ab). Vorher
+    // blieb dann die alte Basis stehen: Beim nächsten Abgleich galt alles eben Übernommene als „hier geändert" und
+    // schlug die inzwischen neuere Fassung des anderen Geräts — das ruhende Gerät schrieb dessen ALTEN Stand zurück,
+    // und beim Arbeitenden sprang die Karte auf die frühere Lage.
+    await basisMerken(weg.source, remote);
     await weg.schreiben();
   } else {
     try {
@@ -796,7 +843,7 @@ export function initAutoSync(): void {
     // rekonstruierbar und dürfen die Übernahme eines Sync-Stands nicht blocken.
     if (!inDerived()) {
       notiereAenderung();
-      try { localStorage.setItem(SYNC_DIRTY_KEY, '1'); localStorage.setItem(WEBDAV_DIRTY_KEY, '1'); localStorage.setItem(KONTO_DIRTY_KEY, '1'); } catch { /* voll → sicherer ohne Fast-Forward */ }
+      try { merkeUngesichert(SYNC_DIRTY_KEY, WEBDAV_DIRTY_KEY, KONTO_DIRTY_KEY); } catch { /* voll → sicherer ohne Fast-Forward */ }
     }
     clearTimeout(timer);
     timer = setTimeout(() => { void autoSave().catch(() => {}); }, 1800);

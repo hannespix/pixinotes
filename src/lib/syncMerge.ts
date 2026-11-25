@@ -28,7 +28,7 @@
 import type { Edge } from '@xyflow/react';
 import { bubblesMischen, type BubblesData } from './bubbles';
 import { punkteMischen } from './punkte';
-import { vergleichsText, zeitenVereinen } from './abgleichZeiten';
+import { kanonText, spaeterWert, vergleichsText, zeitenVereinen, ZEIT_FELDER_DATEN, ZEIT_FELDER_KARTE } from './abgleichZeiten';
 import type { BoardDoc, CommentThread, Project, Space, Stroke } from '../store';
 import type { AppNode } from '../types';
 import { istEingang } from './eingangId';
@@ -218,7 +218,9 @@ function bubblesVereinen(nodes: AppNode[], lokal: AppNode[], fremd: AppNode[]): 
     if (n.type === 'bubbles' && l.type === 'bubbles' && f.type === 'bubbles') {
       const m = bubblesMischen(l.data as Partial<BubblesData>, f.data as Partial<BubblesData>);
       const d = n.data as Partial<BubblesData>;
-      if (JSON.stringify([d.ideen, d.stimmen, d.gruppen, d.abstimmung, d.regeln ?? null]) !== JSON.stringify([m.ideen, m.stimmen, m.gruppen, m.abstimmung, m.regeln ?? null])) {
+      // M524: nach Inhalt vergleichen, nicht nach der Reihenfolge der Schlüssel — die hängt davon ab, welches Gerät
+      // mischt; zwei Geräte schrieben sich dieselbe Karte sonst endlos in ihrer eigenen Reihenfolge zu
+      if (kanonText([d.ideen, d.stimmen, d.gruppen, d.abstimmung, d.regeln ?? null]) !== kanonText([m.ideen, m.stimmen, m.gruppen, m.abstimmung, m.regeln ?? null])) {
         geaendert = true;
         n = { ...n, data: { ...n.data, ...m } } as AppNode;
       }
@@ -226,7 +228,7 @@ function bubblesVereinen(nodes: AppNode[], lokal: AppNode[], fremd: AppNode[]): 
     // M377: Punkte gehören je einer Person — die Tabellen beider Seiten werden vereinigt, nie gegeneinander entschieden
     if (mitPunkten(l) || mitPunkten(f)) {
       const m = punkteMischen((l.data as { punkte?: unknown }).punkte, (f.data as { punkte?: unknown }).punkte);
-      if (JSON.stringify((n.data as { punkte?: unknown }).punkte ?? {}) !== JSON.stringify(m)) {
+      if (kanonText((n.data as { punkte?: unknown }).punkte ?? {}) !== kanonText(m)) {
         geaendert = true;
         n = { ...n, data: { ...n.data, punkte: m } } as AppNode;
       }
@@ -248,6 +250,88 @@ const ohnePunkte = (n: AppNode): string => {
   return vergleichsText({ ...karte, data: daten } as AppNode);
 };
 
+/** M373: Was an einer Bubbles-Karte ohnehin vereinigt wird (bubblesVereinen) — zählt nicht als „anders" */
+const BUBBLES_TABELLEN = ['ideen', 'stimmen', 'gruppen', 'abstimmung', 'regeln'] as const;
+/** Die Karte, wie sie verglichen wird: ohne Punkte, Geräte-Eigenes, Zeitfelder — und bei Bubbles ohne ihre Tabellen */
+const vergleichsKarte = (n: AppNode): string => {
+  if (n.type !== 'bubbles') return ohnePunkte(n);
+  const daten = { ...(n.data as Record<string, unknown>) };
+  for (const k of BUBBLES_TABELLEN) delete daten[k];
+  return ohnePunkte({ ...n, data: daten } as AppNode);
+};
+
+/**
+ * M524: Zwei geänderte Fassungen EINER Karte, Feld für Feld. Vorher gewann bei „beide geändert" die hiesige Karte
+ * als Ganzes: Hatte ein Gerät an einem Bild nur den erkannten Text ergänzt (oder gar nichts getan — bei Bubbles-
+ * Karten galt jede Fassung als „hier geändert") und ein anderes dieselbe Karte verschoben, blieb hier die alte Lage
+ * und reiste von hier zurück. Jetzt gilt je Feld: nur drüben geändert → von drüben; nur hier → von hier; beide
+ * verschieden → hiesig (zählt als Konflikt). Die Lage ist ein Feld, `data` wird eine Ebene tiefer entschieden.
+ * Zeitfelder (abgleichZeiten.ts) nehmen den späteren Wert. Maße bleiben die hiesigen.
+ */
+function karteFeldweise(b: AppNode, l: AppNode, f: AppNode, z: Zaehler): AppNode {
+  type Satz = Record<string, unknown>;
+  const gleich = (x: unknown, y: unknown): boolean => x === y || kanonText(x) === kanonText(y);
+  let konflikt = false;
+  const mische = (B: Satz, L: Satz, F: Satz, aussen: ReadonlySet<string>, zeiten: readonly string[]): Satz => {
+    let aus = L;
+    const setze = (k: string, v: unknown): void => {
+      if (aus === L) aus = { ...L };
+      if (v === undefined) delete aus[k]; else aus[k] = v;
+    };
+    for (const k of new Set([...Object.keys(L), ...Object.keys(F), ...Object.keys(B)])) {
+      if (aussen.has(k) || gleich(L[k], F[k])) continue;
+      if (zeiten.includes(k)) { const w = spaeterWert(L[k], F[k]); if (w !== L[k]) setze(k, w); continue; }
+      if (gleich(L[k], B[k])) setze(k, F[k]);            // nur drüben geändert
+      else if (!gleich(F[k], B[k])) konflikt = true;     // beide verschieden → die hiesige bleibt
+    }
+    return aus;
+  };
+  const tabellen: string[] = l.type === 'bubbles' && f.type === 'bubbles' ? [...BUBBLES_TABELLEN] : [];
+  const karte = mische(b as unknown as Satz, l as unknown as Satz, f as unknown as Satz, new Set(['data', 'measured', 'selected', 'dragging']), ZEIT_FELDER_KARTE);
+  const daten = mische((b.data ?? {}) as Satz, (l.data ?? {}) as Satz, (f.data ?? {}) as Satz, new Set(['punkte', ...tabellen]), ZEIT_FELDER_DATEN);
+  if (konflikt) z.konflikte += 1;
+  if (karte === (l as unknown as Satz) && daten === l.data) return l;
+  return { ...karte, data: daten } as unknown as AppNode;
+}
+
+/**
+ * M524: Im Ergebnis stehen für alles, was sich gegenüber hier nicht geändert hat, wieder die HIESIGEN Objekte
+ * (Karten ohne Blick auf die Maße — die misst jedes Gerät selbst). Vorher kam ein Board, das nur drüben geändert
+ * war, als Ganzes von dort: jede Karte ein neues Objekt, das ganze Board zeichnete neu — bei jeder Änderung eines
+ * anderen Geräts. Ist danach alles wie hier, ist es das hiesige Board selbst.
+ */
+function hiesigeObjekte(w: BoardDoc, l: BoardDoc): BoardDoc {
+  if (w === l) return l;
+  // Hat dieses Gerät die Karte noch nie gemessen (Board hier nie geöffnet), kommt sie samt Maßen von drüben — wie bisher
+  const ohneMass = (n: AppNode): string => { const { measured: m, ...rest } = n as AppNode & { measured?: unknown }; return JSON.stringify(rest) + (m === undefined ? '∅' : ''); };
+  const liste = <T extends { id: string }>(neu: T[] | undefined, alt: T[] | undefined, text: (x: T) => string): T[] | undefined => {
+    if (!neu || !alt || neu === alt) return neu;
+    const A = new Map(alt.map((x) => [x.id, x]));
+    let wieAlt = neu.length === alt.length; let ersetzt = false;
+    const aus = neu.map((x, i) => {
+      const a = A.get(x.id);
+      if (a && (a === x || text(a) === text(x))) { if (a !== x) ersetzt = true; if (alt[i] !== a) wieAlt = false; return a; }
+      wieAlt = false;
+      return x;
+    });
+    return wieAlt ? alt : ersetzt ? aus : neu;
+  };
+  const roh = (x: unknown): string => JSON.stringify(x);
+  const nodes = liste(w.nodes, l.nodes, ohneMass) as AppNode[];
+  const edges = liste(w.edges, l.edges, roh) as Edge[];
+  const drawings = liste(w.drawings, l.drawings, roh);
+  const comments = liste(w.comments, l.comments, roh);
+  if (nodes === w.nodes && edges === w.edges && drawings === w.drawings && comments === w.comments) return w;
+  const aus: BoardDoc = { ...w, nodes, edges };
+  if (drawings) aus.drawings = drawings;
+  if (comments) aus.comments = comments;
+  if (nodes === l.nodes && edges === l.edges && aus.drawings === l.drawings && aus.comments === l.comments) {
+    const kopf = (x: BoardDoc): string => { const { nodes: _n, edges: _e, drawings: _d, comments: _c, ...rest } = x; return kanonText(rest); };
+    if (kopf(aus) === kopf(l)) return l;
+  }
+  return aus;
+}
+
 /** Zwei geänderte Fassungen EINES Boards: Felder dreiwegig, Inhalte je Kennung */
 function mergeBoard(basis: BoardDoc | undefined, lokal: BoardDoc, fremd: BoardDoc, z: Zaehler): BoardDoc {
   // M360: Nur lesend geteilt — es gilt allein der Stand des Besitzers
@@ -256,13 +340,22 @@ function mergeBoard(basis: BoardDoc | undefined, lokal: BoardDoc, fremd: BoardDo
     (basis && str(lokal[k]) === str(basis[k]) ? fremd[k] : lokal[k]);
   const nodes = bubblesVereinen(
     mergeListe<AppNode>(basis?.nodes, lokal.nodes, fremd.nodes, z, (b, l, f) => {
-      if (l.type === 'bubbles' && f.type === 'bubbles') return l;
+      // M373: Die Tabellen einer Bubbles-Karte (Ideen, Stimmen …) werden danach vereinigt — hier zählt der Rest.
+      // M524: Vorher gewann bei Bubbles-Karten immer die hiesige Fassung als Ganzes. „Hier geändert" ist eine solche
+      // Karte aber auf jedem Gerät (allein durch die Maße): Wer sie verschob, bekam sie vom nächsten Gerät an der
+      // alten Stelle zurück.
       // M377: Hat eine Seite nur Punkte vergeben, gilt der Inhalt der anderen — die Punkte werden danach vereinigt
-      const lo = ohnePunkte(l); const fo = ohnePunkte(f);
+      const lo = vergleichsKarte(l); const fo = vergleichsKarte(f);
       // M453/M472: inhaltsgleich, nur anders gestempelt — kein Konflikt; je Zeitfeld gilt der spätere Wert (auf beiden
       // Geräten gleich)
       if (lo === fo) return zeitenVereinen(l, f);
-      if (b) { const bo = ohnePunkte(b); if (bo === lo) return f; if (bo === fo) return l; }
+      if (b) {
+        const bo = vergleichsKarte(b);
+        if (bo === lo) return f;
+        if (bo === fo) return l;
+        return karteFeldweise(b, l, f, z);   // M524: beide geändert → Feld für Feld
+      }
+      if (l.type === 'bubbles' && f.type === 'bubbles') return l;
       z.konflikte += 1; return l;
     }),
     lokal.nodes, fremd.nodes);
@@ -488,6 +581,8 @@ export function dreiWegeMerge(basis0: SyncStand | null, lokal0: SyncStand, fremd
   const mL = byId(lokal.boards);
   const mF = byId(fremd.boards);
   const boards: BoardDoc[] = [];
+  /** M524: dasselbe Ergebnis, aber mit den hiesigen Objekten für alles Unveränderte — das kommt in den Speicher */
+  const hier0: BoardDoc[] = [];
   const geaendert: string[] = [];
   const ids = reihenfolge(basis?.boards.map((b) => b.id), lokal.boards.map((b) => b.id), fremd.boards.map((b) => b.id));
   for (const id of ids) {
@@ -502,9 +597,10 @@ export function dreiWegeMerge(basis0: SyncStand | null, lokal0: SyncStand, fremd
     const w = w0 !== undefined && l !== undefined && f !== undefined
       ? (() => { const nodes = bubblesVereinen(w0.nodes, l.nodes, f.nodes); return nodes === w0.nodes ? w0 : { ...w0, nodes }; })()
       : w0;
-    if (w !== undefined) boards.push(w);
+    const wh = w !== undefined && l !== undefined ? hiesigeObjekte(w, l) : w;
+    if (w !== undefined && wh !== undefined) { boards.push(w); hier0.push(wh); }
     // Abweichung vom lokalen Stand merken (für Undo-Verlauf und Neuaufbau der Ansicht)
-    if ((w === undefined) !== (l === undefined) || (w !== undefined && l !== undefined && w !== l && str(w) !== str(l))) geaendert.push(id);
+    if ((w === undefined) !== (l === undefined) || (wh !== undefined && l !== undefined && wh !== l && str(wh) !== str(l))) geaendert.push(id);
   }
   bericht.konflikte = z.konflikte;
   // M478: Der Eingang ist ein System-Board ohne Projekt — er gehört nicht zu den „Waisen“, die ins erste Projekt wandern
@@ -515,7 +611,7 @@ export function dreiWegeMerge(basis0: SyncStand | null, lokal0: SyncStand, fremd
   const fremdNeu = !gleicheBoards(boards, fremd.boards) || str(spaces) !== str(fremd.spaces);
   // die Auswahl dieses Geräts kommt zurück — verglichen wird danach mit dem Stand, wie er hier im Speicher liegt
   const hier = byId(lokal0.boards);
-  const mitWahl = boards.map((b) => mitAuswahl(b, hier.get(b.id), zurueck));
+  const mitWahl = hier0.map((b) => mitAuswahl(b, hier.get(b.id), zurueck));
   const lokalNeu = !gleicheBoards(mitWahl, lokal0.boards) || str(spaces) !== str(lokal.spaces);
   return { boards: mitWahl, spaces, bericht, geaendert, lokalNeu, fremdNeu };
 }
