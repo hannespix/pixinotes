@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { NodeToolbar, Position, type NodeProps } from '@xyflow/react';
-import { runDerived, useBoard, useKarteFestId } from '../../store';
+import { runDerived, useBoard } from '../../store';
+import { useKarteFestId } from '../../store/selektoren';   // M531 (direkt: store.ts behält seine Namen, m480)
 import type { MermaidNode } from '../../types';
 import { IWand, IUhr } from '../Icons';
 import { MenuHuelle } from '../EbenenMenu';
