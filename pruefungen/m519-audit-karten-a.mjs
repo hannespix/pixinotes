@@ -294,10 +294,11 @@ if (laufe('H')) {
     const auff = [];
     for (const [fx, fy] of punkte) for (const pause of [90, 250]) for (let versuch = 0; versuch < 3; versuch++) {
       const { ctx, P, fehler } = await seite([karte, fern], { viewport: { width: 390, height: 780 }, telefon: true });
-      // Zeiten mitschreiben: wann die Tipps ankamen und ab wann der Fokus stand (unter Last kommt der zweite Tipp mitunter zu spät)
+      // Zeiten mitschreiben: wann die Tipps ankamen und wann der erste Klick den Fokus öffnete (unter Last kommt der
+      // zweite Tipp mitunter zu spät). Der Klick des ersten Tipps IST das Öffnen — die Kopfzeile erscheint erst danach.
       await P.evaluate(() => {
         window.__druck = []; window.addEventListener('pointerdown', () => window.__druck.push(performance.now()), true);
-        new MutationObserver(() => { if (!window.__offenAb && document.querySelector('.focus-head')) window.__offenAb = performance.now(); }).observe(document.body, { childList: true, subtree: true });
+        window.addEventListener('click', () => { window.__offenAb ??= performance.now(); }, true);
       });
       // was der zweite Tipp auslösen könnte, mitschreiben statt ausführen: Verweise (tel:, mailto:, Web), Downloads
       await P.evaluate(() => { window.__ausgeloest = []; document.addEventListener('click', (e) => { const a = e.target.closest?.('a[href]'); if (a && !e.defaultPrevented) { window.__ausgeloest.push(a.getAttribute('href')); e.preventDefault(); } }); });
@@ -327,7 +328,7 @@ if (laufe('H')) {
       await ctx.close();
       // Kam der zweite Tipp erst lange nach dem Öffnen an (Rechner unter Last), war es kein Doppeltipp, sondern ein
       // gewöhnlicher Tipp in die offene Karte — der Fall wird wiederholt, nicht gewertet
-      if (zeit.d.length >= 2 && zeit.f && zeit.d[1] - zeit.f > 330) { if (versuch === 2) console.log(`    (${fx}, ${fy}) ${pause} ms: zweiter Tipp dreimal zu spät – nicht gewertet`); continue; }
+      if (zeit.d.length >= 2 && zeit.f && zeit.d[1] - zeit.f > 400) { if (versuch === 2) console.log(`    (${fx}, ${fy}) ${pause} ms: zweiter Tipp dreimal zu spät – nicht gewertet`); continue; }
       if (was.length) auff.push(`(${fx}, ${fy}) ${pause} ms: ${was.join(', ')}`);
       break;
     }
