@@ -293,6 +293,8 @@ function abgleichen(): void {
   const schreiber = getWriterRole() === 'writer';
   let weg = false;
   for (const [token, e] of Object.entries(g)) {
+    // M531: Vermerk einer Runde, deren Karte gelöscht wurde — hält nur fest, dass sie vorbei ist (siehe unten)
+    if (e.ende) { if (Date.now() - e.ende > 30 * 86_400_000) { delete g[token]; weg = true; } continue; }
     const n = karteVon(e.board, e.karte);
     const m = n && n.type === 'bubbles' ? mitmachenVon(n.data, n.id) : null;
     const boardDa = useBoard.getState().boards.some((b) => b.id === e.board);
@@ -300,14 +302,21 @@ function abgleichen(): void {
       // Runde beendet (oder Karte gelöscht): Schluss sagen, Schlüssel vergessen. Fehlt nur das Board (noch nicht
       // geladen), bleibt der Schlüssel.
       if (dienste.has(token)) anhalten(token, true);
-      if (boardDa || Date.now() - e.seit > 30 * 86_400_000) { delete g[token]; weg = true; }
+      if (boardDa) {
+        // M531: Karte gelöscht → den Schlüssel vergessen, aber vermerken, dass diese Runde HIER zu Ende ging. Holt
+        // Strg+Z die Karte zurück, trägt sie noch „an"; ohne Vermerk hieß es dann „Läuft auf einem anderen Gerät",
+        // obwohl niemand mehr Gastgeber war. Mit Vermerk gilt die Runde als beendet und startet ohne Rückfrage neu.
+        if (!n) g[token] = { board: e.board, karte: e.karte, seit: e.seit, ende: Date.now() };
+        else delete g[token];
+        weg = true;
+      } else if (Date.now() - e.seit > 30 * 86_400_000) { delete g[token]; weg = true; }
       continue;
     }
     const d = dienste.get(token);
     if (!schreiber) { if (d) anhalten(token, false); continue; }
-    if (!d) { void starten(token, e); continue; }
+    if (!d) { if (e.jwk) void starten(token, { jwk: e.jwk, board: e.board, karte: e.karte }); continue; }
     if (n.data !== d.daten) { d.daten = n.data; planen(d); }
   }
-  for (const token of [...dienste.keys()]) if (!g[token]) anhalten(token, true);
+  for (const token of [...dienste.keys()]) if (!g[token] || g[token].ende) anhalten(token, true);
   if (weg) gemerktSetzen(g);
 }

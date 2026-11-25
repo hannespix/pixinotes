@@ -386,7 +386,8 @@ console.log('\n════ J: Board nur zum Lesen ════');
   // Inhalt bleibt geschützt
   await h.knoten('sh').locator('td[data-zelle="C2"]').click();
   await P.waitForSelector('.sheet-eingabe'); await P.keyboard.type('99'); await P.keyboard.press('Enter');
-  await h.knoten('ti').locator('.time-kind', { hasText: 'Arbeit' }).click();
+  // M531: auf Nur-lesen-Boards gibt es die Knöpfe zum Erfassen nicht mehr — der Klick wird ausgelöst, ohne dass man ihn sieht
+  await h.knoten('ti').locator('.time-kind', { hasText: 'Arbeit' }).dispatchEvent('click');
   await P.waitForTimeout(400);
   const nachher = JSON.stringify((await h.zustand()).boards[0].nodes.map((n) => n.data));
   pruefe('J6 Der Inhalt bleibt geschützt, und im Speicher ändert sich nichts (die Ansicht gilt nur auf diesem Gerät)', nachher === vorher && (await h.knoten('sh').locator('td[data-zelle="C2"]').innerText()).trim() === '');

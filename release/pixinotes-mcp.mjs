@@ -40554,6 +40554,9 @@ var import_react = __toESM(require_react(), 1);
 // src/lib/download.ts
 init_define_import_meta_env();
 
+// src/lib/dates.ts
+init_sprache();
+
 // src/lib/fristAnker.ts
 init_define_import_meta_env();
 

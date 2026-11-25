@@ -8,12 +8,36 @@
 import { useSyncExternalStore } from 'react';
 import type { ParsedResult } from 'chrono-node';
 import { triggerDownload } from './download';
+import { sprache } from './sprache';
 
 type ChronoDe = typeof import('./chronoKern')['chronoDe'];
 let chronoDe: ChronoDe | null = null;
 let ladung: Promise<void> | null = null;
 let stand = 0;
 const hoerer = new Set<() => void>();
+const neuZeichnen = (): void => { fundSpeicher.clear(); stand += 1; for (const h of [...hoerer]) h(); };
+/**
+ * M531: Englische Fristen („by Friday", „tomorrow", „next week"). Die englischen Regeln bringt chrono-node ohnehin
+ * mit (die Grundeinstellung der Bibliothek ist Englisch, sie lagen schon immer im Nachlade-Teil „fristen") — sie
+ * kosten dort rund 1 KB mehr und nichts im Start. Gelesen wird englisch nur, wenn die Oberfläche englisch ist oder ein
+ * Text mit englischen Datumswörtern deutsch nichts ergibt.
+ */
+type ChronoEn = typeof import('./chronoKern')['chronoEn'];
+let chronoEn: ChronoEn | null = null;
+/** Die englische Erkennung, falls schon geladen (null sonst — dann `englischNoetig` fragen) */
+export const englischeErkennung = (): ChronoEn | null => chronoEn;
+const KANN_EN = /\b(?:today|tonight|tomorrow|yesterday|monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tues?|wed|thu(?:rs?)?|fri|sat|sun|weekend|weeks?|months?|years?|days?|hours?|noon|midnight|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec)\b/i;
+/** In der deutschen Oberfläche nur Wörter, die es deutsch nicht gibt — „Jan", „Nov" oder „Sat" lesen nicht englisch */
+const EINDEUTIG_EN = /\b(?:today|tonight|tomorrow|yesterday|monday|tuesday|wednesday|thursday|friday|saturday|sunday|weekend|noon|midnight|january|february|march|june|july|october|december|next (?:week|month|year)|in (?:a|\d+) (?:days?|weeks?|months?))\b/i;
+/** Enthält der Text englische Datumswörter? */
+export const kannEnglischSein = (text: string): boolean => (sprache() === 'en' ? KANN_EN : EINDEUTIG_EN).test(text);
+/**
+ * Soll für diesen Text englisch gelesen werden? Ja, wenn die Oberfläche englisch ist oder deutsch nichts gefunden
+ * wurde — und der Text englische Datumswörter hat.
+ */
+export function englischNoetig(text: string, deutschGefunden: boolean): boolean {
+  return !!chronoEn && !(deutschGefunden && sprache() !== 'en') && kannEnglischSein(text);
+}
 /** Ist die Fristen-Erkennung geladen? */
 export const fristenBereit = (): boolean => !!chronoDe;
 /** Die Fristen-Erkennung laden (einmal; danach sofort erfüllt). Anzeigen, die `useFristenStand` nutzen, zeichnen neu. */
@@ -21,9 +45,8 @@ export function fristenLaden(): Promise<void> {
   if (!ladung) {
     ladung = import('./chronoKern').then((m) => {
       chronoDe = m.chronoDe;
-      fundSpeicher.clear();
-      stand += 1;
-      for (const h of [...hoerer]) h();
+      chronoEn = m.chronoEn;   // M531
+      neuZeichnen();
     });
     ladung.catch(() => { ladung = null; });   // offline und nicht im Cache: beim nächsten Text erneut versuchen
   }
@@ -115,24 +138,30 @@ export function detectDates(text: string, now: Date = new Date(), anker?: Date):
   let funde = fundSpeicher.get(schluessel);
   if (!funde) {
     const lesbar = text.replace(KEIN_TERMIN, (m) => ' '.repeat(m.length));
-    if (!kannDatumSein(lesbar)) return [];
+    if (!kannDatumSein(lesbar) && !kannEnglischSein(lesbar)) return [];
     // M459: noch nicht geladen → anstoßen, vorerst nichts (nicht merken — nach dem Laden wird neu gelesen)
     if (!chronoDe) { void fristenLaden().catch(() => {}); return []; }
-    let results: ParsedResult[] = [];
-    try {
-      results = chronoDe.parse(lesbar, ref, { forwardDate: true });
-    } catch {
-      return [];
-    }
-    funde = [];
-    for (const r of results) {
-      // Reine Uhrzeiten überspringen
-      if (!r.start.isCertain('day') && !r.start.isCertain('weekday')) continue;
-      if (nurWortKeinTag(lesbar, r)) continue;
-      funde.push({ text: r.text, date: r.start.date(), index: r.index });
-    }
-    funde.push(...kurzdaten(lesbar, ref));
-    funde.sort((a, b) => a.index - b.index);
+    const gefunden: Array<{ text: string; date: Date; index: number }> = [];
+    const lies = (parser: ChronoDe | ChronoEn): boolean => {
+      let results: ParsedResult[] = [];
+      try {
+        results = parser.parse(lesbar, ref, { forwardDate: true });
+      } catch {
+        return false;
+      }
+      for (const r of results) {
+        // Reine Uhrzeiten überspringen
+        if (!r.start.isCertain('day') && !r.start.isCertain('weekday')) continue;
+        if (nurWortKeinTag(lesbar, r)) continue;
+        gefunden.push({ text: r.text, date: r.start.date(), index: r.index });
+      }
+      return true;
+    };
+    if (!lies(chronoDe)) return [];
+    gefunden.push(...kurzdaten(lesbar, ref));
+    // M531: englisch nachlesen („by Friday") — in der englischen Oberfläche immer, sonst nur, wenn deutsch nichts kam
+    if (englischNoetig(lesbar, gefunden.length > 0)) lies(chronoEn!);
+    funde = gefunden.sort((a, b) => a.index - b.index);
     fundSpeicher.set(schluessel, funde);
   }
   const seen = new Set<string>();
@@ -156,7 +185,7 @@ export function detectDates(text: string, now: Date = new Date(), anker?: Date):
  * M459: `null` = weiß ich noch nicht (die Erkennung lädt gerade) — wer Daten daraus ableitet, ändert dann nichts.
  */
 export function hatRelativesDatumOderOffen(text: string): boolean | null {
-  if (!text || text.length < 3 || !kannDatumSein(text)) return false;
+  if (!text || text.length < 3 || (!kannDatumSein(text) && !kannEnglischSein(text))) return false;
   if (!chronoDe) { void fristenLaden().catch(() => {}); return null; }
   return hatRelativesDatum(text);
 }

@@ -27,7 +27,7 @@
 import { ankerFuer, type FristAnker } from './fristAnker';
 import type { ParsedResult } from 'chrono-node';
 import { chronoDe } from './chronoKern';
-import { kurzdaten, nurWortKeinTag } from './dates';
+import { englischeErkennung, englischNoetig, kurzdaten, nurWortKeinTag } from './dates';
 
 export interface NotizTermin {
   /** ISO yyyy-mm-dd */
@@ -78,6 +78,8 @@ function scanne(blocks: AnyBlock[] | undefined, out: NotizTermin[], anker?: Fris
         let ergebnisse: ParsedResult[];
         try {
           ergebnisse = chronoDe.parse(text, ref, { forwardDate: true });
+          // M531: englische Angaben („Review on Friday") — nur, wenn deutsch nichts kam oder die Oberfläche englisch ist
+          if (englischNoetig(text, ergebnisse.length > 0)) ergebnisse = [...ergebnisse, ...englischeErkennung()!.parse(text, ref, { forwardDate: true })];
         } catch {
           ergebnisse = [];
         }
