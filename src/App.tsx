@@ -1,6 +1,7 @@
 import { QR_EREIGNIS } from './lib/qr';
 import { lazy, Suspense, useEffect, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react';
 import { nachLazy } from './lib/nachLazy';
+import { ausserhalbZug } from './lib/zugAnzeige';
 import { ReactFlowProvider } from '@xyflow/react';
 import { auswahlLeisteLaden, Board, kartenVorladen, kommentareLaden } from './components/Board';
 import { Dock } from './components/Dock';
@@ -271,7 +272,8 @@ function imLeerlaufVorladen() {
     for (const l of [ladeEinstellungen, ladeHilfe, ladeVorlagen, ladeVersionen, ladeSicherung, ladeEingang, ladeAppInstallieren]) void l().catch(() => null);
   };
   const ric = (window as Window & { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
-  window.setTimeout(() => (ric ? ric(los, { timeout: 4000 }) : los()), VORLADEN_NACH_MS);
+  // M539: nicht mitten in einen Zug (jedes import() hängt Links in den Kopf → Stil des ganzen Dokuments neu)
+  window.setTimeout(() => (ric ? ric(() => ausserhalbZug(los), { timeout: 4000 }) : ausserhalbZug(los)), VORLADEN_NACH_MS);
 }
 /** So lange nach dem Laden warten — der Start selbst (erstes Board, Editor) hat Vorrang */
 const VORLADEN_NACH_MS = 4000;
@@ -298,7 +300,7 @@ export default function App() {
   // Auto-Sync in den verbundenen Sync-Ordner (Nextcloud & Co.) — no-op ohne Verbindung
   useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initSyncStart(); initBrain(); initGrabsteine(); initBoardVersionen(); seitenBreitenReparieren();
     // M476: Auto-Sicherung bzw. die Erinnerung nach 14 Tagen — der Code dafür lädt nur nach, wenn etwas fällig ist
-    window.setTimeout(() => { if (sicherungStartFaellig()) void import('./lib/sicherung').then((m) => m.sicherungStart()); }, 6000); imLeerlaufVorladen(); window.setTimeout(verlaufLaden, VORLADEN_NACH_MS);
+    window.setTimeout(() => ausserhalbZug(() => { if (sicherungStartFaellig()) void import('./lib/sicherung').then((m) => m.sicherungStart()); }), 6000); imLeerlaufVorladen(); window.setTimeout(() => ausserhalbZug(verlaufLaden), VORLADEN_NACH_MS);
     // M513: Läuft auf diesem Gerät eine Mitmach-Runde (QR an einer Ideabubbles-Karte)? Dann den Gastgeber nachladen.
     try { if (localStorage.getItem('pixinotes-mitmachen')) void import('./lib/mitmachen').then((m) => m.gastgeberLaden()); } catch { /* privat */ } window.setTimeout(() => useBoard.getState().fristAnkerNachtragen(), 1200); }, []);
 
@@ -336,9 +338,9 @@ export default function App() {
   useEffect(() => {
     let stopp: (() => void) | null = null;
     let weg = false;
-    const t = window.setTimeout(() => {
-      void import('./lib/textInBildern').then((m) => { if (!weg) stopp = m.bildTextStarten(0); }).catch(() => {});
-    }, BILDTEXT_NACH_MS);
+    const t = window.setTimeout(() => ausserhalbZug(() => {
+      if (!weg) void import('./lib/textInBildern').then((m) => { if (!weg) stopp = m.bildTextStarten(0); }).catch(() => {});
+    }), BILDTEXT_NACH_MS);
     return () => { weg = true; window.clearTimeout(t); stopp?.(); };
   }, []);
 
