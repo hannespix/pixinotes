@@ -7,10 +7,10 @@
 // WICHTIG: Das Paket enthält NIEMALS KI-Schlüssel, WebDAV-Zugangsdaten oder
 // OAuth-Tokens — die leben in eigenen localStorage-Schlüsseln außerhalb des
 // Board-Stores und werden hier gar nicht erst angefasst.
-import { t } from './sprache';
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc } from '../store';
 import { ensurePermission, idbDel, idbGet, idbSet, syncSupported, type SyncDirHandle } from './syncFolder';
 import { nurAuswahlAnders, ohneAuswahl } from './syncMerge';
+import { gestaltLaden } from './sicher';
 
 export interface ProjectPayload {
   app: 'pixinotes-projekt';
@@ -68,11 +68,14 @@ function isPayload(p: unknown): p is ProjectPayload {
     && Array.isArray(x.boards) && x.boards.length > 0;
 }
 
+// M522: Was im Paket steht, haben ANDERE geschrieben — es läuft durch lib/sicherGestalt.ts (paketVonAussen).
+// Lädt die Prüfung nicht (offline), gilt die Grundprüfung wie zuvor.
+const paketGeprueft = (p: unknown): Promise<ProjectPayload | null> =>
+  gestaltLaden().then((m) => m.paketVonAussen(p, isPayload), () => (isPayload(p) ? p : null));
 export async function readProjectFile(handle: SyncDirHandle, projectId: string): Promise<ProjectPayload | null> {
   try {
     const fh = await handle.getFileHandle(fileNameFor(projectId));
-    const p = JSON.parse(await (await fh.getFile()).text()) as unknown;
-    return isPayload(p) ? p : null;
+    return await paketGeprueft(JSON.parse(await (await fh.getFile()).text()));
   } catch {
     return null; // Datei existiert (noch) nicht oder ist unlesbar
   }
@@ -87,8 +90,8 @@ export async function scanProjectFiles(handle: SyncDirHandle): Promise<ProjectPa
       if (entry.kind !== 'file' || !FILE_RE.test(entry.name)) continue;
       try {
         const fh = await handle.getFileHandle(entry.name);
-        const p = JSON.parse(await (await fh.getFile()).text()) as unknown;
-        if (isPayload(p)) out.push(p);
+        const p = await paketGeprueft(JSON.parse(await (await fh.getFile()).text()));
+        if (p) out.push(p);
       } catch { /* einzelne kaputte Datei überspringen */ }
     }
   } catch { /* Auflistung nicht möglich */ }
@@ -199,28 +202,7 @@ export async function disconnectProjectSync(projectId: string): Promise<void> {
   localStorage.removeItem(dirtyKey(projectId));
 }
 
-// ---------- Einladung per E-Mail (bewusst OHNE Passwörter/Zugangsdaten) ----------
-export function buildInviteText(projectName: string, folderName: string): string {
-  const appUrl = window.location.href.split('#')[0];
-  return [
-    'Hallo,',
-    '',
-    `ich lade dich ein, an unserem PixiNotes-Projekt „${projectName}" mitzuarbeiten. So trittst du bei:`,
-    '',
-    `1) Nimm die Ordner-Freigabe an: [HIER den Freigabe-Link zum Ordner „${folderName}" einfügen – z. B. in Nextcloud über „Teilen"]`,
-    '2) Lass den freigegebenen Ordner von deinem Sync-Client (Nextcloud/OneDrive/Dropbox) auf deinen Rechner synchronisieren.',
-    `3) Öffne PixiNotes: ${appUrl}`,
-    '4) Dort: Einstellungen (Zahnrad) → Synchronisation → „Projekt beitreten…" → wähle den synchronisierten Ordner aus.',
-    '',
-    'PixiNotes findet darin das Projekt-Paket, richtet den automatischen Abgleich ein und zeigt dir das Projekt neben deinen eigenen.',
-    'Wer mitarbeiten darf, regelt allein die Ordner-Freigabe – diese E-Mail enthält keine Passwörter oder Zugangsdaten.',
-  ].map((z) => t(z)).join('\n');   // M381: auf Englisch geht die Einladung englisch hinaus
-}
-
-export function buildInviteMailto(projectName: string, folderName: string): string {
-  const subject = t(`Einladung zum PixiNotes-Projekt „${projectName}"`);
-  return `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(buildInviteText(projectName, folderName))}`;
-}
+// Einladung per E-Mail: lib/projektEinladung.ts (M522 – nur die Einstellungen brauchen den Text, nicht der Start)
 
 // ---------- Auto-Sync (spiegelt die Logik des globalen Ordner-Syncs) ----------
 let started = false;

@@ -30,7 +30,8 @@ import { kontoDateiHolen } from '../../lib/syncStart';
  */
 export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
   const showToast = useBoard((s) => s.showToast);
-  const file = data;
+  // M519: ohne Namen oder Größe (alter Stand) mit Vorgaben rechnen statt auszufallen
+  const file = data.name && typeof data.size === 'number' ? data : { ...data, name: data.name || 'Datei', size: data.size ?? 0 };
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
   /** M263: „DB_Reservierung_762631109316.pdf" sagt niemandem etwas. */
   const eigenerTitel = !!file.titel?.trim();

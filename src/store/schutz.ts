@@ -28,9 +28,24 @@ if (typeof window !== 'undefined') {
   const merken = () => { letzteEingabe = performance.now(); };
   for (const ev of ['pointerdown', 'pointerup', 'keydown', 'drop', 'paste'] as const) window.addEventListener(ev, merken, true);
 }
+/**
+ * M522: Hat der Schutz in DIESEM Handgriff etwas verworfen? Karten melden ihren Erfolg gleich nach dem Schreiben
+ * („Arbeit beendet (2:00 h)", „Karte gelöscht") — sie erfahren nicht, dass der Speicher die Änderung nicht angenommen
+ * hat. Der Schutz merkt sich darum bis zum Ende des laufenden Handgriffs, WARUM er verworfen hat; showToast
+ * (store/hinweise.ts) zeigt dann diesen Grund statt der Erfolgsmeldung. Am Schutz selbst ändert das nichts.
+ */
+let verworfenWeil = '';
+export const schutzVerworfen = (): string => verworfenWeil;
+function verworfenMerken(grund: string): void {
+  // nur nach einer Eingabe — stille Selbst-Korrekturen der Karten (beim Aufbau) sind kein Handgriff
+  if (performance.now() - letzteEingabe > 1500) return;
+  if (!verworfenWeil) queueMicrotask(() => { verworfenWeil = ''; });
+  verworfenWeil = grund;
+}
 let leseHinweisAm = 0;
 export const LESE_HINWEIS = 'Dieses Board ist nur zum Lesen freigegeben. Für eigene Änderungen: oben „Eigene Kopie anlegen".';
 function leseHinweis(): void {
+  verworfenMerken(LESE_HINWEIS);
   const jetzt = performance.now();
   if (jetzt - letzteEingabe > 1500 || jetzt - leseHinweisAm < 4000) return;
   leseHinweisAm = jetzt;
@@ -113,10 +128,12 @@ export function setzeKartenSperren(boardId: string, sperren: Map<string, string>
 }
 let sperrHinweisAm = 0;
 function sperrHinweis(name: string): void {
+  const text = `${name} bearbeitet diese Karte gerade – gleich wieder frei.`;
+  verworfenMerken(text);
   const jetzt = performance.now();
   if (jetzt - letzteEingabe > 1500 || jetzt - sperrHinweisAm < 4000) return;
   sperrHinweisAm = jetzt;
-  queueMicrotask(() => useBoard.getState().showToast(`${name} bearbeitet diese Karte gerade – gleich wieder frei.`, false, 4000));
+  queueMicrotask(() => useBoard.getState().showToast(text, false, 4000));
 }
 /**
  * M477: Notizen, in denen gerade ANDERE gemeinsam tippen (Yjs, lib/notizGemeinsamKern.ts). Der Text ist frei — den
@@ -249,6 +266,7 @@ export function ohneStempel(fn: () => void): void {
 }
 let rechtHinweisAm = 0;
 function rechtHinweis(text: string): void {
+  verworfenMerken(text);
   const jetzt = performance.now();
   if (jetzt - letzteEingabe > 1500 || jetzt - rechtHinweisAm < 4000) return;
   rechtHinweisAm = jetzt;

@@ -18,6 +18,7 @@
 import { claimWriter, flushPersist, useBoard, hinweisMitKnopf, type BoardDoc, type CardTemplate, type Space } from '../store';
 import { uid, type AppNode, type KanbanData } from '../types';
 import { boardVonAussen, karteEntschaerfen, karteGueltig } from './sicher';
+import './sicherGestalt';   // M522: hängt die Gestalt-Prüfung in lib/sicher.ts ein
 import { idbDel, idbGet, idbKeys, idbSet, KONTO_DIRTY_KEY, SYNC_DIRTY_KEY, WEBDAV_DIRTY_KEY, type SyncDatei, type SyncDirHandle } from './syncFolder';
 import { zumWeitergeben } from './share';
 import { EINGANG_ID, istEingang } from './eingangId';

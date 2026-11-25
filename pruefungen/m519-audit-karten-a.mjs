@@ -315,7 +315,8 @@ if (laufe('H')) {
       if (z.fenster) was.push('Fenster offen');
       if (z.ausgeloest.length) was.push(`Verweis ${z.ausgeloest[0]}`);
       if (geladen.length) was.push(`Download ${geladen[0]}`);
-      if (z.tippt) was.push('Cursor im Text');
+      // (bei der Notiz setzt schon der ERSTE Tipp in den Text den Cursor — das gehört zum Antippen einer Notiz, nicht zum Doppeltipp)
+      if (z.tippt && name !== 'notiz') was.push('Cursor im Text');
       if (fehler.length) was.push(fehler[0]);
       if (was.length) auff.push(`(${fx}, ${fy}) ${pause} ms: ${was.join(', ')}`);
       await ctx.close();

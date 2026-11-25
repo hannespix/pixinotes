@@ -82,7 +82,9 @@ const NODE_COLORS: Array<[string, string, string]> = [
  * Sprache wie die Auswahl-Toolbar oben). Flowchart-Schritte werden direkt im
  * Bild bearbeitet: umbenennen, anfügen, Form, Farbe, verbinden, entfernen.
  */
-export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }: NodeProps<MermaidNode>) {
+export function MermaidCard({ id, data: roh, selected, width: nodeW, height: nodeH }: NodeProps<MermaidNode>) {
+  // M519: ohne Code (alter Stand) wie ein leeres Diagramm rechnen statt auszufallen
+  const data = useMemo(() => (typeof roh.code === 'string' ? roh : { ...roh, code: '' }), [roh]);
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const resizeNode = useBoard((s) => s.resizeNode);
   const showToast = useBoard((s) => s.showToast);
