@@ -589,17 +589,20 @@ const bekannteVersion = (boardId: string): number => {
  * Wie M524 beim Konto (Mini-Abruf vor board_aendern): Es bleibt das Fenster einer Anfrage.
  *   'gleich' — nichts Neues; 'neu' — eingearbeitet, der Schritt ist neu zu berechnen
  */
-async function vorSchreibenNachsehen(boardId: string, token: string): Promise<'gleich' | 'neu'> {
+async function vorSchreibenNachsehen(boardId: string, token: string): Promise<{ art: 'gleich' | 'neu'; version?: number }> {
   let s: { version: number } | null;
-  try { s = await rpc<{ version: number } | null>('gast_stand', { p_token: token }); } catch { return 'gleich'; }
-  if (!s) return 'gleich';
+  try { s = await rpc<{ version: number } | null>('gast_stand', { p_token: token }); } catch { return { art: 'gleich' }; }
+  if (!s) return { art: 'gleich' };
   const sv = Number(s.version);
-  if (!(sv > bekannteVersion(boardId))) return 'gleich';
+  if (!Number.isFinite(sv)) return { art: 'gleich' };
+  if (!(sv > bekannteVersion(boardId))) return { art: 'gleich', version: sv };
   await kettenLauf(boardId);                  // kam es schon über den Kanal?
-  if (sv <= bekannteVersion(boardId)) return 'neu';
+  if (sv <= bekannteVersion(boardId)) return { art: 'neu', version: sv };
   await holen(boardId, true);                // sonst den ganzen Stand (einmal — kein Warten auf Ruhe)
-  return 'neu';
+  return { art: 'neu', version: sv };
 }
+/** Wie oft hintereinander ein Schreiben an der Vorbedingung scheiterte (je Board) */
+const vorbedingungVersuche = new Map<string, number>();
 /** Board lokal nicht mehr da (gelöscht): Eintrag still entfernen */
 function beendetStill(boardId: string): void {
   setzeGruppe(boardId, null);
@@ -704,7 +707,7 @@ function nochmalBald(boardId: string): void {
 }
 
 /** Eigene Änderungen zum Server: nur, was sich geändert hat (M366) */
-async function hinaus(boardId: string, nachgesehen = false): Promise<void> {
+async function hinaus(boardId: string, nachgesehen?: { version?: number }): Promise<void> {
   if (ohnePatch) { await hinausGanz(boardId); return; }
   const e = lesen()[boardId];
   if (!e || e.rolle !== 'bearbeiten') return;
@@ -720,12 +723,25 @@ async function hinaus(boardId: string, nachgesehen = false): Promise<void> {
   const p = patchAus(ohneAuswahl(rein(stand)), zuSchreiben);
   if (!p) return;
   // M533: Eine Karte, die eben noch ein anderer in der Hand hatte → erst nachsehen, ob er inzwischen gespeichert hat
-  if (!nachgesehen && (p.nodes?.set ?? []).some((n) => fremdFrisch(boardId, n.id))) {
+  const riskant = (p.nodes?.set ?? []).some((n) => fremdFrisch(boardId, n.id));
+  let wenn = nachgesehen?.version;
+  if (riskant && !nachgesehen) {
     const r = await vorSchreibenNachsehen(boardId, e.token);
-    if (r === 'neu') { await hinaus(boardId, true); return; }
+    // eingearbeitet ist mindestens bis zur gesehenen Version (holen kann schon Neueres gebracht haben)
+    if (r.art === 'neu') { await hinaus(boardId, { version: r.version === undefined ? undefined : Math.max(r.version, bekannteVersion(boardId)) }); return; }
+    wenn = r.version;
   }
+  // M538: … und der Server schreibt nur, wenn das Board noch auf diesem Stand ist (Vorbedingung). Speichert der andere
+  // genau zwischen Blick und Schreiben, ersetzte die ganze Karte sonst seinen neuen Text. Nur bei solchen Karten: In
+  // großen Gruppen scheiterten sonst die meisten Schritte an Änderungen anderer an anderen Karten (M366).
+  // Die Vorbedingung steht im Patch (`wenn: { version }`, Migration 20261125120000_gast_aendern_vorbedingung.sql),
+  // nicht in einem eigenen Parameter: Ein Server ohne die Migration lässt den Schlüssel liegen und schreibt wie bisher
+  // (derselbe Aufruf, kein 404) — dann bleibt es beim Blick davor (M533, das Fenster einer Anfrage).
+  const mitWenn = riskant && wenn !== undefined;
   try {
-    const r = await rpc<{ version: number; vor: number }>('gast_aendern', { p_token: e.token, p_patch: p });
+    // `wenn` reist nur zum Server, nicht in den Kanal (`p` bleibt der reine Patch)
+    const r = await rpc<{ version: number; vor: number; geprueft?: boolean }>('gast_aendern', { p_token: e.token, p_patch: mitWenn ? { ...p, wenn: { version: wenn } } : p });
+    vorbedingungVersuche.delete(boardId);
     const v = Number(r.version); const vor = Number(r.vor);
     kanaele.get(boardId)?.senden('delta', JSON.stringify(p).length <= DELTA_MAX_ZEICHEN ? { v, vor, p } : { v, vor });
     k.wartend.set(v, { v, vor, p, eigen: true });
@@ -735,6 +751,16 @@ async function hinaus(boardId: string, nachgesehen = false): Promise<void> {
     const art = f instanceof GastFehler ? f.art : 'netz';
     // Der Server kennt die Funktion nicht (oder lässt Unangemeldete nicht heran): der bisherige Weg
     if (art === 'fehlt' || art === 'abgelehnt') { ohnePatch = true; await hinausGanz(boardId); return; }
+    // M538: Der andere hat zwischen Blick und Schreiben gespeichert → neu nachsehen, je Feld einarbeiten (M524), neu
+    // berechnen und noch einmal. Nie ohne Vorbedingung über seinen Stand hinweg: nach drei Versuchen später wieder.
+    if (art === 'vorbedingung') {
+      const n = (vorbedingungVersuche.get(boardId) ?? 0) + 1;
+      vorbedingungVersuche.set(boardId, n);
+      if (n <= 3) { await hinaus(boardId); return; }
+      vorbedingungVersuche.delete(boardId);
+      nochmalBald(boardId);
+      return;
+    }
     if (art === 'keine-freigabe') { await holen(boardId); return; }   // Rolle geändert oder Link beendet — der Blick klärt es
     if (art === 'nicht-erlaubt') { await serverGilt(boardId); return; }
     nochmalBald(boardId);
