@@ -6,7 +6,7 @@ import type { MermaidNode } from '../../types';
 import { IWand, IUhr } from '../Icons';
 import { MenuHuelle } from '../EbenenMenu';
 import { aiReady } from '../../lib/ai';
-import { aiMermaid, buildMermaidSource, getMermaid, LEGACY_MERMAID_DEFAULT, MERMAID_STYLES, MERMAID_TEMPLATES as TEMPLATES, mermaidResteWeg, preloadHandFont } from '../../lib/mermaid';
+import { aiMermaid, buildMermaidSource, LEGACY_MERMAID_DEFAULT, MERMAID_STYLES, MERMAID_TEMPLATES as TEMPLATES, mermaidResteWeg, mermaidZeichnen } from '../../lib/mermaid';
 import {
   addGanttSection, addGanttTask, addMindChild, addPie, addQuadrantPoint,
   addSeqActor, addSeqMsg, addSeqNote, addState, addTimelineEvent,
@@ -153,16 +153,11 @@ export function MermaidCard({ id, data: roh, selected, width: nodeW, height: nod
     // Debounce, damit nicht jeder Tastendruck einen (oft ungültigen)
     // Zwischenstand rendert (Audit)
     const t = setTimeout(() => {
-      getMermaid()
-        // Render-ID pro VERSUCH eindeutig: mermaid räumt vor dem Rendern alle
-        // Elemente mit derselben ID weg — mit stabiler ID löscht ein
-        // fehlgeschlagener Versuch sonst das angezeigte SVG aus dem DOM (M90)
-        .then(async (mermaid) => {
-          // Handschrift-Look: Scribble-Schrift VOR dem Rendern laden (Messung!)
-          if (look === 'hand') await preloadHandFont();
-          return mermaid.render(`pn-mermaid-${id}-${myKey}`, buildMermaidSource(renderCode, style, look));
-        })
-        .then(({ svg }) => { if (!cancelled && myKey === renderKey.current) { setSvg(svg); setError(''); } })
+      // Render-ID pro VERSUCH eindeutig: mermaid räumt vor dem Rendern alle Elemente mit derselben ID weg — mit
+      // stabiler ID löscht ein fehlgeschlagener Versuch sonst das angezeigte SVG aus dem DOM (M90). M535: gezeichnet
+      // wird abseits des Board-Dokuments (lib/mermaid.ts mermaidZeichnen), die Handschrift lädt es selbst vorher.
+      mermaidZeichnen(`pn-mermaid-${id}-${myKey}`, buildMermaidSource(renderCode, style, look))
+        .then((svg) => { if (!cancelled && myKey === renderKey.current) { setSvg(svg); setError(''); } })
         // svg NICHT leeren — beim Tippen bleibt das letzte gültige Diagramm
         // sichtbar, der Fehler erscheint nur als kleines Overlay (M90)
         .catch((e) => {

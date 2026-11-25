@@ -1,4 +1,4 @@
-import { useEffect, useState, type SyntheticEvent } from 'react';
+import { useEffect, useRef, useState, type SyntheticEvent } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import { runDerived, selectActiveBoard, useBoard, useKarteFest } from '../../store';
 import { triggerDownload } from '../../lib/download';
@@ -8,6 +8,7 @@ import { DragTitle } from './DragTitle';
 import { BildLupe, BildTextChips, bildTeileVorladen } from './bildSpaet';   // M519: nachgeladen
 import { bildBearbeiten } from '../BildEditorHost';
 import { ICrop, IImage } from '../Icons';
+import { useBildAnzeige } from '../../lib/bildStandbild';
 
 /**
  * Screenshot / Bild als Karte (per Strg+V, Drag&Drop oder aus E-Mail-Anhang).
@@ -32,6 +33,9 @@ export function ImageCard({ id, data, selected }: NodeProps<ImageNode>) {
   const titel = img.titel?.trim() || img.name || '';
   const [lupe, setLupe] = useState(false);
   useEffect(() => bildTeileVorladen(), []);
+  // M535: animiertes SVG — beim Ziehen und außerhalb des Bildes ein Standbild, sonst animiert wie bisher
+  const bildRef = useRef<HTMLImageElement | null>(null);
+  const anzeige = useBildAnzeige(bildRef, img.src);
   const fest = useKarteFest((img as { von?: string }).von);
   const rahmen = img.rahmen === true;
   /* Ältere Bild-Karten tragen eine von Hand gezogene Höhe, in der noch Rand und Namenszeile stecken —
@@ -78,7 +82,7 @@ export function ImageCard({ id, data, selected }: NodeProps<ImageNode>) {
       ruhig={!rahmen}
       className={`image-card ${rahmen ? 'mit-rahmen' : 'rahmenlos'}`}
     >
-      <img src={img.src} alt={titel || 'Bild'} draggable={false} onLoad={anlegen} />
+      <img ref={bildRef} src={anzeige} alt={titel || 'Bild'} draggable={false} onLoad={anlegen} />
       {/* M395: zuschneiden, drehen, … — erscheint wie die Lupe erst am markierten Bild */}
       {!fest && (
         <button

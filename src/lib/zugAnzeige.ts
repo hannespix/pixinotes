@@ -31,9 +31,13 @@ export const useAnzeige = (id: string): Anzeige | undefined => useSyncExternalSt
 let zug = false;
 const nachZugHoerer = new Set<() => void>();
 export const zugLaeuft = (): boolean => zug;
+/** M535: hören, wann ein Zug beginnt und endet (animierte Bilder zeigen im Zug ihr Standbild) */
+const zugHoerer = new Set<() => void>();
+export const zugBeobachten = (f: () => void): (() => void) => { zugHoerer.add(f); return () => { zugHoerer.delete(f); }; };
 export function zugSetzen(an: boolean): void {
   if (zug === an) return;
   zug = an;
+  zugHoerer.forEach((f) => f());
   if (!an) { const h = [...nachZugHoerer]; nachZugHoerer.clear(); h.forEach((f) => f()); }
 }
 /** Einmal rufen, sobald der laufende Zug vorbei ist */

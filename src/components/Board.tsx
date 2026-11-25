@@ -17,6 +17,7 @@ import {
 } from '@xyflow/react';
 import { fangAktiv, fangen, fangSetzen, type Kasten } from '../lib/fang';
 import { zugSetzen } from '../lib/zugAnzeige';
+import { ablegenGenauAn } from '../lib/ablegenGenau';
 import { Fanglinien } from './Fanglinien';
 import { AnsichtPortal } from './AnsichtPortal';
 import { LiveSperren, LiveZeigerSpaet } from './LiveLeiste';
@@ -1570,6 +1571,7 @@ export function Board() {
     window.addEventListener('pointerdown', onDown, true);
     return () => window.removeEventListener('pointerdown', onDown, true);
   }, []);
+  useEffect(ablegenGenauAn, []);   // M535: Loslassen ohne letzte Bewegung → Karte trotzdem am Zeiger
 
   const onNodeDrag = useCallback((ev: MouseEvent | TouchEvent, node: Node) => {
     {

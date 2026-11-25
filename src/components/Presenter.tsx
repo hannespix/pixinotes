@@ -8,7 +8,7 @@ import { fensterDarueber } from '../lib/overlay';
 import { sprache } from '../lib/sprache';
 import { selectActiveBoard, selectNurLesen, useBoard } from '../store';
 import { nodeToHtml } from '../lib/serializeFormate';
-import { buildMermaidSource, getMermaid, preloadHandFont } from '../lib/mermaid';
+import { buildMermaidSource, mermaidZeichnen } from '../lib/mermaid';
 import { folieAb, kartenFolge } from '../lib/kartenFolge';
 import { useAndroidBackspaceFix } from '../lib/blocknoteAndroidFix';
 import { editorUpload } from '../lib/notizBild';
@@ -156,14 +156,10 @@ function MermaidSlide({ node }: { node: MermaidNode }) {
     let cancelled = false;
     const myKey = ++renderKey.current;
     const t = setTimeout(() => {
-      getMermaid()
-        .then(async (mermaid) => {
-          if (look === 'hand') await preloadHandFont(); // Scribble-Schrift vor der Messung
-          // Render-ID pro Versuch eindeutig: mermaids ID-Cleanup löscht sonst
-          // bei einem FEHLGESCHLAGENEN Versuch das angezeigte SVG (M90-Parität)
-          return mermaid.render(`pn-slide-${node.id}-${myKey}`, buildMermaidSource(node.data.code, style, look));
-        })
-        .then(({ svg }) => { if (!cancelled && myKey === renderKey.current) { setSvg(svg); setError(''); } })
+      // Render-ID pro Versuch eindeutig: mermaids ID-Cleanup löscht sonst bei einem FEHLGESCHLAGENEN Versuch das
+      // angezeigte SVG (M90-Parität). M535: abseits des Dokuments gezeichnet, Handschrift lädt mermaidZeichnen selbst.
+      mermaidZeichnen(`pn-slide-${node.id}-${myKey}`, buildMermaidSource(node.data.code, style, look))
+        .then((svg) => { if (!cancelled && myKey === renderKey.current) { setSvg(svg); setError(''); } })
         .catch((e) => { if (!cancelled && myKey === renderKey.current) setError(String(e?.message ?? e).split('\n')[0]); });
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
