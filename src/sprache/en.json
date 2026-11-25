@@ -3907,4 +3907,4 @@
 "Der gespeicherte Stand vom":"The stored state from",
 "war nicht lesbar. PixiNotes hat ihn aufgehoben, bevor es neu gespeichert hat.":"could not be read. PixiNotes kept it before saving again.",
 "Rettungskopie endgültig verwerfen?":"Discard the rescue copy for good?",
-"Der gespeicherte Stand war nicht lesbar – PixiNotes startet leer. Eine Rettungskopie liegt unter Einstellungen → Daten.":"The stored state could not be read – PixiNotes starts empty. A rescue copy is under Settings → Data."}
+"Gespeicherter Stand nicht lesbar – PixiNotes startet leer. Rettungskopie: Einstellungen → Daten.":"Stored state unreadable – PixiNotes starts empty. Rescue copy: Settings → Data."}
