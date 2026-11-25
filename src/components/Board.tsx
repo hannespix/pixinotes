@@ -1,6 +1,6 @@
 import { fokusAnsicht, fokusAnsichtMarkieren, fokusStufeLoesen, fokusZoomFuer, FOKUS_ANSICHT_EREIGNIS, FOKUS_ZOOM_EREIGNIS } from '../lib/fokusAnsicht';
 import { overlayOffen } from '../lib/overlay';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -77,12 +77,22 @@ import { EINGANG_ZIEHEN, eingangHolen, eingangZielWeg } from '../lib/eingang';
  *  beschränkt, statt das ganze Board weiß werden zu lassen. Der Wrapper wird
  *  EINMAL auf Modulebene gebaut; täte man das im Render, remounteten bei jeder
  *  Änderung sämtliche Karten (und BlockNote verlöre den Editor-Zustand). */
-const guard = <P extends object>(C: React.ComponentType<P>): React.ComponentType<P> => {
+const guard = <P extends object>(C: React.ComponentType<P>, mitLage = false): React.ComponentType<P> => {
   const Guarded = (props: P) => (
     <ErrorBoundary what="Diese Karte"><C {...props} /></ErrorBoundary>
   );
   Guarded.displayName = `Guarded(${C.displayName ?? C.name ?? 'Card'})`;
-  return Guarded;
+  // M525: React Flow reicht jeder Karte ihre Lage herein (positionAbsoluteX/Y) — beim Ziehen ändert die sich mit jeder
+  // Mausbewegung, und die gezogene Karte zeichnete ihren ganzen Inhalt jedes Mal neu (ein Kanban mit hundert Tickets,
+  // ein Editor, ein Tool). Verschoben wird sie per CSS an ihrer Hülle; der Inhalt hängt nicht an der Lage. Nur wer sie
+  // wirklich liest, meldet sich mit `mitLage` (E-Mail: legt Anhänge neben die Karte).
+  return mitLage ? Guarded : memo(Guarded, ohneLageGleich) as unknown as React.ComponentType<P>;
+};
+const ohneLageGleich = (a: object, b: object): boolean => {
+  const x = a as Record<string, unknown>; const y = b as Record<string, unknown>;
+  for (const k in y) if (x[k] !== y[k] && k !== 'positionAbsoluteX' && k !== 'positionAbsoluteY') return false;
+  for (const k in x) if (!(k in y)) return false;
+  return true;
 };
 
 /**
@@ -128,7 +138,7 @@ export function kartenVorladen(): Promise<unknown> {
 
 const nodeTypes: NodeTypes = {
   note: guard(NoteCard),
-  email: guard(EmailCard),
+  email: guard(EmailCard, true),   // M525: liest ihre Lage (Anhang als Karte daneben)
   image: guard(ImageCard),
   file: guard(FileCard),
   kanban: guard(spaet(KARTEN_LADER.kanban)),
@@ -183,7 +193,8 @@ function Kommentare() {
 export const auswahlLeisteLaden = () => import('./SelectionToolbar');
 const AuswahlLeisteSpaet = lazy(() => auswahlLeisteLaden().then((m) => ({ default: m.SelectionToolbar })));
 let auswahlLeisteEingehaengt = false;
-function AuswahlLeiste() {
+// M525: memo — das Board zeichnet beim Ziehen je Mausbewegung neu; die Leiste (gut 130 Symbole) nur, wenn sie selbst Anlass hat
+const AuswahlLeiste = memo(function AuswahlLeiste() {
   const gewaehlt = useBoard((s) => selectActiveBoard(s).nodes.some((n) => n.selected));
   const [an, setAn] = useState(auswahlLeisteEingehaengt);
   useEffect(() => { if (gewaehlt && !an) { auswahlLeisteEingehaengt = true; setAn(true); } }, [gewaehlt, an]);
@@ -196,7 +207,7 @@ function AuswahlLeiste() {
     return () => { window.removeEventListener('pointerdown', vorab, true); window.removeEventListener('keydown', vorab, true); };
   }, [an]);
   return an || gewaehlt ? <Suspense fallback={null}><AuswahlLeisteSpaet /></Suspense> : null;
-}
+});
 
 
 /**
