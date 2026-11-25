@@ -1,5 +1,5 @@
 # M524 — Konto-Abgleich: Ein älterer Stand setzt die eigene Arbeit nicht mehr zurück
-PR: #… · Prüfreihe: `pruefungen/m524-konto-ruecksetzer.mjs` · Datum: 2026-11-25
+PR: #215 · Prüfreihe: `pruefungen/m524-konto-ruecksetzer.mjs` · Datum: 2026-11-25
 
 ## Warum
 Fehlerbericht des Besitzers: „Ich arbeite, verändere, verschiebe … dann wird plötzlich ein älterer Stand vom Server
