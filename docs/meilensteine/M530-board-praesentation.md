@@ -29,7 +29,8 @@ vorher nachgestellt (rot) und gemessen; die Reihe ist jetzt grün.
   dann ein `ClipboardEvent('paste')` an `editor.domElement` — BlockNote/ProseMirror behandeln es wie Strg+V im Text
   (Markdown, Bilder über `uploadFile`, gemeinsam über Yjs; der Fenster-Zuhörer des Boards lässt es durch, weil das Ziel
   im Notiz-Text liegt). Nur lesend (`isEditable` falsch) oder andere Karte → Hinweis.
-- **Duplizieren:** `store/karten.ts` `dupliziere(ids)` nimmt zu jedem gewählten Rahmen `frameMembers(f, nodes, true, true)`
+- **Duplizieren:** `store/duplizieren.ts` (nachgeladen; die Aktion `dupliziere(ids)` in `store/karten.ts` ruft hierher und
+  liefert jetzt `Promise<number>`, Aufrufer zeigen den Hinweis im `then`) nimmt zu jedem gewählten Rahmen `frameMembers(f, nodes, true, true)`
   dazu (verschachtelte Rahmen, archivierte Karten) und lässt Kanten zwischen zwei kopierten Rahmen weg (`istRahmen`).
   Ist ein Rahmen dabei, rückt die ganze Kopie um die Breite (bzw. Höhe) der Auswahl + 60 nach rechts (sonst nach unten),
   bis kein anderes Element im Weg liegt (40 Punkte Abstand) — `findFreeSpot` ließ Ränder überlappen.
@@ -44,22 +45,27 @@ vorher nachgestellt (rot) und gemessen; die Reihe ist jetzt grün.
   der Darstellung neu heran, `lib/fokusAnsicht.ts`).
 - **Ausgänge:** Kante `data.folge` (Zahl, Platz am Ausgang). `lib/rahmenReise.ts` `rahmenPfeile` sortiert die Ausgänge je
   Rahmen nach `folge` (ohne `folge` hinten, sonst Zieh-Reihenfolge) — `rahmenReise` und damit `rahmenPfeilNr` folgen.
-  Store: `ausgaengeOrdnen(kantenIds)` (`store/kanten.ts`, Typ in `typen.ts`, ein Rückgängig-Schritt). Menü in
+  Store: `ausgaengeOrdnen(kantenIds)` (Aktion in `store/kanten.ts`, nachgeladen aus `store/ausgaenge.ts`, Typ in
+  `typen.ts`, ein Rückgängig-Schritt). Menü in
   `SelectionToolbar.tsx` (`data-taste="ausgang-vor"`). Abgleich: eine Kante wird als Ganzes zusammengeführt, `folge` reist
   mit; Fremddaten: Kanten prüft `sicherGestalt` nur auf Kennung/Enden, eine unbekannte `folge` (keine Zahl) wird ignoriert.
 - **Esc:** `fensterDarueber()` (M523) in `DrawingLayer.tsx` (Stift; `null` = „liegt irgendein Fenster darüber"),
   `Presenter.tsx` (zusätzlich zu den bisherigen Fenstern), `BildExport.tsx`, `LinkDialog.tsx`, `FreigabeDialog.tsx`
   (je mit `ref` auf den eigenen `.modal-backdrop`), `LiveLeisteVoll.tsx` (`null`). Weil `overlay.ts` den Stapel beim
   Tastendruck festhält, stimmt die Antwort auch für Zuhörer, die nach dem Schließen des oberen Fensters laufen.
-- **Board löschen:** `store/struktur.ts` `removeBoard` merkt `boardUndo` (Board, Stelle in `boards`, Projekt, Stelle im
-  Projekt, aktives Board) und zeigt den Hinweis mit `undo: 'ebene'` — derselbe Knopf wie bei Bereich/Projekt
-  (`hinweise.ts` → `ebeneZurueck`). `ebeneZurueck` lädt bei `boardUndo` `store/boardZurueck.ts` nach (Start-Paket).
-  Ein Löschen von Bereich/Projekt verwirft `boardUndo` und umgekehrt — der Knopf gehört dem letzten Hinweis.
+- **Board löschen:** `store/struktur.ts` `removeBoard` lädt `store/boardZurueck.ts` nach: `boardLoeschen` (die bisherige
+  Logik — letztes sichtbares Board bleibt, nächstes Board des Projekts wird offen) merkt Board, Stelle in `boards`,
+  Projekt, Stelle im Projekt und aktives Board und zeigt den Hinweis mit `undo: 'ebene'` — derselbe Knopf wie bei
+  Bereich/Projekt (`hinweise.ts` → `ebeneZurueck`); `boardZurueck` legt es zurück. `struktur.ts` merkt nur `boardWeg`
+  (das letzte Gelöschte war ein Board); ein Löschen von Bereich/Projekt setzt es zurück und umgekehrt — der Knopf
+  gehört dem letzten Hinweis.
   `EbenenMenu.tsx` ohne `window.confirm`. Abgleich: Die Grabsteine des Boards (`lib/grabsteine.ts`) reisen nur, solange
   es fehlt (`grabsteineFuer` lässt Vorhandenes weg); im Konto schreibt der nächste Takt die Board-Datei neu, die
   Zusammenführung auf dem zweiten Gerät sieht es als „drüben neu" (Basis ohne Board). Nachgewiesen in Reihe K.
-- **Start-JS (m446/m459/m467/m483/m502):** + rund 2 KB (2 063 324 B gegen 2 061 342 B auf dem Hauptzweig vor M518, Grenze
-  2 065 000 B). Nachgeladen statt im Start-Paket: `lib/fokusEinfuegen.ts`, `store/boardZurueck.ts`.
+- **Start-JS (m446/m459/m467/m483/m502):** Nach M527 waren auf dem Hauptzweig nur rund 126 B frei. M530 kostet das
+  Start-Paket netto nichts: Nachgeladen sind `lib/fokusEinfuegen.ts`, `store/boardZurueck.ts` (ganz `removeBoard`),
+  `store/duplizieren.ts` (ganz `dupliziere`, auch der Teil von vorher) und `store/ausgaenge.ts`. Stand nach dem
+  Einmischen von M527/M528/M531: 2 064 812 B (Grenze 2 065 000 B, 188 B frei — rund 60 B mehr als vorher).
 
 ## Prüfreihe
 `pruefungen/m530-board-praesentation.mjs [A B C D E F G H K]` — A Einfügen im Fokus (Notiz, Bild, andere Karte, ohne
@@ -76,3 +82,9 @@ das Konto mit zwei Geräten (Supabase nachgebaut, Gerüst aus m524 ohne Steuerun
 - Die Reihenfolge der Ausgänge lässt sich nur im Rahmen-Menü ändern (nicht an der Nummernmarke) — eine Stelle genügt.
 - Der Hinweis mit „Rückgängig" nach dem Board-Löschen gilt 12 s und nur in dieser Sitzung (wie bei Bereich/Projekt).
 - Die Liste der Gruppe (Live) ist in der Reihe nicht gemessen (braucht einen Live-Kanal); der Weg ist derselbe wie beim Stift.
+
+## Für andere Bereiche
+- **m514 K1/K2 (Bildzeit bzw. Stilrechnungen im Flug mit 200 Karten)** flattern unter Last (zwei Läufe nebeneinander):
+  gemessen mit `--wiederhole 3 --bahnen 2` auf dem Build **vor** M530 (2 von 3 grün, K2) wie danach (1 von 3, K1) —
+  allein grün. Es sind Zeitmessungen, die mit der CPU-Last schwanken; M530 ändert am Flug nichts (nur `F` löst einen
+  zusätzlichen Flug aus).
