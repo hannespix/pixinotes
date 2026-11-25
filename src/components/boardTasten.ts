@@ -131,6 +131,11 @@ export function useBoardTasten(kamera: Kamera, anzRef: MutableRefObject<number>)
       }
       // M530: auch gewählte Rahmen — samt Inhalt (store/karten.ts `dupliziere`)
       const mitRahmen = board.nodes.filter((n) => n.selected && (!n.archived || st.showArchived));
+      // M538: Im Karten-Fokus lag die Kopie unsichtbar hinter der offenen Karte (wie Strg+V vor M530) — jetzt nur ein
+      // Hinweis. Strg+D schluckt die Taste trotzdem (sonst legt der Browser ein Lesezeichen an)
+      if (strg && !e.altKey && !e.shiftKey && e.code === 'KeyD' && st.focusCard) {
+        return tun(() => st.showToast('Die geöffnete Karte wird nicht dupliziert. Esc schließt sie – dann dupliziert Strg+D die Auswahl.'));
+      }
       if (strg && !e.altKey && !e.shiftKey && e.code === 'KeyD' && mitRahmen.length) {
         return tun(() => {
           void st.dupliziere(mitRahmen.map((n) => n.id)).then((zahl) => { if (zahl) st.showToast(`${zahlWort(zahl, 'Karte', 'Karten')} dupliziert`); });
