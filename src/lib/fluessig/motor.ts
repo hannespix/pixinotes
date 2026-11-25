@@ -199,7 +199,7 @@ export class Flaeche {
   private tropfen: { indices: number[]; until: number } | null = null;
   private naechsterTropfen = 0;
   private ruhigSeit = 0;
-  /** M540: noch nicht gerechnete Zeit (s) — wandert ins nächste Bild, statt verworfen zu werden */
+  /** M540: noch nicht gerechnete Zeit (s) — wandert ins nächste Bild, statt verworfen zu werden (immer < 1 Schritt) */
   private zeitRest = 0;
   private idleSince = 0;
   private hand: { x: number; y: number } | null = null;
@@ -420,7 +420,9 @@ export class Flaeche {
   }
 
   private aufwecken(): void {
-    this.ruht = false; this.ruhigSeit = 0; this.zeitRest = 0;
+    // M541: Die gesammelte Zeit bleibt stehen. Jede Mausbewegung weckt; setzte das den Rest auf 0, rechnete bei
+    // bewegter Maus auf 144 Hz wieder kaum ein Bild einen Schritt (der Fehler aus M540 kam zurück).
+    this.ruht = false; this.ruhigSeit = 0;
     this.beruehrt = performance.now();
     wecken();
   }
