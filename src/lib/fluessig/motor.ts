@@ -15,6 +15,7 @@ import { sampleGlyphs } from './glyphen';
 import { createQuality, type Qualitaet } from './qualitaet';
 import { burstFrom, dripIndices, idleHand, isCalm, maxAbstand, meanSpeed, scatterAround, Settle } from './effekte';
 import type { FluessigZaeh } from '../fluessigDaten';
+import { zugLaeuft } from '../zugAnzeige';
 
 export interface Einstellung {
   text: string;
@@ -43,7 +44,7 @@ const MAX_AKTIV = 3;
 const SCHRIFT_REF = 100;
 
 /** Für Prüfreihen und Fehlersuche: wie oft der Takt lief und wie viele Karten gerade rechnen */
-export const zaehler = { takte: 0, laufend: 0, flaechen: 0 };
+export const zaehler = { takte: 0, laufend: 0, flaechen: 0, schritte: 0 };
 if (typeof window !== 'undefined') (window as unknown as { pixinotesFluessig: typeof zaehler }).pixinotesFluessig = zaehler;
 
 let zeichner: Zeichner | null = null;
@@ -103,8 +104,16 @@ function takt(t: number): void {
   const laufen = [...flaechen].filter((f) => f.willLaufen()).sort((a, b) => b.beruehrt - a.beruehrt).slice(0, MAX_AKTIV);
   zaehler.laufend = laufen.length;
   if (!laufen.length) { letzterTakt = 0; return; }
+  // M525: Wird gerade eine Karte gezogen, hat das Ziehen Vorrang — die Flüssigkeit hält so lange an (kein Rechnen, kein
+  // Zeichnen) und fließt mit dem Ablegen weiter. „Lebendig" kommt sonst nie zur Ruhe und nahm jedem Bild des Zugs
+  // Rechenzeit weg. Wer die Flüssigkeit selbst anfasst, bewegt sie weiter. Der Takt läuft leer mit (ein Vergleich).
+  if (zugLaeuft()) {
+    for (const f of laufen) if (f.wirdBeruehrt()) { zaehler.schritte++; f.schritt(t, dt); }
+    raf = requestAnimationFrame(takt);
+    return;
+  }
   const arbeit = performance.now();
-  for (const f of laufen) f.schritt(t, dt);
+  for (const f of laufen) { zaehler.schritte++; f.schritt(t, dt); }
   qualitaet?.frame(interval, performance.now() - arbeit);
   if ([...flaechen].some((f) => f.willLaufen())) raf = requestAnimationFrame(takt);
   else { letzterTakt = 0; zaehler.laufend = 0; }
@@ -391,6 +400,9 @@ export class Flaeche {
     this.beruehrt = performance.now();
     wecken();
   }
+
+  /** M525: Fasst gerade jemand diese Flüssigkeit an (Druck oder Magnet)? Dann rechnet sie auch während eines Zugs. */
+  wirdBeruehrt(): boolean { return this.pointer.down || this.magnetAn; }
 
   willLaufen(): boolean {
     return this.sichtbar && !this.ruht && !!this.fluid && this.fluid.n > 0 && !this.still;
