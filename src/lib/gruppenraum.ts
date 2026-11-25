@@ -40,7 +40,37 @@ const timer = new Map<string, GruppenTimer>();
 /** zuletzt beendete Läufe — eine verspätete Meldung des alten Laufs startet ihn nicht neu */
 const beendet = new Map<string, number>();
 let wiederholen: ReturnType<typeof setInterval> | null = null;
-const melden = (boardId: string): void => { window.dispatchEvent(new CustomEvent(TIMER_EREIGNIS, { detail: boardId })); };
+const melden = (boardId: string): void => { sichern(); window.dispatchEvent(new CustomEvent(TIMER_EREIGNIS, { detail: boardId })); };
+
+/**
+ * M531: Der Starter behält seinen Timer über ein Neuladen. Gemerkt wird das ENDE (nach der Uhr dieses Geräts), nicht
+ * die Restzeit — nach dem Laden läuft die Uhr weiter, wo sie stehen müsste, oder ist abgelaufen. Nur im Speicher des
+ * Tabs (sessionStorage): ein anderes Fenster startet keinen zweiten Sender. Bei den anderen ändert sich nichts — sie
+ * bekommen die Restzeit weiter alle drei Sekunden (gleicher Lauf, gleiche Kennung des Starters).
+ */
+const TIMER_KEY = 'pixinotes-gruppen-timer';
+/** So lange nach dem Ende bringt ein Neuladen noch „Zeit ist um" — später ist der Timer einfach vorbei */
+const NACHLAUF_MS = 8000;
+function sichern(): void {
+  const meine: Record<string, Omit<GruppenTimer, 'von'>> = {};
+  for (const [b, t] of timer) if (t.von === ich().id) meine[b] = { lauf: t.lauf, ende: t.ende, dauer: t.dauer, name: t.name };
+  try { if (Object.keys(meine).length) sessionStorage.setItem(TIMER_KEY, JSON.stringify(meine)); else sessionStorage.removeItem(TIMER_KEY); } catch { /* privat/voll: dann eben nicht */ }
+}
+function zurueckholen(): void {
+  let roh: unknown;
+  try { roh = JSON.parse(sessionStorage.getItem(TIMER_KEY) ?? 'null'); } catch { return; }
+  if (!roh || typeof roh !== 'object') return;
+  const jetzt = Date.now();
+  const mich = ich();
+  for (const [b, t] of Object.entries(roh as Record<string, Partial<GruppenTimer>>)) {
+    if (!t || typeof t.lauf !== 'number' || typeof t.ende !== 'number' || typeof t.dauer !== 'number') continue;
+    if (t.ende < jetzt - NACHLAUF_MS || t.ende - jetzt > TIMER_MAX_MS + 60_000) continue;   // längst vorbei oder unsinnig
+    if (!timer.has(b)) timer.set(b, { lauf: t.lauf, ende: t.ende, dauer: Math.min(TIMER_MAX_MS, Math.max(t.dauer, 0)), von: mich.id, name: mich.name });
+  }
+  sichern();
+  takten();
+  for (const b of timer.keys()) melden(b);
+}
 export const timerVon = (boardId: string): GruppenTimer | null => timer.get(boardId) ?? null;
 /** Restzeit in Millisekunden (nie negativ) */
 export const timerRest = (t: GruppenTimer | null): number => (t ? Math.max(0, t.ende - Date.now()) : 0);
@@ -94,6 +124,7 @@ let gestartet = false;
 export function initGruppenraum(): void {
   if (gestartet) return;
   gestartet = true;
+  zurueckholen();
   window.addEventListener(LIVE_NACHRICHT, (e) => {
     const d = (e as CustomEvent<{ boardId: string; ereignis: string; inhalt: unknown }>).detail;
     if (d?.ereignis === 'reakt') {

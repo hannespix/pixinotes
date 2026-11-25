@@ -21,7 +21,12 @@ export interface MitmachenKarte {
   /** M520: Kennung der Karte, in der die Runde geöffnet wurde (fehlt bei Runden von vor M520) */
   karte?: string;
 }
-interface Gemerkt { jwk: JsonWebKey; board: string; karte: string; seit: number }
+/**
+ * Was dieses Gerät sich je Runde merkt. M531: `ende` (ohne Schlüssel) = die Karte wurde hier gelöscht, die Runde ist
+ * vorbei. Holt Strg+Z die Karte zurück, steht in ihren Daten noch „an" — der Vermerk sagt, dass niemand mehr
+ * Gastgeber ist (`hierBeendet`).
+ */
+interface Gemerkt { jwk?: JsonWebKey; board: string; karte: string; seit: number; ende?: number }
 
 /**
  * Die Runde einer Karte. M520: `karte` = Kennung der fragenden Karte. Eine KOPIE (Duplizieren, Board kopieren,
@@ -41,7 +46,15 @@ export function gemerktSetzen(m: Record<string, Gemerkt>): void {
   try { if (Object.keys(m).length) localStorage.setItem(MITMACHEN_KEY, JSON.stringify(m)); else localStorage.removeItem(MITMACHEN_KEY); } catch { /* voll */ }
 }
 /** Ist dieses Gerät Gastgeber der Runde dieser Karte? */
-export const hierGastgeber = (token: string | undefined, karte: string): boolean => !!token && gemerkt()[token]?.karte === karte;
+export const hierGastgeber = (token: string | undefined, karte: string): boolean => {
+  const e = token ? gemerkt()[token] : undefined;
+  return !!e && e.karte === karte && !e.ende;
+};
+/** M531: Ging die Runde dieser Karte auf diesem Gerät zu Ende (Karte gelöscht), auch wenn die Karte noch „an" sagt? */
+export const hierBeendet = (token: string | undefined, karte: string): boolean => {
+  const e = token ? gemerkt()[token] : undefined;
+  return !!e && e.karte === karte && !!e.ende;
+};
 
 /**
  * Link zur Teilnehmer-Seite. Look: Gibt das Board einen Look mit (M509), reist er mit (Hell/Dunkel, Design, Akzent);

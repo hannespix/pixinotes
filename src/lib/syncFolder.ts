@@ -4,7 +4,7 @@
 // kein CORS, keine App-Passwörter — funktioniert überall, wo der Sync-Client läuft.
 // Das Ordner-Handle wird in IndexedDB gemerkt (übersteht Neustarts in Chrome/Edge).
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc, type Space } from '../store';
-import { berichtAlsSatz, dreiWegeMerge, nurAuswahlAnders, ohneAuswahl, type SyncStand } from './syncMerge';
+import { berichtAlsSatz, dreiWegeMerge, nurAuswahlAnders, ohneAuswahl, tabellenMischen, type SyncStand } from './syncMerge';
 import { grabsteineFuer, grabsteineVereinigen } from './grabsteine';
 import { standGeprueft } from './sicher';
 
@@ -565,6 +565,8 @@ export async function fremdStandEinarbeiten(remote0: SyncPayload, weg: SyncWeg, 
   // es bleibt hier bestehen, und der nächste Schreibvorgang heilt die Datei.
   const remote = await standGeprueft(remote0);
   if (!remote) return 'fehler';
+  // M528: Rechen-Tabellen mischen nach ihrem Umbau-Protokoll — der Teil liegt nicht im Start-Paket
+  if (!tabellenMischen.f) await import('./tabellenUmbau').catch(() => null);
   const basis = await basisLesen(weg.source);
   grabsteineVereinigen(remote.geloescht); // M351: Löschungen reisen über mehrere Geräte weiter
   if (!basis) {

@@ -37,6 +37,9 @@ const satzMit = (texte: string[], zahlen: string[] = []): Richten => (x, i) => {
   return aus;
 };
 const nurText: Richten = (x) => (textFeld(x) ? x : undefined);
+/** M528: ein Schritt im Umbau-Protokoll der Rechen-Tabelle (lib/tabellenUmbau.ts) */
+const umbauSchritt: Richten = (x) => (istSatz(x) && textFeld(x.id) && (x.a === 'z' || x.a === 's')
+  && Number.isInteger(x.bei) && (x.bei as number) >= 0 && Number.isInteger(x.n) && x.n !== 0 ? x : undefined);
 /** Eine Liste richten; dieselbe Liste, wenn nichts zu tun war */
 function listeRichten(v: unknown[], richten: Richten | undefined): unknown[] {
   if (!richten) return v;
@@ -104,7 +107,7 @@ const GESTALT: Record<string, { felder: Record<string, FeldArt>; eintraege?: Rec
   calendar: { felder: { month: 'textOpt' } },
   frame: { felder: { name: 'text', color: 'textOpt' } },
   week: { felder: { title: 'text', entries: 'liste', cols: 'listeOpt', slots: 'listeOpt' }, eintraege: { entries: satzMit(['id', 'text'], ['day', 'start', 'dur']), cols: nurText, slots: nurText }, bereich: { from: [0, 1440], to: [0, 2880] } },
-  sheet: { felder: { title: 'textOpt', cells: 'texteOpt', colW: 'objektOpt', links: 'texteOpt', stile: 'objektOpt', filter: 'objektOpt', stilListe: 'listeOpt', verbunden: 'listeOpt' }, eintraege: { verbunden: nurText }, bereich: { cols: [1, 702], rows: [1, 1048576], kopf: [0, 1048576], bis: [0, 1048576] } },   // Zeilen: so viele fasst Excel
+  sheet: { felder: { title: 'textOpt', cells: 'texteOpt', colW: 'objektOpt', links: 'texteOpt', stile: 'objektOpt', filter: 'objektOpt', stilListe: 'listeOpt', verbunden: 'listeOpt', umbau: 'listeOpt' }, eintraege: { verbunden: nurText, umbau: umbauSchritt }, bereich: { cols: [1, 702], rows: [1, 1048576], kopf: [0, 1048576], bis: [0, 1048576] } },   // Zeilen: so viele fasst Excel
   minutes: {
     felder: { title: 'text', entries: 'liste', agenda: 'listeOpt', personenAbgelehnt: 'listeOpt' },
     eintraege: { entries: mitListen(satzMit(['id', 'date']), { blocks: block, decisions: satzMit(['id', 'text']), infoTops: nurText }), agenda: nurText, personenAbgelehnt: nurText },

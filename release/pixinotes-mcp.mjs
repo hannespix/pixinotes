@@ -113,14 +113,14 @@ var require_code = __commonJS({
       return new _Code(code);
     }
     exports._ = _;
-    var plus = new _Code("+");
+    var plus2 = new _Code("+");
     function str(strs, ...args) {
       const expr = [safeStringify(strs[0])];
       let i = 0;
       while (i < args.length) {
-        expr.push(plus);
+        expr.push(plus2);
         addCodeArg(expr, args[i]);
-        expr.push(plus, safeStringify(strs[++i]));
+        expr.push(plus2, safeStringify(strs[++i]));
       }
       optimize(expr);
       return new _Code(expr);
@@ -138,7 +138,7 @@ var require_code = __commonJS({
     function optimize(expr) {
       let i = 1;
       while (i < expr.length - 1) {
-        if (expr[i] === plus) {
+        if (expr[i] === plus2) {
           const res = mergeExprItems(expr[i - 1], expr[i + 1]);
           if (res !== void 0) {
             expr.splice(i - 1, 3, res);
@@ -7375,11 +7375,11 @@ function schlageNach(kern) {
       const t2 = m.re.exec(kern);
       if (!t2) continue;
       en = m.en.replace(/\u0001(\d+)\u0002/g, (_, i) => {
-        const teil = t2[Number(i) + 1] ?? "";
-        if (m.endung.has(Number(i)) && (teil === "" || ENDUNG.test(teil) || EINZAHL.test(teil))) return ENDUNG.test(teil) ? "s" : "";
-        const r = /^(\s*)([\s\S]*?)(\s*)$/.exec(teil);
+        const teil2 = t2[Number(i) + 1] ?? "";
+        if (m.endung.has(Number(i)) && (teil2 === "" || ENDUNG.test(teil2) || EINZAHL.test(teil2))) return ENDUNG.test(teil2) ? "s" : "";
+        const r = /^(\s*)([\s\S]*?)(\s*)$/.exec(teil2);
         const innen = r ? exakt.get(r[2]) : void 0;
-        return innen !== void 0 && r ? r[1] + innen + r[3] : teil;
+        return innen !== void 0 && r ? r[1] + innen + r[3] : teil2;
       });
       break;
     }
@@ -7411,12 +7411,13 @@ function nurZahlWorte(kern) {
   for (const z2 of zahlWorte) if (rest.includes(z2)) rest = rest.split(z2).join(" ");
   return rest !== kern && !HAT_BUCHSTABEN.test(rest);
 }
-var aktiv, exakt, ENDUNG, EINZAHL, muster, eigene, merk, luecken, TASTEN, TASTE, HAT_BUCHSTABEN, REGEL_DE, REGEL_EN, zahlWorte;
+var aktiv, sprache, exakt, ENDUNG, EINZAHL, muster, eigene, merk, luecken, TASTEN, TASTE, HAT_BUCHSTABEN, REGEL_DE, REGEL_EN, zahlWorte;
 var init_sprache = __esm({
   "src/lib/sprache.ts"() {
     "use strict";
     init_define_import_meta_env();
     aktiv = "de";
+    sprache = () => aktiv;
     exakt = /* @__PURE__ */ new Map();
     ENDUNG = /^(e|en|n|er|ern|s|se|änge|öcke|üsse)$/;
     EINZAHL = /^(ang|ock|uss)$/;
@@ -7568,8 +7569,8 @@ var init_storeShim = __esm({
       (sel) => sel ? sel(lesen()) : lesen(),
       {
         getState: lesen,
-        setState: (teil) => {
-          const neu = typeof teil === "function" ? teil(lesen()) : teil;
+        setState: (teil2) => {
+          const neu = typeof teil2 === "function" ? teil2(lesen()) : teil2;
           zustand = { ...zustand, ...neu };
         },
         subscribe: () => () => {
@@ -7577,6 +7578,790 @@ var init_storeShim = __esm({
       }
     );
     selectActiveBoard = (s) => s.boards.find((b) => b.id === s.activeId) ?? s.boards[0];
+  }
+});
+
+// src/lib/formel.ts
+function adresseZuIndex(adr) {
+  const m = /^\$?([A-Z]{1,3})\$?([0-9]{1,5})$/.exec(adr.toUpperCase());
+  if (!m) return null;
+  let spalte = 0;
+  for (const z2 of m[1]) spalte = spalte * 26 + (z2.charCodeAt(0) - 64);
+  const zeile = Number(m[2]);
+  if (!zeile) return null;
+  return { spalte: spalte - 1, zeile: zeile - 1 };
+}
+function indexZuAdresse(spalte, zeile) {
+  let s = "";
+  for (let n = spalte + 1; n > 0; n = Math.floor((n - 1) / 26)) {
+    s = String.fromCharCode(65 + (n - 1) % 26) + s;
+  }
+  return `${s}${zeile + 1}`;
+}
+function deuteEingabe(roh) {
+  const t2 = roh.trim();
+  if (t2 === "") return null;
+  if (/^(wahr|true)$/i.test(t2)) return true;
+  if (/^(falsch|false)$/i.test(t2)) return false;
+  const zahl2 = alsZahl(t2);
+  return zahl2 === null ? roh : zahl2;
+}
+function alsZahl(t2) {
+  let s = t2.trim().replace(/€/g, "").replace(/%$/, "").trim();
+  if (!s) return null;
+  if (/\s/.test(s)) {
+    if (!/^[+-]?\d{1,3}([ \u00a0\u202f]\d{3})+([.,]\d+)?$/.test(s)) return null;
+    s = s.replace(/\s/g, "");
+  }
+  if (/^[+-]?0\d/.test(s)) return null;
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  else if (/^[+-]?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
+  if (!/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(s)) return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? t2.trim().endsWith("%") ? n / 100 : n : null;
+}
+function zerteile(f) {
+  const aus = [];
+  let i = 0;
+  while (i < f.length) {
+    const x = plus.lex?.(f, i);
+    if (x) {
+      aus.push({ ...x[0], p: i, e: x[1] });
+      i = x[1];
+      continue;
+    }
+    const p = i;
+    const n = aus.length;
+    do {
+      const c = f[i];
+      if (/\s/.test(c)) {
+        i += 1;
+        continue;
+      }
+      if (c === '"') {
+        let s = "";
+        i += 1;
+        while (i < f.length && f[i] !== '"') {
+          s += f[i];
+          i += 1;
+        }
+        if (i >= f.length) return null;
+        i += 1;
+        aus.push({ art: "text", wert: s });
+        continue;
+      }
+      if (/[0-9]/.test(c) || c === "." && /[0-9]/.test(f[i + 1] ?? "")) {
+        let s = "";
+        while (i < f.length && (/[0-9]/.test(f[i]) || (f[i] === "." || f[i] === ",") && /[0-9]/.test(f[i + 1] ?? ""))) {
+          s += f[i];
+          i += 1;
+        }
+        const n2 = alsZahl(s);
+        if (n2 === null) return null;
+        aus.push({ art: "zahl", wert: n2 });
+        continue;
+      }
+      if (/[A-Za-z_ÄÖÜäöüß$]/.test(c)) {
+        let s = "";
+        while (i < f.length && /[A-Za-z0-9_ÄÖÜäöüß$.]/.test(f[i])) {
+          s += f[i];
+          i += 1;
+        }
+        const ohne = s.replace(/\$/g, "");
+        aus.push(adresseZuIndex(ohne) ? { art: "bezug", wert: ohne.toUpperCase() } : { art: "name", wert: s.toUpperCase() });
+        continue;
+      }
+      const zwei = f.slice(i, i + 2);
+      if (["<=", ">=", "<>"].includes(zwei)) {
+        aus.push({ art: "op", wert: zwei });
+        i += 2;
+        continue;
+      }
+      if ("+-*/^%()=<>&;:".includes(c)) {
+        aus.push({ art: "op", wert: c });
+        i += 1;
+        continue;
+      }
+      return null;
+    } while (false);
+    if (aus.length > n) {
+      aus[n].p = p;
+      aus[n].e = i;
+    }
+  }
+  return aus;
+}
+function bereich(von, bis, lies) {
+  const a = adresseZuIndex(von);
+  const b = adresseZuIndex(bis);
+  if (!a || !b) return [FEHLER.bezug];
+  const werte = [];
+  for (let z2 = Math.min(a.zeile, b.zeile); z2 <= Math.max(a.zeile, b.zeile); z2 += 1) {
+    for (let s = Math.min(a.spalte, b.spalte); s <= Math.max(a.spalte, b.spalte); s += 1) {
+      werte.push(lies(indexZuAdresse(s, z2)));
+    }
+  }
+  return werte;
+}
+function runde(w, stellen) {
+  const st = Math.max(-12, Math.min(12, Math.trunc(stellen)));
+  const r = Number(`${Math.round(Number(`${Math.abs(w)}e${st}`))}e${-st}`);
+  return Number.isFinite(r) ? Math.sign(w) * r : Math.round(w * 10 ** st) / 10 ** st;
+}
+function heuteLokal() {
+  const d = /* @__PURE__ */ new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function wert(l) {
+  const t2 = schau(l);
+  if (!t2) return FEHLER.wert;
+  if (t2.art === "op" && (t2.wert === "-" || t2.wert === "+")) {
+    l.i += 1;
+    const v = wert(l);
+    const f = durchreichen(v);
+    if (f) return f;
+    const n = zuZahl(einzel(v));
+    if (n === null) return FEHLER.wert;
+    return t2.wert === "-" ? -n : n;
+  }
+  if (t2.art === "zahl") {
+    l.i += 1;
+    return t2.wert;
+  }
+  if (t2.art === "plus") {
+    l.i += 1;
+    return plus.wert ? plus.wert(t2, l) : FEHLER.wert;
+  }
+  if (t2.art === "text") {
+    l.i += 1;
+    return t2.wert;
+  }
+  if (t2.art === "bezug") {
+    l.i += 1;
+    if (istOp(l, ":") && l.z[l.i + 1]?.art === "bezug") {
+      const bis = l.z[l.i + 1].wert;
+      l.i += 2;
+      return bereich(t2.wert, bis, l.lies);
+    }
+    return l.lies(t2.wert);
+  }
+  if (t2.art === "name") {
+    const name = ALIAS[t2.wert] ?? t2.wert;
+    l.i += 1;
+    if (!istOp(l, "(")) return FEHLER.name;
+    l.i += 1;
+    const args = [];
+    if (!istOp(l, ")")) {
+      for (; ; ) {
+        args.push(vergleich(l));
+        if (istOp(l, ";")) {
+          l.i += 1;
+          continue;
+        }
+        break;
+      }
+    }
+    if (!istOp(l, ")")) return FEHLER.wert;
+    l.i += 1;
+    const fn = FUNKTIONEN[name];
+    if (!fn) return FEHLER.name;
+    if (name === "WENN") {
+      const p = flach([args[0]])[0];
+      if (istFehler(p)) return p;
+      const wahr = p === true || typeof p === "number" && p !== 0;
+      const zweig = wahr ? args[1] : args[2];
+      if (zweig === void 0) return wahr;
+      return flach([zweig]).find(istFehler) ?? (flach([zweig])[0] ?? null);
+    }
+    const schlecht = flach(args).find(istFehler);
+    return schlecht ?? fn(args);
+  }
+  if (istOp(l, "(")) {
+    l.i += 1;
+    const v = vergleich(l);
+    if (!istOp(l, ")")) return FEHLER.wert;
+    l.i += 1;
+    return v;
+  }
+  return FEHLER.wert;
+}
+function potenz(l) {
+  let links = wert(l);
+  while (istOp(l, "^", "%")) {
+    const op = schau(l).wert;
+    l.i += 1;
+    if (op === "%") {
+      const f2 = durchreichen(links);
+      if (f2) {
+        links = f2;
+        continue;
+      }
+      const n = zuZahl(einzel(links));
+      links = n === null ? FEHLER.wert : n / 100;
+      continue;
+    }
+    const rechts = wert(l);
+    const f = durchreichen(links, rechts);
+    if (f) {
+      links = f;
+      continue;
+    }
+    const a = zuZahl(einzel(links));
+    const b = zuZahl(einzel(rechts));
+    links = a === null || b === null ? FEHLER.wert : a ** b;
+  }
+  return links;
+}
+function punkt(l) {
+  let links = potenz(l);
+  while (istOp(l, "*", "/")) {
+    const op = schau(l).wert;
+    l.i += 1;
+    const rechts = potenz(l);
+    const f = durchreichen(links, rechts);
+    if (f) {
+      links = f;
+      continue;
+    }
+    const a = zuZahl(einzel(links));
+    const b = zuZahl(einzel(rechts));
+    if (a === null || b === null) {
+      links = FEHLER.wert;
+      continue;
+    }
+    if (op === "/" && b === 0) {
+      links = FEHLER.division;
+      continue;
+    }
+    links = op === "*" ? a * b : a / b;
+  }
+  return links;
+}
+function strich(l) {
+  let links = punkt(l);
+  while (istOp(l, "+", "-", "&")) {
+    const op = schau(l).wert;
+    l.i += 1;
+    const rechts = punkt(l);
+    const f = durchreichen(links, rechts);
+    if (f) {
+      links = f;
+      continue;
+    }
+    const lv = einzel(links);
+    const rv = einzel(rechts);
+    if (op === "&") {
+      links = `${lv ?? ""}${rv ?? ""}`;
+      continue;
+    }
+    const d = plus.rechne?.(op, lv, rv);
+    if (d !== void 0) {
+      links = d;
+      continue;
+    }
+    const a = zuZahl(lv);
+    const b = zuZahl(rv);
+    if (a === null || b === null) {
+      links = FEHLER.wert;
+      continue;
+    }
+    links = op === "+" ? a + b : a - b;
+  }
+  return links;
+}
+function vergleich(l) {
+  const links = strich(l);
+  if (!istOp(l, "=", "<", ">", "<=", ">=", "<>")) return links;
+  const op = schau(l).wert;
+  l.i += 1;
+  const rechts = strich(l);
+  const f = durchreichen(links, rechts);
+  if (f) return f;
+  const lv = einzel(links);
+  const rv = einzel(rechts);
+  const d = plus.rechne?.(op, lv, rv);
+  if (d !== void 0) return d;
+  const a = zuZahl(lv);
+  const b = zuZahl(rv);
+  const [x, y] = a !== null && b !== null ? [a, b] : [String(lv ?? "").toLowerCase(), String(rv ?? "").toLowerCase()];
+  switch (op) {
+    case "=":
+      return x === y;
+    case "<>":
+      return x !== y;
+    case "<":
+      return x < y;
+    case ">":
+      return x > y;
+    case "<=":
+      return x <= y;
+    default:
+      return x >= y;
+  }
+}
+function rechne(formel, lies, belegt) {
+  const z2 = zerteile(formel);
+  if (!z2 || !z2.length) return FEHLER.wert;
+  const l = { z: z2, i: 0, lies, belegt };
+  const v = vergleich(l);
+  if (l.i < z2.length) return FEHLER.wert;
+  return einzel(v);
+}
+function rechneBlatt(zellen) {
+  return rechneBlattMitLinks(zellen).werte;
+}
+function rechneBlattMitLinks(zellen) {
+  const links = {};
+  const fertig = {};
+  const laufend = /* @__PURE__ */ new Set();
+  let liste2 = null;
+  const belegt = () => liste2 ??= Object.keys(zellen).filter((a) => zellen[a] !== "").map((a) => a.toUpperCase());
+  const hole = (adr) => {
+    const A = adr.toUpperCase();
+    if (A in fertig) return fertig[A];
+    if (laufend.has(A)) return FEHLER.zyklus;
+    const roh = zellen[A];
+    if (roh === void 0 || roh === "") return null;
+    if (!roh.startsWith("=")) {
+      fertig[A] = deuteEingabe(roh);
+      return fertig[A];
+    }
+    laufend.add(A);
+    const aussen = linkZelle;
+    linkZelle = { adr: A, ziele: links };
+    let v;
+    try {
+      v = rechne(roh.slice(1), hole, belegt);
+    } finally {
+      linkZelle = aussen;
+    }
+    laufend.delete(A);
+    fertig[A] = v;
+    if (links[A] !== void 0 && (v === null || v === "" || typeof v === "string" && v.startsWith("#"))) delete links[A];
+    return v;
+  };
+  for (const adr of Object.keys(zellen)) hole(adr);
+  return { werte: fertig, links };
+}
+function zeigeWert(v) {
+  if (v === null) return "";
+  if (typeof v === "boolean") return v ? "WAHR" : "FALSCH";
+  if (typeof v === "number") {
+    if (!Number.isFinite(v)) return FEHLER.wert;
+    const gerundet = Math.round(v * 1e10) / 1e10;
+    return gerundet.toLocaleString("de-DE", { maximumFractionDigits: 10 });
+  }
+  return typeof v === "string" ? plus.zeige?.(v) ?? v : v;
+}
+var FEHLER, istFehler, zuZahl, plus, schau, istOp, flach, zahlen, linkZelle, FUNKTIONEN, ALIAS, einzel, durchreichen;
+var init_formel = __esm({
+  "src/lib/formel.ts"() {
+    "use strict";
+    init_define_import_meta_env();
+    FEHLER = {
+      wert: "#WERT!",
+      division: "#DIV/0!",
+      name: "#NAME?",
+      bezug: "#BEZUG!",
+      zyklus: "#ZYKLUS!"
+    };
+    istFehler = (v) => typeof v === "string" && Object.values(FEHLER).includes(v);
+    zuZahl = (v) => {
+      if (typeof v === "number") return v;
+      if (typeof v === "boolean") return v ? 1 : 0;
+      if (v === null) return 0;
+      return alsZahl(v);
+    };
+    plus = {};
+    schau = (l) => l.z[l.i];
+    istOp = (l, ...w) => {
+      const t2 = schau(l);
+      return !!t2 && t2.art === "op" && w.includes(t2.wert);
+    };
+    flach = (args) => args.flatMap((a) => Array.isArray(a) ? a : [a]);
+    zahlen = (args) => flach(args).filter((v) => v !== null && v !== "").map(zuZahl).filter((n) => n !== null);
+    linkZelle = null;
+    FUNKTIONEN = {
+      SUMME: (a) => zahlen(a).reduce((s, n) => s + n, 0),
+      MITTELWERT: (a) => {
+        const n = zahlen(a);
+        return n.length ? n.reduce((s, x) => s + x, 0) / n.length : FEHLER.division;
+      },
+      MIN: (a) => {
+        const n = zahlen(a);
+        return n.length ? Math.min(...n) : 0;
+      },
+      MAX: (a) => {
+        const n = zahlen(a);
+        return n.length ? Math.max(...n) : 0;
+      },
+      ANZAHL: (a) => zahlen(a).length,
+      ANZAHL2: (a) => flach(a).filter((v) => v !== null && v !== "").length,
+      PRODUKT: (a) => zahlen(a).reduce((s, n) => s * n, 1),
+      RUNDEN: (a) => {
+        const [w, st] = [zuZahl(flach([a[0]])[0]), zuZahl(flach([a[1] ?? 0])[0]) ?? 0];
+        if (w === null) return FEHLER.wert;
+        return runde(w, st);
+      },
+      ABS: (a) => {
+        const n = zuZahl(flach([a[0]])[0]);
+        return n === null ? FEHLER.wert : Math.abs(n);
+      },
+      WENN: (a) => {
+        const p = flach([a[0]])[0];
+        const wahr = p === true || typeof p === "number" && p !== 0;
+        const zweig = wahr ? a[1] : a[2];
+        return zweig === void 0 ? wahr : flach([zweig])[0] ?? null;
+      },
+      HEUTE: () => heuteLokal(),
+      L\u00C4NGE: (a) => String(flach([a[0]])[0] ?? "").length,
+      VERKETTEN: (a) => flach(a).map((v) => v === null ? "" : String(v)).join(""),
+      // M407: =HYPERLINK("https://…";"Angebot") zeigt den Text (oder die Adresse); die Tabelle macht daraus einen Link
+      HYPERLINK: (a) => {
+        const ziel = flach([a[0]])[0];
+        const text3 = a[1] === void 0 ? null : flach([a[1]])[0];
+        if (linkZelle && ziel !== null && ziel !== "" && typeof ziel !== "boolean") linkZelle.ziele[linkZelle.adr] = String(ziel);
+        return text3 ?? ziel ?? "";
+      }
+    };
+    ALIAS = {
+      SUM: "SUMME",
+      AVERAGE: "MITTELWERT",
+      COUNT: "ANZAHL",
+      COUNTA: "ANZAHL2",
+      PRODUCT: "PRODUKT",
+      ROUND: "RUNDEN",
+      IF: "WENN",
+      TODAY: "HEUTE",
+      LEN: "L\xC4NGE",
+      CONCATENATE: "VERKETTEN",
+      LAENGE: "L\xC4NGE"
+    };
+    einzel = (v) => Array.isArray(v) ? v[0] ?? null : v;
+    durchreichen = (...v) => {
+      for (const x of v) {
+        const e = einzel(x);
+        if (istFehler(e)) return e;
+      }
+      return null;
+    };
+  }
+});
+
+// src/lib/formelPlus.ts
+var formelPlus_exports = {};
+__export(formelPlus_exports, {
+  SPALTEN_MAX: () => SPALTEN_MAX,
+  ZEILEN_MAX: () => ZEILEN_MAX,
+  bezuegeUmbauen: () => bezuegeUmbauen,
+  bezuegeUmschreiben: () => bezuegeUmschreiben,
+  bezuegeVerlegen: () => bezuegeVerlegen,
+  bezuegeVerschieben: () => bezuegeVerschieben,
+  bezugFehlerText: () => bezugFehlerText,
+  bezugText: () => bezugText,
+  datumAus: () => datumAus,
+  spalteBuchstaben: () => spalteBuchstaben,
+  spalteNr: () => spalteNr,
+  tageVon: () => tageVon,
+  umbauNummer: () => umbauNummer,
+  umbauSpanne: () => umbauSpanne
+});
+function tageVon(v) {
+  if (typeof v !== "string") return null;
+  const t2 = v.trim();
+  let j, m, d, h = 0, mi = 0, se = 0;
+  let x = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(t2);
+  if (x) {
+    [j, m, d] = [Number(x[1]), Number(x[2]), Number(x[3])];
+    h = Number(x[4] ?? 0);
+    mi = Number(x[5] ?? 0);
+    se = Number(x[6] ?? 0);
+  } else {
+    x = /^(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2})(?:,?\s+(\d{1,2}):(\d{2}))?$/.exec(t2);
+    if (!x) return null;
+    [d, m, j] = [Number(x[1]), Number(x[2]), Number(x[3])];
+    if (x[3].length === 2) j += 2e3;
+    h = Number(x[4] ?? 0);
+    mi = Number(x[5] ?? 0);
+  }
+  if (m < 1 || m > 12 || d < 1 || h > 23 || mi > 59 || se > 59) return null;
+  const ms = Date.UTC(j, m - 1, d, h, mi, se);
+  if (new Date(ms).getUTCDate() !== d) return null;
+  return ms / TAG_MS;
+}
+function datumAus(tage, mitZeit) {
+  const ms = Math.round(tage * TAG_MS / 6e4) * 6e4;
+  const iso = new Date(ms).toISOString();
+  return mitZeit && ms % TAG_MS !== 0 ? iso.slice(0, 16) : iso.slice(0, 10);
+}
+function zelleLesen(roh) {
+  const m = /^(\$?)([A-Za-z]{1,3})(\$?)(\d{1,7})$/.exec(roh);
+  if (!m) return null;
+  return { s: { i: spalteNr(m[2]), fest: !!m[1] }, z: { i: Number(m[4]) - 1, fest: !!m[3] } };
+}
+function bezugText(b) {
+  switch (b.art) {
+    case "zelle":
+      return zelleText(b);
+    case "bereich":
+      return `${zelleText(b.a)}:${zelleText(b.b)}`;
+    case "spalten":
+      return `${spalteText(b.a)}:${spalteText(b.b)}`;
+    default:
+      return `${zeileText(b.a)}:${zeileText(b.b)}`;
+  }
+}
+function bezuegeUmschreiben(roh, fn) {
+  if (!roh.startsWith("=")) return roh;
+  const f = roh.slice(1);
+  const z2 = zerteile(f);
+  if (!z2) return roh;
+  let aus = "";
+  let bis = 0;
+  for (let k = 0; k < z2.length; k += 1) {
+    const t2 = z2[k];
+    let b = null;
+    let ende = t2.e ?? 0;
+    if (t2.art === "bezug") {
+      const c = zelleLesen(f.slice(t2.p, t2.e));
+      const n1 = z2[k + 1], n2 = z2[k + 2];
+      const c2 = n1?.art === "op" && n1.wert === ":" && n2?.art === "bezug" ? zelleLesen(f.slice(n2.p, n2.e)) : null;
+      if (c && c2) {
+        b = { art: "bereich", a: c, b: c2 };
+        ende = n2.e ?? ende;
+        k += 2;
+      } else if (c) b = { art: "zelle", ...c };
+    } else if (t2.art === "plus" && /^[SZ]/.test(t2.wert)) {
+      const m = /^(\$?)(\w+):(\$?)(\w+)$/.exec(f.slice(t2.p, t2.e));
+      if (m) {
+        const sp = t2.wert[0] === "S";
+        const st = (fest, w) => ({ i: sp ? spalteNr(w) : Number(w) - 1, fest: !!fest });
+        b = { art: sp ? "spalten" : "zeilen", a: st(m[1], m[2]), b: st(m[3], m[4]) };
+      }
+    }
+    if (!b) continue;
+    const neu = fn(b);
+    if (neu === void 0) continue;
+    const text3 = neu === null || !imRahmen(neu) ? bezugFehlerText() : bezugText(neu);
+    if (neu && text3 === bezugText(b)) continue;
+    aus += f.slice(bis, t2.p) + text3;
+    bis = ende;
+  }
+  return bis === 0 ? roh : `=${aus}${f.slice(bis)}`;
+}
+function bezuegeVerschieben(roh, dz, ds) {
+  if (!dz && !ds) return roh;
+  const sp = (x) => x.fest ? x : { ...x, i: x.i + ds };
+  const ze = (x) => x.fest ? x : { ...x, i: x.i + dz };
+  const c = (x) => ({ s: sp(x.s), z: ze(x.z) });
+  return bezuegeUmschreiben(roh, (b) => {
+    switch (b.art) {
+      case "zelle":
+        return { art: "zelle", ...c(b) };
+      case "bereich":
+        return { art: "bereich", a: c(b.a), b: c(b.b) };
+      case "spalten":
+        return { art: "spalten", a: sp(b.a), b: sp(b.b) };
+      default:
+        return { art: "zeilen", a: ze(b.a), b: ze(b.b) };
+    }
+  });
+}
+function bezuegeVerlegen(roh, r, dz, ds) {
+  const drin = (x) => x.s.i >= r.s0 && x.s.i <= r.s1 && x.z.i >= r.z0 && x.z.i <= r.z1;
+  const weg = (x) => ({ s: { ...x.s, i: x.s.i + ds }, z: { ...x.z, i: x.z.i + dz } });
+  return bezuegeUmschreiben(roh, (b) => {
+    if (b.art === "zelle") return drin(b) ? { art: "zelle", ...weg(b) } : void 0;
+    if (b.art === "bereich") return drin(b.a) && drin(b.b) ? { art: "bereich", a: weg(b.a), b: weg(b.b) } : void 0;
+    return void 0;
+  });
+}
+function umbauNummer(x, u) {
+  if (u.n > 0) return x >= u.bei ? x + u.n : x;
+  const d = -u.n;
+  return x < u.bei ? x : x < u.bei + d ? null : x - d;
+}
+function umbauSpanne(von, bis, u) {
+  const lo = Math.min(von, bis), hi = Math.max(von, bis);
+  if (u.n > 0) return [lo >= u.bei ? lo + u.n : lo, hi >= u.bei ? hi + u.n : hi];
+  const d = -u.n;
+  const nlo = lo < u.bei ? lo : lo < u.bei + d ? u.bei : lo - d;
+  const nhi = hi < u.bei ? hi : hi < u.bei + d ? u.bei - 1 : hi - d;
+  return nhi < nlo ? null : [nlo, nhi];
+}
+function bezuegeUmbauen(roh, u) {
+  const zeilen = u.a === "z";
+  const st = (x, i) => ({ ...x, i });
+  return bezuegeUmschreiben(roh, (b) => {
+    if (b.art === "zelle") {
+      const x = zeilen ? b.z : b.s;
+      const n = umbauNummer(x.i, u);
+      if (n === null) return null;
+      return n === x.i ? void 0 : zeilen ? { ...b, z: st(b.z, n) } : { ...b, s: st(b.s, n) };
+    }
+    if (b.art === "bereich") {
+      const [p2, q2] = zeilen ? [b.a.z, b.b.z] : [b.a.s, b.b.s];
+      const sp2 = umbauSpanne(p2.i, q2.i, u);
+      if (!sp2) return null;
+      const lo = p2.i <= q2.i ? [p2, q2] : [q2, p2];
+      if (sp2[0] === Math.min(p2.i, q2.i) && sp2[1] === Math.max(p2.i, q2.i)) return void 0;
+      const a = { s: b.a.s.i <= b.b.s.i ? b.a.s : b.b.s, z: b.a.z.i <= b.b.z.i ? b.a.z : b.b.z };
+      const e = { s: b.a.s.i <= b.b.s.i ? b.b.s : b.a.s, z: b.a.z.i <= b.b.z.i ? b.b.z : b.a.z };
+      if (zeilen) {
+        a.z = st(lo[0], sp2[0]);
+        e.z = st(lo[1], sp2[1]);
+      } else {
+        a.s = st(lo[0], sp2[0]);
+        e.s = st(lo[1], sp2[1]);
+      }
+      return { art: "bereich", a, b: e };
+    }
+    if (b.art === "spalten" !== !zeilen) return void 0;
+    const sp = umbauSpanne(b.a.i, b.b.i, u);
+    if (!sp) return null;
+    if (sp[0] === Math.min(b.a.i, b.b.i) && sp[1] === Math.max(b.a.i, b.b.i)) return void 0;
+    const [p, q] = b.a.i <= b.b.i ? [b.a, b.b] : [b.b, b.a];
+    return { ...b, a: st(p, sp[0]), b: st(q, sp[1]) };
+  });
+}
+var spalteNr, spalteBuchstaben, FEHLER_NAMEN, VOR, TAG_MS, istMitZeit, genau, erstes, teil, EN_FEHLER, SPALTEN_MAX, ZEILEN_MAX, spalteText, zeileText, zelleText, imRahmen, bezugFehlerText;
+var init_formelPlus = __esm({
+  "src/lib/formelPlus.ts"() {
+    "use strict";
+    init_define_import_meta_env();
+    init_formel();
+    init_sprache();
+    spalteNr = (b) => [...b.toUpperCase()].reduce((n, c) => n * 26 + (c.charCodeAt(0) - 64), 0) - 1;
+    spalteBuchstaben = (s) => indexZuAdresse(s, 0).replace(/\d+/g, "");
+    FEHLER_NAMEN = {
+      "BEZUG!": FEHLER.bezug,
+      "REF!": FEHLER.bezug,
+      "WERT!": FEHLER.wert,
+      "VALUE!": FEHLER.wert,
+      "DIV/0!": FEHLER.division,
+      "NAME?": FEHLER.name,
+      "ZYKLUS!": FEHLER.zyklus,
+      "CIRCULAR!": FEHLER.zyklus
+    };
+    VOR = /[A-Za-z0-9_ÄÖÜäöüß$.,]/;
+    plus.lex = (f, i) => {
+      if (f[i] === "#") {
+        const m = /^#(BEZUG!|REF!|WERT!|VALUE!|DIV\/0!|NAME\?|ZYKLUS!|CIRCULAR!)/i.exec(f.slice(i));
+        return m ? [{ art: "plus", wert: `F${FEHLER_NAMEN[m[1].toUpperCase()]}` }, i + m[0].length] : null;
+      }
+      if (i > 0 && VOR.test(f[i - 1])) return null;
+      const rest = f.slice(i, i + 24);
+      const sp = /^\$?([A-Za-z]{1,3}):\$?([A-Za-z]{1,3})(?![A-Za-z0-9_ÄÖÜäöüß$.(])/.exec(rest);
+      if (sp) return [{ art: "plus", wert: `S${sp[1].toUpperCase()}:${sp[2].toUpperCase()}` }, i + sp[0].length];
+      const ze = /^\$?(\d{1,7}):\$?(\d{1,7})(?![0-9.,A-Za-z])/.exec(rest);
+      if (ze && Number(ze[1]) > 0 && Number(ze[2]) > 0) return [{ art: "plus", wert: `Z${ze[1]}:${ze[2]}` }, i + ze[0].length];
+      return null;
+    };
+    plus.wert = (t2, l) => {
+      const w = String(t2.wert);
+      if (w[0] === "F") return w.slice(1);
+      if (!l.belegt) return FEHLER.bezug;
+      const [a, b] = w.slice(1).split(":");
+      const spalten = w[0] === "S";
+      const von = spalten ? spalteNr(a) : Number(a) - 1;
+      const bis = spalten ? spalteNr(b) : Number(b) - 1;
+      const lo = Math.min(von, bis), hi = Math.max(von, bis);
+      const treffer = [];
+      for (const adr of l.belegt()) {
+        const x = adresseZuIndex(adr);
+        if (!x) continue;
+        const k = spalten ? x.spalte : x.zeile;
+        if (k >= lo && k <= hi) treffer.push({ s: x.spalte, z: x.zeile, adr });
+      }
+      treffer.sort((p, q) => p.z - q.z || p.s - q.s);
+      return treffer.map((x) => l.lies(x.adr));
+    };
+    TAG_MS = 864e5;
+    istMitZeit = (v) => typeof v === "string" && /\d:\d{2}/.test(v);
+    genau = (n) => Math.round(n * 1e6) / 1e6;
+    plus.rechne = (op, a, b) => {
+      const da = tageVon(a), db = tageVon(b);
+      if (da === null && db === null) return void 0;
+      if (op === "+" || op === "-") {
+        if (da !== null && db !== null) return op === "-" ? genau(da - db) : FEHLER.wert;
+        if (da === null) {
+          const n2 = zuZahl(a);
+          return op === "+" && n2 !== null ? datumAus(db + n2, istMitZeit(b) || !Number.isInteger(n2)) : FEHLER.wert;
+        }
+        const n = zuZahl(b);
+        if (n === null) return FEHLER.wert;
+        return datumAus(op === "+" ? da + n : da - n, istMitZeit(a) || !Number.isInteger(n));
+      }
+      if (da === null || db === null) return void 0;
+      switch (op) {
+        case "=":
+          return da === db;
+        case "<>":
+          return da !== db;
+        case "<":
+          return da < db;
+        case ">":
+          return da > db;
+        case "<=":
+          return da <= db;
+        case ">=":
+          return da >= db;
+        default:
+          return void 0;
+      }
+    };
+    erstes = (a, i = 0) => {
+      const x = a[i];
+      return Array.isArray(x) ? x[0] ?? null : x ?? null;
+    };
+    teil = (welcher) => (a) => {
+      const t2 = tageVon(erstes(a));
+      if (t2 === null) return FEHLER.wert;
+      const d = new Date(Math.floor(t2) * TAG_MS);
+      return [d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate()][welcher];
+    };
+    Object.assign(FUNKTIONEN, {
+      JETZT: () => {
+        const d = /* @__PURE__ */ new Date();
+        return datumAus(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes()) / TAG_MS, true);
+      },
+      DATUM: (a) => {
+        const [j, m, t2] = [0, 1, 2].map((i) => zuZahl(erstes(a, i)));
+        if (j === null || m === null || t2 === null) return FEHLER.wert;
+        return datumAus(Date.UTC(Math.trunc(j), Math.trunc(m) - 1, Math.trunc(t2)) / TAG_MS, false);
+      },
+      JAHR: teil(0),
+      MONAT: teil(1),
+      TAG: teil(2)
+    });
+    Object.assign(ALIAS, { NOW: "JETZT", DATE: "DATUM", YEAR: "JAHR", MONTH: "MONAT", DAY: "TAG" });
+    EN_FEHLER = { [FEHLER.bezug]: "#REF!", [FEHLER.wert]: "#VALUE!", [FEHLER.zyklus]: "#CIRCULAR!" };
+    plus.zeige = (v) => {
+      const en = sprache() === "en";
+      if (v[0] === "#") return en ? EN_FEHLER[v] : void 0;
+      const x = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}:\d{2}))?$/.exec(v);
+      if (!x || tageVon(v) === null) return void 0;
+      return (en ? `${x[3]}/${x[2]}/${x[1]}` : `${x[3]}.${x[2]}.${x[1]}`) + (x[4] ? ` ${x[4]}` : "");
+    };
+    SPALTEN_MAX = 16384;
+    ZEILEN_MAX = 1048576;
+    spalteText = (x) => `${x.fest ? "$" : ""}${spalteBuchstaben(x.i)}`;
+    zeileText = (x) => `${x.fest ? "$" : ""}${x.i + 1}`;
+    zelleText = (c) => spalteText(c.s) + zeileText(c.z);
+    imRahmen = (b) => {
+      const ok = (s, max) => !s || s.i >= 0 && s.i < max;
+      switch (b.art) {
+        case "zelle":
+          return ok(b.s, SPALTEN_MAX) && ok(b.z, ZEILEN_MAX);
+        case "bereich":
+          return ok(b.a.s, SPALTEN_MAX) && ok(b.a.z, ZEILEN_MAX) && ok(b.b.s, SPALTEN_MAX) && ok(b.b.z, ZEILEN_MAX);
+        case "spalten":
+          return ok(b.a, SPALTEN_MAX) && ok(b.b, SPALTEN_MAX);
+        default:
+          return ok(b.a, ZEILEN_MAX) && ok(b.b, ZEILEN_MAX);
+      }
+    };
+    bezugFehlerText = () => sprache() === "en" ? "#REF!" : FEHLER.bezug;
   }
 });
 
@@ -39855,444 +40640,13 @@ function formatBytes(size) {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// src/lib/formel.ts
-init_define_import_meta_env();
-var FEHLER = {
-  wert: "#WERT!",
-  division: "#DIV/0!",
-  name: "#NAME?",
-  bezug: "#BEZUG!",
-  zyklus: "#ZYKLUS!"
-};
-var istFehler = (v) => typeof v === "string" && Object.values(FEHLER).includes(v);
-function adresseZuIndex(adr) {
-  const m = /^\$?([A-Z]{1,3})\$?([0-9]{1,5})$/.exec(adr.toUpperCase());
-  if (!m) return null;
-  let spalte = 0;
-  for (const z2 of m[1]) spalte = spalte * 26 + (z2.charCodeAt(0) - 64);
-  const zeile = Number(m[2]);
-  if (!zeile) return null;
-  return { spalte: spalte - 1, zeile: zeile - 1 };
-}
-function indexZuAdresse(spalte, zeile) {
-  let s = "";
-  for (let n = spalte + 1; n > 0; n = Math.floor((n - 1) / 26)) {
-    s = String.fromCharCode(65 + (n - 1) % 26) + s;
-  }
-  return `${s}${zeile + 1}`;
-}
-function deuteEingabe(roh) {
-  const t2 = roh.trim();
-  if (t2 === "") return null;
-  if (/^(wahr|true)$/i.test(t2)) return true;
-  if (/^(falsch|false)$/i.test(t2)) return false;
-  const zahl2 = alsZahl(t2);
-  return zahl2 === null ? roh : zahl2;
-}
-function alsZahl(t2) {
-  let s = t2.trim().replace(/€/g, "").replace(/%$/, "").trim();
-  if (!s) return null;
-  if (/\s/.test(s)) {
-    if (!/^[+-]?\d{1,3}([ \u00a0\u202f]\d{3})+([.,]\d+)?$/.test(s)) return null;
-    s = s.replace(/\s/g, "");
-  }
-  if (/^[+-]?0\d/.test(s)) return null;
-  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
-  else if (/^[+-]?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
-  if (!/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(s)) return null;
-  const n = Number(s);
-  return Number.isFinite(n) ? t2.trim().endsWith("%") ? n / 100 : n : null;
-}
-var zuZahl = (v) => {
-  if (typeof v === "number") return v;
-  if (typeof v === "boolean") return v ? 1 : 0;
-  if (v === null) return 0;
-  return alsZahl(v);
-};
-function zerteile(f) {
-  const aus = [];
-  let i = 0;
-  while (i < f.length) {
-    const c = f[i];
-    if (/\s/.test(c)) {
-      i += 1;
-      continue;
-    }
-    if (c === '"') {
-      let s = "";
-      i += 1;
-      while (i < f.length && f[i] !== '"') {
-        s += f[i];
-        i += 1;
-      }
-      if (i >= f.length) return null;
-      i += 1;
-      aus.push({ art: "text", wert: s });
-      continue;
-    }
-    if (/[0-9]/.test(c) || c === "." && /[0-9]/.test(f[i + 1] ?? "")) {
-      let s = "";
-      while (i < f.length && (/[0-9]/.test(f[i]) || (f[i] === "." || f[i] === ",") && /[0-9]/.test(f[i + 1] ?? ""))) {
-        s += f[i];
-        i += 1;
-      }
-      const n = alsZahl(s);
-      if (n === null) return null;
-      aus.push({ art: "zahl", wert: n });
-      continue;
-    }
-    if (/[A-Za-z_ÄÖÜäöüß$]/.test(c)) {
-      let s = "";
-      while (i < f.length && /[A-Za-z0-9_ÄÖÜäöüß$.]/.test(f[i])) {
-        s += f[i];
-        i += 1;
-      }
-      const ohne = s.replace(/\$/g, "");
-      aus.push(adresseZuIndex(ohne) ? { art: "bezug", wert: ohne.toUpperCase() } : { art: "name", wert: s.toUpperCase() });
-      continue;
-    }
-    const zwei = f.slice(i, i + 2);
-    if (["<=", ">=", "<>"].includes(zwei)) {
-      aus.push({ art: "op", wert: zwei });
-      i += 2;
-      continue;
-    }
-    if ("+-*/^%()=<>&;:".includes(c)) {
-      aus.push({ art: "op", wert: c });
-      i += 1;
-      continue;
-    }
-    return null;
-  }
-  return aus;
-}
-var schau = (l) => l.z[l.i];
-var istOp = (l, ...w) => {
-  const t2 = schau(l);
-  return !!t2 && t2.art === "op" && w.includes(t2.wert);
-};
-function bereich(von, bis, lies) {
-  const a = adresseZuIndex(von);
-  const b = adresseZuIndex(bis);
-  if (!a || !b) return [FEHLER.bezug];
-  const werte = [];
-  for (let z2 = Math.min(a.zeile, b.zeile); z2 <= Math.max(a.zeile, b.zeile); z2 += 1) {
-    for (let s = Math.min(a.spalte, b.spalte); s <= Math.max(a.spalte, b.spalte); s += 1) {
-      werte.push(lies(indexZuAdresse(s, z2)));
-    }
-  }
-  return werte;
-}
-var flach = (args) => args.flatMap((a) => Array.isArray(a) ? a : [a]);
-var zahlen = (args) => flach(args).filter((v) => v !== null && v !== "").map(zuZahl).filter((n) => n !== null);
-function runde(w, stellen) {
-  const st = Math.max(-12, Math.min(12, Math.trunc(stellen)));
-  const r = Number(`${Math.round(Number(`${Math.abs(w)}e${st}`))}e${-st}`);
-  return Number.isFinite(r) ? Math.sign(w) * r : Math.round(w * 10 ** st) / 10 ** st;
-}
-function heuteLokal() {
-  const d = /* @__PURE__ */ new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-var linkZelle = null;
-var FUNKTIONEN = {
-  SUMME: (a) => zahlen(a).reduce((s, n) => s + n, 0),
-  MITTELWERT: (a) => {
-    const n = zahlen(a);
-    return n.length ? n.reduce((s, x) => s + x, 0) / n.length : FEHLER.division;
-  },
-  MIN: (a) => {
-    const n = zahlen(a);
-    return n.length ? Math.min(...n) : 0;
-  },
-  MAX: (a) => {
-    const n = zahlen(a);
-    return n.length ? Math.max(...n) : 0;
-  },
-  ANZAHL: (a) => zahlen(a).length,
-  ANZAHL2: (a) => flach(a).filter((v) => v !== null && v !== "").length,
-  PRODUKT: (a) => zahlen(a).reduce((s, n) => s * n, 1),
-  RUNDEN: (a) => {
-    const [w, st] = [zuZahl(flach([a[0]])[0]), zuZahl(flach([a[1] ?? 0])[0]) ?? 0];
-    if (w === null) return FEHLER.wert;
-    return runde(w, st);
-  },
-  ABS: (a) => {
-    const n = zuZahl(flach([a[0]])[0]);
-    return n === null ? FEHLER.wert : Math.abs(n);
-  },
-  WENN: (a) => {
-    const p = flach([a[0]])[0];
-    const wahr = p === true || typeof p === "number" && p !== 0;
-    const zweig = wahr ? a[1] : a[2];
-    return zweig === void 0 ? wahr : flach([zweig])[0] ?? null;
-  },
-  HEUTE: () => heuteLokal(),
-  L\u00C4NGE: (a) => String(flach([a[0]])[0] ?? "").length,
-  VERKETTEN: (a) => flach(a).map((v) => v === null ? "" : String(v)).join(""),
-  // M407: =HYPERLINK("https://…";"Angebot") zeigt den Text (oder die Adresse); die Tabelle macht daraus einen Link
-  HYPERLINK: (a) => {
-    const ziel = flach([a[0]])[0];
-    const text3 = a[1] === void 0 ? null : flach([a[1]])[0];
-    if (linkZelle && ziel !== null && ziel !== "" && typeof ziel !== "boolean") linkZelle.ziele[linkZelle.adr] = String(ziel);
-    return text3 ?? ziel ?? "";
-  }
-};
-var ALIAS = {
-  SUM: "SUMME",
-  AVERAGE: "MITTELWERT",
-  COUNT: "ANZAHL",
-  COUNTA: "ANZAHL2",
-  PRODUCT: "PRODUKT",
-  ROUND: "RUNDEN",
-  IF: "WENN",
-  TODAY: "HEUTE",
-  LEN: "L\xC4NGE",
-  CONCATENATE: "VERKETTEN",
-  LAENGE: "L\xC4NGE"
-};
-function wert(l) {
-  const t2 = schau(l);
-  if (!t2) return FEHLER.wert;
-  if (t2.art === "op" && (t2.wert === "-" || t2.wert === "+")) {
-    l.i += 1;
-    const v = wert(l);
-    const f = durchreichen(v);
-    if (f) return f;
-    const n = zuZahl(einzel(v));
-    if (n === null) return FEHLER.wert;
-    return t2.wert === "-" ? -n : n;
-  }
-  if (t2.art === "zahl") {
-    l.i += 1;
-    return t2.wert;
-  }
-  if (t2.art === "text") {
-    l.i += 1;
-    return t2.wert;
-  }
-  if (t2.art === "bezug") {
-    l.i += 1;
-    if (istOp(l, ":") && l.z[l.i + 1]?.art === "bezug") {
-      const bis = l.z[l.i + 1].wert;
-      l.i += 2;
-      return bereich(t2.wert, bis, l.lies);
-    }
-    return l.lies(t2.wert);
-  }
-  if (t2.art === "name") {
-    const name = ALIAS[t2.wert] ?? t2.wert;
-    l.i += 1;
-    if (!istOp(l, "(")) return FEHLER.name;
-    l.i += 1;
-    const args = [];
-    if (!istOp(l, ")")) {
-      for (; ; ) {
-        args.push(vergleich(l));
-        if (istOp(l, ";")) {
-          l.i += 1;
-          continue;
-        }
-        break;
-      }
-    }
-    if (!istOp(l, ")")) return FEHLER.wert;
-    l.i += 1;
-    const fn = FUNKTIONEN[name];
-    if (!fn) return FEHLER.name;
-    if (name === "WENN") {
-      const p = flach([args[0]])[0];
-      if (istFehler(p)) return p;
-      const wahr = p === true || typeof p === "number" && p !== 0;
-      const zweig = wahr ? args[1] : args[2];
-      if (zweig === void 0) return wahr;
-      return flach([zweig]).find(istFehler) ?? (flach([zweig])[0] ?? null);
-    }
-    const schlecht = flach(args).find(istFehler);
-    return schlecht ?? fn(args);
-  }
-  if (istOp(l, "(")) {
-    l.i += 1;
-    const v = vergleich(l);
-    if (!istOp(l, ")")) return FEHLER.wert;
-    l.i += 1;
-    return v;
-  }
-  return FEHLER.wert;
-}
-var einzel = (v) => Array.isArray(v) ? v[0] ?? null : v;
-var durchreichen = (...v) => {
-  for (const x of v) {
-    const e = einzel(x);
-    if (istFehler(e)) return e;
-  }
-  return null;
-};
-function potenz(l) {
-  let links = wert(l);
-  while (istOp(l, "^", "%")) {
-    const op = schau(l).wert;
-    l.i += 1;
-    if (op === "%") {
-      const f2 = durchreichen(links);
-      if (f2) {
-        links = f2;
-        continue;
-      }
-      const n = zuZahl(einzel(links));
-      links = n === null ? FEHLER.wert : n / 100;
-      continue;
-    }
-    const rechts = wert(l);
-    const f = durchreichen(links, rechts);
-    if (f) {
-      links = f;
-      continue;
-    }
-    const a = zuZahl(einzel(links));
-    const b = zuZahl(einzel(rechts));
-    links = a === null || b === null ? FEHLER.wert : a ** b;
-  }
-  return links;
-}
-function punkt(l) {
-  let links = potenz(l);
-  while (istOp(l, "*", "/")) {
-    const op = schau(l).wert;
-    l.i += 1;
-    const rechts = potenz(l);
-    const f = durchreichen(links, rechts);
-    if (f) {
-      links = f;
-      continue;
-    }
-    const a = zuZahl(einzel(links));
-    const b = zuZahl(einzel(rechts));
-    if (a === null || b === null) {
-      links = FEHLER.wert;
-      continue;
-    }
-    if (op === "/" && b === 0) {
-      links = FEHLER.division;
-      continue;
-    }
-    links = op === "*" ? a * b : a / b;
-  }
-  return links;
-}
-function strich(l) {
-  let links = punkt(l);
-  while (istOp(l, "+", "-", "&")) {
-    const op = schau(l).wert;
-    l.i += 1;
-    const rechts = punkt(l);
-    const f = durchreichen(links, rechts);
-    if (f) {
-      links = f;
-      continue;
-    }
-    const lv = einzel(links);
-    const rv = einzel(rechts);
-    if (op === "&") {
-      links = `${lv ?? ""}${rv ?? ""}`;
-      continue;
-    }
-    const a = zuZahl(lv);
-    const b = zuZahl(rv);
-    if (a === null || b === null) {
-      links = FEHLER.wert;
-      continue;
-    }
-    links = op === "+" ? a + b : a - b;
-  }
-  return links;
-}
-function vergleich(l) {
-  const links = strich(l);
-  if (!istOp(l, "=", "<", ">", "<=", ">=", "<>")) return links;
-  const op = schau(l).wert;
-  l.i += 1;
-  const rechts = strich(l);
-  const f = durchreichen(links, rechts);
-  if (f) return f;
-  const lv = einzel(links);
-  const rv = einzel(rechts);
-  const a = zuZahl(lv);
-  const b = zuZahl(rv);
-  const [x, y] = a !== null && b !== null ? [a, b] : [String(lv ?? "").toLowerCase(), String(rv ?? "").toLowerCase()];
-  switch (op) {
-    case "=":
-      return x === y;
-    case "<>":
-      return x !== y;
-    case "<":
-      return x < y;
-    case ">":
-      return x > y;
-    case "<=":
-      return x <= y;
-    default:
-      return x >= y;
-  }
-}
-function rechne(formel, lies) {
-  const z2 = zerteile(formel);
-  if (!z2 || !z2.length) return FEHLER.wert;
-  const l = { z: z2, i: 0, lies };
-  const v = vergleich(l);
-  if (l.i < z2.length) return FEHLER.wert;
-  return einzel(v);
-}
-function rechneBlatt(zellen) {
-  return rechneBlattMitLinks(zellen).werte;
-}
-function rechneBlattMitLinks(zellen) {
-  const links = {};
-  const fertig = {};
-  const laufend = /* @__PURE__ */ new Set();
-  const hole = (adr) => {
-    const A = adr.toUpperCase();
-    if (A in fertig) return fertig[A];
-    if (laufend.has(A)) return FEHLER.zyklus;
-    const roh = zellen[A];
-    if (roh === void 0 || roh === "") return null;
-    if (!roh.startsWith("=")) {
-      fertig[A] = deuteEingabe(roh);
-      return fertig[A];
-    }
-    laufend.add(A);
-    const aussen = linkZelle;
-    linkZelle = { adr: A, ziele: links };
-    let v;
-    try {
-      v = rechne(roh.slice(1), hole);
-    } finally {
-      linkZelle = aussen;
-    }
-    laufend.delete(A);
-    fertig[A] = v;
-    if (links[A] !== void 0 && (v === null || v === "" || typeof v === "string" && v.startsWith("#"))) delete links[A];
-    return v;
-  };
-  for (const adr of Object.keys(zellen)) hole(adr);
-  return { werte: fertig, links };
-}
-function zeigeWert(v) {
-  if (v === null) return "";
-  if (typeof v === "boolean") return v ? "WAHR" : "FALSCH";
-  if (typeof v === "number") {
-    if (!Number.isFinite(v)) return FEHLER.wert;
-    const gerundet = Math.round(v * 1e10) / 1e10;
-    return gerundet.toLocaleString("de-DE", { maximumFractionDigits: 10 });
-  }
-  return v;
-}
-
 // src/lib/serialize.ts
+init_formel();
 function sheetZeilen(s) {
   const zellen = s.cells ?? {};
   const spalten = Math.max(1, s.cols ?? 5);
   const zeilen = Math.max(1, s.rows ?? 8);
+  if (!plus.rechne) void Promise.resolve().then(() => (init_formelPlus(), formelPlus_exports)).catch(() => null);
   const werte = rechneBlatt(zellen);
   const aus = [];
   for (let z2 = 0; z2 < zeilen; z2 += 1) {
@@ -40523,6 +40877,9 @@ ${rows.join("\n")}`;
   }
 }
 
+// src/lib/kiModule.ts
+init_formel();
+
 // src/lib/tabellenAnsicht.ts
 init_define_import_meta_env();
 function spaltenName(index) {
@@ -40553,6 +40910,9 @@ var import_react = __toESM(require_react(), 1);
 
 // src/lib/download.ts
 init_define_import_meta_env();
+
+// src/lib/dates.ts
+init_sprache();
 
 // src/lib/fristAnker.ts
 init_define_import_meta_env();
@@ -40830,8 +41190,8 @@ var spalteVon = (v, cols) => {
   if (typeof v === "number" && n !== null) return Math.max(0, Math.min(cols.length - 1, Math.round(n)));
   const t2 = text(v).toLowerCase();
   if (!t2) return null;
-  const genau = cols.findIndex((c) => c.toLowerCase() === t2);
-  if (genau >= 0) return genau;
+  const genau2 = cols.findIndex((c) => c.toLowerCase() === t2);
+  if (genau2 >= 0) return genau2;
   const etwa = cols.findIndex((c) => c.toLowerCase().includes(t2) || t2.includes(c.toLowerCase()));
   if (etwa >= 0) return etwa;
   if (/erledigt|fertig|done|abgeschlossen/.test(t2)) return cols.length - 1;
@@ -40855,7 +41215,7 @@ function ticketsAus(roh, data) {
 }
 var ADR = /^([A-Z]{1,2})(\d{1,4})$/;
 var zellText = (v) => typeof v === "number" && Number.isFinite(v) ? String(v).replace(".", ",") : typeof v === "boolean" ? v ? "WAHR" : "FALSCH" : typeof v === "string" ? v.trim().slice(0, 500) : "";
-var spalteNr = (name) => {
+var spalteNr2 = (name) => {
   let n = 0;
   for (const c of name) n = n * 26 + (c.charCodeAt(0) - 64);
   return n - 1;
@@ -40866,7 +41226,7 @@ function masse(s, zellen) {
   for (const adr of Object.keys(zellen)) {
     const m = ADR.exec(adr);
     if (!m) continue;
-    cols = Math.max(cols, spalteNr(m[1]) + 1);
+    cols = Math.max(cols, spalteNr2(m[1]) + 1);
     rows = Math.max(rows, Number(m[2]));
   }
   return { cols: Math.min(cols, 60), rows: Math.min(rows, 2e3) };
@@ -40884,9 +41244,9 @@ var HEX = /^#[0-9a-f]{6}$/i;
 function bereich2(roh) {
   const m = /^\s*\$?([A-Z]{1,2})\$?(\d{1,4})(?:\s*:\s*\$?([A-Z]{1,2})\$?(\d{1,4}))?\s*$/i.exec(text(roh, 20).toUpperCase());
   if (!m) return [];
-  const s1 = spalteNr(m[1]);
+  const s1 = spalteNr2(m[1]);
   const z1 = Number(m[2]);
-  const s2 = m[3] ? spalteNr(m[3]) : s1;
+  const s2 = m[3] ? spalteNr2(m[3]) : s1;
   const z2 = m[4] ? Number(m[4]) : z1;
   const aus = [];
   for (let z3 = Math.min(z1, z2); z3 <= Math.max(z1, z2); z3 += 1) for (let s = Math.min(s1, s2); s <= Math.max(s1, s2); s += 1) {

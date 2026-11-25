@@ -84,10 +84,28 @@ export function KontaktCard({ id, data, selected }: NodeProps<KontaktNode>) {
   };
 
   const fertig = () => {
-    // leere Zeilen räumen, sobald die Bearbeitung endet
-    patch({ telefone: k.telefone.filter((t) => t.nummer.trim()), emails: k.emails.filter((m) => m.trim()) });
+    // leere Zeilen räumen, sobald die Bearbeitung endet (nur wenn es welche gibt — sonst kein Schritt im Verlauf)
+    const telefone = k.telefone.filter((t) => t.nummer.trim());
+    const emails = k.emails.filter((m) => m.trim());
+    if (telefone.length !== k.telefone.length || emails.length !== k.emails.length) patch({ telefone, emails });
     setBearbeiten(false);
   };
+  // M531: Klick daneben oder Fokus woandershin beendet das Bearbeiten wie „Fertig" — die Eingaben sind ohnehin schon
+  // gespeichert (jedes Feld schreibt sofort). Vorher blieb die Karte im Formular, bis jemand „Fertig" fand.
+  const kopfRef = useRef<HTMLDivElement>(null);
+  const fertigRef = useRef(fertig);
+  fertigRef.current = fertig;
+  useEffect(() => {
+    if (!bearbeiten) return;
+    const wurzel = () => kopfRef.current?.closest('.react-flow__node, .card-shell') ?? null;
+    const daneben = (ziel: EventTarget | null) => ziel instanceof Node && ziel.isConnected && !wurzel()?.contains(ziel);
+    const druck = (e: PointerEvent) => { if (daneben(e.target)) fertigRef.current(); };
+    const fokus = (e: FocusEvent) => { if (e.relatedTarget && daneben(e.relatedTarget)) fertigRef.current(); };
+    document.addEventListener('pointerdown', druck, true);
+    const w = wurzel();
+    w?.addEventListener('focusout', fokus as EventListener);
+    return () => { document.removeEventListener('pointerdown', druck, true); w?.removeEventListener('focusout', fokus as EventListener); };
+  }, [bearbeiten]);
 
   const setTelefon = (i: number, t: Partial<KontaktTelefon>) => patch({ telefone: k.telefone.map((x, j) => (j === i ? { ...x, ...t } : x)) });
   const setEmail = (i: number, m: string) => patch({ emails: k.emails.map((x, j) => (j === i ? m : x)) });
@@ -105,7 +123,7 @@ export function KontaktCard({ id, data, selected }: NodeProps<KontaktNode>) {
 
   return (
     <CardShell id={id} selected={selected} minWidth={220} minHeight={110} className="kontakt-card">
-      <div className="kontakt-kopf">
+      <div className="kontakt-kopf" ref={kopfRef}>
         <div className="kontakt-foto" aria-hidden="true">
           {k.foto ? <img src={k.foto} alt="" draggable={false} /> : (initialen(k.name) || <IPerson size={20} />)}
         </div>

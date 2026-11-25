@@ -89,7 +89,7 @@ function alsZahl(t: string): number | null {
   return Number.isFinite(n) ? (t.trim().endsWith('%') ? n / 100 : n) : null;
 }
 
-const zuZahl = (v: ZellWert): number | null => {
+export const zuZahl = (v: ZellWert): number | null => {
   if (typeof v === 'number') return v;
   if (typeof v === 'boolean') return v ? 1 : 0;
   if (v === null) return 0;
@@ -98,17 +98,38 @@ const zuZahl = (v: ZellWert): number | null => {
 
 // ───────────────────────────── Zerteilen ─────────────────────────────
 
-type Zeichen =
+/** M528: `p`/`e` = Anfang und Ende im Formeltext (zum Umschreiben der Bezüge, lib/formelPlus.ts); `plus` = was die
+ *  Erweiterung erkennt (ganze Spalten/Zeilen, Fehlerwerte) */
+export type Zeichen = (
   | { art: 'zahl'; wert: number }
   | { art: 'text'; wert: string }
   | { art: 'bezug'; wert: string }
   | { art: 'name'; wert: string }
-  | { art: 'op'; wert: string };
+  | { art: 'op'; wert: string }
+  | { art: 'plus'; wert: string }
+) & { p?: number; e?: number };
 
-function zerteile(f: string): Zeichen[] | null {
+/**
+ * M528: Erweiterungen, die mit der Rechen-Tabelle nachgeladen werden (lib/formelPlus.ts): ganze Spalten und Zeilen
+ * (A:A, 1:1), Fehlerwerte in Formeln (#BEZUG!), Datumsrechnung (=HEUTE()+1), Anzeige von Datum und Fehlern je Sprache.
+ * Hier stehen nur die Haken — der Rechner selbst liegt im Start-Paket (Suche, Export), die Erweiterung nicht.
+ */
+export const plus: {
+  lex?: (f: string, i: number) => [Zeichen, number] | null;
+  wert?: (t: Zeichen, l: Lage) => ZellWert | ZellWert[];
+  rechne?: (op: string, a: ZellWert, b: ZellWert) => ZellWert | undefined;
+  zeige?: (v: string) => string | undefined;
+} = {};
+
+export function zerteile(f: string): Zeichen[] | null {
   const aus: Zeichen[] = [];
   let i = 0;
   while (i < f.length) {
+    const x = plus.lex?.(f, i);
+    if (x) { aus.push({ ...x[0], p: i, e: x[1] }); i = x[1]; continue; }
+    const p = i; const n = aus.length;
+    // M528: `continue` verlässt nur diesen Block — danach bekommt das neue Zeichen seine Stelle im Text
+    do {
     const c = f[i];
     if (/\s/.test(c)) { i += 1; continue; }
     if (c === '"') {
@@ -148,6 +169,8 @@ function zerteile(f: string): Zeichen[] | null {
     if (['<=', '>=', '<>'].includes(zwei)) { aus.push({ art: 'op', wert: zwei }); i += 2; continue; }
     if ('+-*/^%()=<>&;:'.includes(c)) { aus.push({ art: 'op', wert: c }); i += 1; continue; }
     return null;                                    // unbekanntes Zeichen
+    } while (false);
+    if (aus.length > n) { aus[n].p = p; aus[n].e = i; }
   }
   return aus;
 }
@@ -157,7 +180,8 @@ function zerteile(f: string): Zeichen[] | null {
 /** Zugriff auf andere Zellen — vom Aufrufer gestellt (dort sitzt der Speicher) */
 export type ZellLeser = (adresse: string) => ZellWert;
 
-interface Lage { z: Zeichen[]; i: number; lies: ZellLeser }
+/** M528: `belegt` = alle Adressen mit Inhalt (für ganze Spalten und Zeilen) */
+export interface Lage { z: Zeichen[]; i: number; lies: ZellLeser; belegt?: () => string[] }
 
 const schau = (l: Lage) => l.z[l.i];
 const istOp = (l: Lage, ...w: string[]) => {
@@ -206,7 +230,7 @@ function heuteLokal(): string {
 /** M411: Für welche Zelle gerade gerechnet wird – dorthin schreibt =HYPERLINK(…) sein Ziel (rechneBlattMitLinks) */
 let linkZelle: { adr: string; ziele: Record<string, string> } | null = null;
 
-const FUNKTIONEN: Record<string, (a: (ZellWert | ZellWert[])[]) => ZellWert> = {
+export const FUNKTIONEN: Record<string, (a: (ZellWert | ZellWert[])[]) => ZellWert> = {
   SUMME: (a) => zahlen(a).reduce((s, n) => s + n, 0),
   MITTELWERT: (a) => { const n = zahlen(a); return n.length ? n.reduce((s, x) => s + x, 0) / n.length : FEHLER.division; },
   MIN: (a) => { const n = zahlen(a); return n.length ? Math.min(...n) : 0; },
@@ -238,7 +262,7 @@ const FUNKTIONEN: Record<string, (a: (ZellWert | ZellWert[])[]) => ZellWert> = {
   },
 };
 // Englische Zweitnamen — dieselbe Funktion, anderer Aufruf
-const ALIAS: Record<string, string> = {
+export const ALIAS: Record<string, string> = {
   SUM: 'SUMME', AVERAGE: 'MITTELWERT', COUNT: 'ANZAHL', COUNTA: 'ANZAHL2',
   PRODUCT: 'PRODUKT', ROUND: 'RUNDEN', IF: 'WENN', TODAY: 'HEUTE',
   LEN: 'LÄNGE', CONCATENATE: 'VERKETTEN', LAENGE: 'LÄNGE',
@@ -259,6 +283,7 @@ function wert(l: Lage): ZellWert | ZellWert[] {
     return t.wert === '-' ? -n : n;
   }
   if (t.art === 'zahl') { l.i += 1; return t.wert; }
+  if (t.art === 'plus') { l.i += 1; return plus.wert ? plus.wert(t, l) : FEHLER.wert; }
   if (t.art === 'text') { l.i += 1; return t.wert; }
   if (t.art === 'bezug') {
     l.i += 1;
@@ -375,6 +400,8 @@ function strich(l: Lage): ZellWert | ZellWert[] {
     const lv = einzel(links);
     const rv = einzel(rechts);
     if (op === '&') { links = `${lv ?? ''}${rv ?? ''}`; continue; }
+    const d = plus.rechne?.(op, lv, rv);             // M528: Datum ± Tage, Datum − Datum
+    if (d !== undefined) { links = d; continue; }
     const a = zuZahl(lv); const b = zuZahl(rv);
     if (a === null || b === null) { links = FEHLER.wert; continue; }
     links = op === '+' ? a + b : a - b;
@@ -392,6 +419,8 @@ function vergleich(l: Lage): ZellWert | ZellWert[] {
   if (f) return f;
   const lv = einzel(links);
   const rv = einzel(rechts);
+  const d = plus.rechne?.(op, lv, rv);               // M528: zwei Daten vergleichen
+  if (d !== undefined) return d;
   const a = zuZahl(lv); const b = zuZahl(rv);
   // M520: Text vergleicht ohne Rücksicht auf Groß/Klein — wie Excel und LibreOffice (="ja"="Ja" ist WAHR). Eine aus
   // Excel übernommene Formel wie =WENN(B2="offen";…) fand „Offen" sonst nicht und rechnete still den anderen Zweig.
@@ -411,10 +440,10 @@ function vergleich(l: Lage): ZellWert | ZellWert[] {
  * Liefert bei Unsinn einen Fehlerwert statt zu werfen — eine Tabelle soll
  * wegen einer schiefen Zelle nicht die ganze Karte mitreißen.
  */
-export function rechne(formel: string, lies: ZellLeser): ZellWert {
+export function rechne(formel: string, lies: ZellLeser, belegt?: () => string[]): ZellWert {
   const z = zerteile(formel);
   if (!z || !z.length) return FEHLER.wert;
-  const l: Lage = { z, i: 0, lies };
+  const l: Lage = { z, i: 0, lies, belegt };
   const v = vergleich(l);
   if (l.i < z.length) return FEHLER.wert;          // Rest nicht verstanden
   return einzel(v);
@@ -444,6 +473,8 @@ export function rechneBlattMitLinks(zellen: Record<string, string>): { werte: Re
   const links: Record<string, string> = {};
   const fertig: Record<string, ZellWert> = {};
   const laufend = new Set<string>();
+  let liste: string[] | null = null;
+  const belegt = (): string[] => (liste ??= Object.keys(zellen).filter((a) => zellen[a] !== '').map((a) => a.toUpperCase()));
 
   const hole = (adr: string): ZellWert => {
     const A = adr.toUpperCase();
@@ -458,7 +489,7 @@ export function rechneBlattMitLinks(zellen: Record<string, string>): { werte: Re
     const aussen = linkZelle;
     linkZelle = { adr: A, ziele: links };
     let v: ZellWert;
-    try { v = rechne(roh.slice(1), hole); } finally { linkZelle = aussen; }
+    try { v = rechne(roh.slice(1), hole, belegt); } finally { linkZelle = aussen; }
     laufend.delete(A);
     fertig[A] = v;
     // ein Ziel zählt nur, wenn die Zelle auch etwas zeigt (kein Fehler, nicht leer)
@@ -479,5 +510,6 @@ export function zeigeWert(v: ZellWert): string {
     const gerundet = Math.round(v * 1e10) / 1e10;
     return gerundet.toLocaleString('de-DE', { maximumFractionDigits: 10 });
   }
-  return v;
+  // (manche Aufrufer reichen für eine leere Zelle `undefined` herein — das bleibt, wie es war)
+  return typeof v === 'string' ? plus.zeige?.(v) ?? v : v;
 }
