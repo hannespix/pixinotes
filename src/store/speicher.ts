@@ -290,7 +290,7 @@ export const standBereit = (): Promise<void> => bereit;
 beimSichern(() => {
   textVon = new WeakMap();
   if (writerRole === 'writer') reassertPersist();
-});
+}, () => { textVon = new WeakMap(); });
 
 /** Persistierten Stand aus localStorage in den laufenden Store übernehmen —
  *  Mitleser folgen so dem Schreiber; ein Nachfolger übernimmt vor dem ersten

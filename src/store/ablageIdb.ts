@@ -92,7 +92,9 @@ export function verweiseEinsetzen<T>(wert: T, inhalte: Map<string, string>): T {
 let dauerhaftGefragt = false;
 /** Alles Offene sichern, eins nach dem anderen (ein großer Schub würde die IndexedDB für Sekunden belegen). Läuft als A.lauf. */
 export async function abarbeiten(): Promise<void> {
-  let neu = 0;
+  // Erst am Ende (gemeinsam mit nachSichern) als gesichert führen: Wüchse `gesichert` mittendrin, passte ein vorher
+  // gemerkter Text (mit data-URL) nicht mehr zum Stand, den ein Schreiben dazwischen prüft
+  const neu: string[] = [];
   try {
     for (;;) {
       const naechster = A.offen.entries().next();
@@ -100,7 +102,7 @@ export async function abarbeiten(): Promise<void> {
       const [r, daten] = naechster.value;
       A.offen.delete(r);
       if (A.gesichert.has(r)) continue;
-      if (await inhaltSichern(r, daten)) { A.gesichert.add(r); neu += 1; A.zaehler.gesichert += 1; } else A.zaehler.fehler += 1;
+      if (await inhaltSichern(r, daten)) { neu.push(r); A.zaehler.gesichert += 1; } else A.zaehler.fehler += 1;
     }
   } catch {
     // keine IndexedDB (privates Fenster, gesperrt): die data-URLs bleiben im Text — wie bisher
@@ -110,7 +112,8 @@ export async function abarbeiten(): Promise<void> {
     A.lauf = null;
     if (A.offen.size) planen();   // kam während des Laufs noch etwas dazu
   }
-  if (neu > 0) {
+  if (neu.length > 0) {
+    for (const r of neu) A.gesichert.add(r);
     // Den Browser bitten, die Ablage nicht bei Platzmangel zu räumen (einmal; er entscheidet selbst)
     if (!dauerhaftGefragt) { dauerhaftGefragt = true; void navigator.storage?.persist?.().catch(() => false); }
     A.nachSichern();

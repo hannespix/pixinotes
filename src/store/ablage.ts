@@ -60,14 +60,16 @@ export const A = {
   lauf: null as Promise<void> | null,
   /** Meldet der Speicherschicht: Es liegt Neues sicher in der Ablage — den Stand jetzt mit Verweisen schreiben */
   nachSichern: () => {},
+  /** Der Speicher verwirft sein Text-Gedächtnis (M525) — nötig, sobald `gesichert` wächst */
+  vergessen: () => {},
   /** Zähler für Prüfreihen und Fehlersuche */
   zaehler: { gesichert: 0, fehler: 0, geladen: 0, fehlt: 0 },
 };
 let geplant = false;
-export const beimSichern = (fn: () => void): void => { A.nachSichern = fn; };
+export const beimSichern = (fn: () => void, vergessen: () => void): void => { A.nachSichern = fn; A.vergessen = vergessen; };
 /** Aus der Ablage geladen: Der Inhalt liegt sicher, und sein Verweis ist bekannt (kein erneutes Durchrechnen) */
 export const alsGesichertMerken = (v: string, daten?: string): void => {
-  A.gesichert.add(v);
+  if (!A.gesichert.has(v)) { A.gesichert.add(v); A.vergessen(); }
   if (daten !== undefined && verweise.size < 2000) verweise.set(daten, v);
 };
 
