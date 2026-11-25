@@ -236,8 +236,12 @@ async function profil(st, opt = {}) {
 const kopfZeile = (h, n, id = 'sh') => h.karte(id).locator('.sheet-zeilenkopf').nth(n - 1);
 const kopfSpalte = (h, b, id = 'sh') => h.karte(id).locator(`thead th[data-spalte="${b}"]`);
 
+/** Ein Abschnitt im Browser: bricht er ab (etwa gegen einen alten Build ohne diese Funktionen), wird das ein roter Prüfpunkt, kein Absturz */
+async function abschnitt(fn) {
+  try { await fn(); } catch (e) { pruefe('Abschnitt lief durch', false, String(e).split('\n')[0].slice(0, 200)); }
+}
 console.log('\n════ B: im Programm ════');
-{
+await abschnitt(async () => {
   const h = await profil(standMit([brett('b1', [tabelle('sh', { cells: { A1: 'Miete', B1: '1.234,50', A2: 'Strom', B2: '89,90', A3: 'Wasser', B3: '40', A4: 'Summe', B4: '=SUMME(B1:B3)', C1: '=B1*2', D1: '=B3' } })])]));
   const { P } = h;
   // B1 Zeile einfügen über den Zeilenkopf
@@ -370,8 +374,8 @@ console.log('\n════ B: im Programm ════');
   pruefe('B7d Esc im Bearbeiten verwirft das Getippte; danach führt die Tastatur die Auswahl weiter (A3 → B3)',
     nachEsc.A3 === 'Wasser' && (await P.evaluate(() => document.querySelector('td.anker')?.dataset.zelle)) === 'B3', nachEsc);
   await h.ctx.close();
-}
-{
+});
+await abschnitt(async () => {
   // B8 Datum und ganze Spalten in der Karte (Uhr: 25.11.2026)
   const h = await profil(standMit([brett('b2', [tabelle('sh', { cells: { A1: '10', A2: '20', A3: '30', B1: '=SUMME(A:A)', B2: '=MITTELWERT(A:A)', C1: '=HEUTE()+1', C2: '=DATUM(2026;12;24)-HEUTE()', C3: '24.12.2026', C4: '=C3+7', D1: '=SUMME(D:D)' } })])]));
   const w = await h.werte();
@@ -384,8 +388,8 @@ console.log('\n════ B: im Programm ════');
   pruefe('B8c eine neue Zahl in Spalte A zählt sofort mit: 100 · Mittelwert 25', (await h.werte()).B1 === '100' && (await h.werte()).B2 === '25', await h.werte());
   await h.P.screenshot({ path: path.join(BILDER, 'm528-datum.png') }).catch(() => {});
   await h.ctx.close();
-}
-{
+});
+await abschnitt(async () => {
   // B9 Englisch
   const h = await profil(standMit([brett('b3', [tabelle('sh', { cells: { A1: '10', B1: '=A1*2', C1: '=TODAY()+1', C2: '=SUM(A:A)' } })])]), { en: true });
   await warteBis(async () => (await h.werte()).C1 === '26/11/2026');
@@ -399,8 +403,8 @@ console.log('\n════ B: im Programm ════');
     gleich(texte, ['Insert column left', 'Insert column right', 'Delete column']) && w.A1 === '#REF!' && d?.cells.A1 === '=#REF!*2' && w.B1 === '26/11/2026', { texte, w, f: d?.cells.A1 });
   await h.P.screenshot({ path: path.join(BILDER, 'm528-englisch.png') }).catch(() => {});
   await h.ctx.close();
-}
-{
+});
+await abschnitt(async () => {
   // B10 Grenze 26 Spalten: Einfügen nur, wenn hinten Platz ist
   const voll = {}; for (let s = 0; s < 26; s += 1) voll[`${String.fromCharCode(65 + s)}1`] = String(s);
   const h = await profil(standMit([brett('b4', [tabelle('sh', { cols: 26, cells: voll })])]));
@@ -417,7 +421,7 @@ console.log('\n════ B: im Programm ════');
   const d2 = await h.zellen((x) => !!x.cells.Y2); const t2 = await h.toasts();
   pruefe('B10b drei Werte ab Y2 einfügen: Y2 und Z2 kommen an, der Rest wird mit Hinweis weggelassen', d2?.cells.Y2 === 'a' && d2?.cells.Z2 === 'b' && d2?.cols === 26 && t2.some((x) => /höchstens 26 Spalten/.test(x)), { c: d2?.cells, t2 });
   await h.ctx.close();
-}
+});
 
 pruefe('Z keine Seitenfehler', fehler.length === 0, fehler);
 await browser.close();
