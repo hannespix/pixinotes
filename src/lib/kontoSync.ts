@@ -18,7 +18,7 @@ import './sicherGestalt';   // M522: hängt die Gestalt-Prüfung in lib/sicher.t
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc, type Space } from '../store';
 import {
   alsBase64, anhangKarte, base64AlsBlob, basisLesen, basisMerken, basisVergessen, buildSyncPayloadMitDateien, DATEI_BUDGET_MB,
-  emitSyncStatus, fremdStandEinarbeiten, idbDel, idbGet, idbSet, KONTO_DIRTY_KEY, notiereAenderung, SYNC_DIRTY_KEY,
+  emitSyncStatus, fremdStandEinarbeiten, idbDel, idbGet, idbHat, idbSet, KONTO_DIRTY_KEY, notiereAenderung, SYNC_DIRTY_KEY,
   uebernimmDateien, WEBDAV_DIRTY_KEY, type EinarbeitenErgebnis, type SyncDatei, type SyncPayload, type SyncWeg,
 } from './syncFolder';
 import { googleTokenFuer, loadCalAccounts, msAnmeldung, msTokenErneuern, oauthAvailable } from './calAccounts';
@@ -594,7 +594,7 @@ function realtimeStarten(): void {
       const kenn = await kennLesen();
       const kopf = await laufwerk().kopf(UMGEBUNG);
       if (kopf === null || kopf === kenn.etag) return; // die eigene Änderung
-      await checkKontoRemote(true);
+      await checkKontoRemote(true, true);
     });
   }, besitzer, s.name ?? '', () => (anmeldungNoetig ? Promise.reject(new Error('Anmeldung nötig')) : tokenHolen().then((r) => r.token)));
 }
@@ -668,6 +668,12 @@ interface Kenn {
    *  Inhalt hier noch damit überein, hat sich nichts geändert — sonst schriebe dieses Gerät nach JEDER Änderung
    *  eines Gasts das ganze Board zurück, nur weil sein eigener Stempel anders gerechnet ist. */
   alias?: Record<string, { st: string; hash: string }>;
+  /** M524: Größe jeder Datei im Konto, wie zuletzt gesehen — daran zeigt sich, ob dort eine andere Fassung liegt,
+   *  ohne den hiesigen Inhalt zu laden */
+  groessen?: Record<string, number>;
+  /** M524: Tools, deren Quelltext HIER ersetzt wurde und noch nicht im Konto liegt — die dortige Fassung ist die
+   *  ältere und darf die hiesige nicht überschreiben */
+  ersetzt?: string[];
 }
 const leereKenn = (): Kenn => ({ boards: {}, dateien: [], etag: null, savedAt: null });
 /** M383: Kennzeichen eines Server-Stands — Version der eigenen Umgebung und der geteilten Boards anderer Konten */
@@ -692,7 +698,10 @@ export function stempel(text: string): string {
   return `${h.toString(16)}:${text.length}`;
 }
 
-const dateiLokal = anhangLokal;   // M371: Datei-Anhang oder Tool-Quelltext
+/** M371: Datei-Anhang oder Tool-Quelltext — M524: nur nachsehen, ob er da ist (nicht laden) */
+const dateiLokal = async (id: string): Promise<boolean> => {
+  try { return (await idbHat(`file:${id}`)) || (await idbHat(`happ:${id}`)); } catch { return anhangLokal(id); }
+};
 
 /** Zuletzt gelesene Board-Inhalte je Stempel (nur Arbeitsspeicher) — spart das erneute Laden unveränderter Boards */
 const gelesen = new Map<string, { st: string; board: BoardDoc }>();
@@ -798,9 +807,22 @@ export async function kontoLesen(): Promise<{ payload: SyncPayload; kenn: Kenn }
     spaces = mitGeteiltBereich(u.spaces, boards.filter((b) => b.geteiltVon));
   }
   const dateien: Record<string, SyncDatei> = {};
+  const groessen: Record<string, number> = {};
+  // M524: hier ersetzte, noch nicht hochgeladene Tools — solange die Karte im Konto steht
+  const ersetzt = (alt.ersetzt ?? []).filter((id) => !!u.dateien?.[id]);
   for (const [id, meta] of Object.entries(u.dateien ?? {})) {
-    // M371: Ein Tool, dessen Quelltext im Konto inzwischen ein anderer ist (Datei ersetzt), wird neu geholt
-    const veraltet = meta.mime === 'text/html' && !!meta.groesse && !!(await idbGet(`happ:${id}`)) && (await anhangGroesse(id)) !== meta.groesse;
+    if (meta.groesse) groessen[id] = meta.groesse;
+    if (ersetzt.includes(id)) continue;
+    // M371: Ein Tool, dessen Quelltext im Konto inzwischen ein anderer ist (Datei ersetzt), wird neu geholt.
+    // M524: Ob er ein anderer ist, sagt die Größe im Konto, verglichen mit der zuletzt dort gesehenen — nicht mehr
+    // der hiesige Inhalt. Vorher wurde bei JEDEM Lesen der Quelltext jedes Tools dreimal aus der Ablage geladen
+    // (bei 16 Tools mit 5 MB dauerte ein einziger Abgleich viele Sekunden, alles andere wartete dahinter), und
+    // ein hier gerade ersetzter Quelltext galt als „veraltet": Die alte Fassung aus dem Konto überschrieb ihn.
+    // Nur ein Gerät, das die Größen noch nie gemerkt hat, vergleicht einmal wie früher.
+    const gesehen = alt.groessen?.[id];
+    const veraltet = meta.mime === 'text/html' && !!meta.groesse && alt.dateien.includes(id) && (gesehen !== undefined
+      ? gesehen !== meta.groesse
+      : !alt.groessen && (await idbHat(`happ:${id}`)) && (await anhangGroesse(id)) !== meta.groesse);
     if (!veraltet && await dateiLokal(id)) continue;
     // M329: Große Anhänge holt die Karte beim Öffnen (kontoDateiNachladen) — nicht jeder Abgleich
     if ((meta.groesse ?? 0) > DATEI_SOFORT_BYTES) continue;
@@ -809,7 +831,11 @@ export async function kontoLesen(): Promise<{ payload: SyncPayload; kenn: Kenn }
       if (blob) dateien[id] = { name: meta.name, mime: meta.mime ?? (blob.type || undefined), b64: await alsBase64(blob) };
     } catch { /* eine Datei darf den Abgleich nicht aufhalten */ }
   }
-  const kenn: Kenn = { boards: { ...u.boards }, dateien: Object.keys(u.dateien ?? {}), etag, savedAt, kern: umgebungKern({ spaces: u.spaces, reihe, boards: u.boards, dateien: u.dateien ?? {} }), fremd, ...(Object.keys(alias).length ? { alias } : {}) };
+  const kenn: Kenn = {
+    boards: { ...u.boards }, dateien: Object.keys(u.dateien ?? {}).filter((id) => !ersetzt.includes(id)), etag, savedAt,
+    kern: umgebungKern({ spaces: u.spaces, reihe, boards: u.boards, dateien: u.dateien ?? {} }), fremd, groessen,
+    ...(Object.keys(alias).length ? { alias } : {}), ...(ersetzt.length ? { ersetzt } : {}),
+  };
   await idbSet(KENN_KEY, kenn);
   const payload: SyncPayload = { app: 'pixinotes', version: 2, savedAt, boards, spaces, activeId: u.activeId, ...(Object.keys(dateien).length ? { dateien } : {}) };
   // Zwei Geräte, die sich überschrieben haben (Drive kennt keine Vorbedingung):
@@ -1088,6 +1114,15 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
   const fremdNeu: NonNullable<Kenn['fremd']> = { ...(kenn.fremd ?? {}) };
   const kernBekannt = kenn.kern;
   try {
+    // M524: board_aendern prüft nichts — eine Karte, die hier auf einem älteren Stand beruht, ersetzt auf dem Server
+    // die neuere eines anderen Geräts (dessen Änderung ist dann überall weg). Zwischen dem Blick auf den Server
+    // (autoPush) und hier liegen die Warteschlange und das Zusammenstellen des Stands, bei großen Boards Sekunden.
+    // Darum unmittelbar vor dem Schreiben noch einmal der Mini-Abruf: Hat inzwischen ein anderer geschrieben, erst
+    // dessen Stand einarbeiten (das schreibt dann selbst, mit beiden Anteilen).
+    if (nochmal && sitz?.anbieter === 'supabase' && !ohneBoardAendern && kenn.etag) {
+      const kopf = await lw.kopf(UMGEBUNG);
+      if (kopf !== null && kopf !== kenn.etag) throw new VorbedingungFehler();
+    }
     // M383: Geänderte Boards, die der Server schon kennt, kartenweise — nur was sich geändert hat
     if (sitz?.anbieter === 'supabase' && sitz.userId && !ohneBoardAendern && kenn.etag) {
       const basis = await basisFinden(kenn.etag);
@@ -1226,7 +1261,8 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
       for (const name of plan.loeschen) await lw.loeschen(name);
       etag = await lw.schreiben(UMGEBUNG, JSON.stringify(u), 'application/json', kenn.etag);
     }
-    await idbSet(KENN_KEY, { boards: stempelNeu, dateien: Object.keys(dateienMeta), etag, savedAt: payload.savedAt, kern, fremd: fremdNeu, ...(Object.keys(aliasBleibt).length ? { alias: aliasBleibt } : {}) } satisfies Kenn);
+    const groessen = Object.fromEntries(Object.entries(dateienMeta).filter(([, m]) => !!m.groesse).map(([id, m]) => [id, m.groesse as number]));
+    await idbSet(KENN_KEY, { boards: stempelNeu, dateien: Object.keys(dateienMeta), etag, savedAt: payload.savedAt, kern, fremd: fremdNeu, groessen, ...(Object.keys(aliasBleibt).length ? { alias: aliasBleibt } : {}) } satisfies Kenn);
     angewandt = kennMarke({ etag, fremd: fremdNeu });
     await basenMerken(etag, { boards: payload.boards, spaces: payload.spaces }, angewandt, true);
   } catch (e) {
@@ -1352,13 +1388,31 @@ function kontoVerbindenRoh(): Promise<VerbindenErgebnis> {
 
 /** Konto prüfen und einen fremden Stand einarbeiten. */
 /** Liefert das Ergebnis der Zusammenführung — `null`, wenn nichts zu tun war oder nicht geprüft wurde. */
-export async function checkKontoRemote(erzwingen = false): Promise<EinarbeitenErgebnis | null> {
+/**
+ * M524 `nurWennNeu`: Der Aufrufer hat am Mini-Abruf gesehen, dass auf dem Server etwas anderes liegt, als dieses
+ * Gerät kennt. Das stimmt oft schon nicht mehr, wenn der Blick an die Reihe kommt: Während des eigenen Schreibens
+ * kennt der Server den neuen Stand, das Gerät verbucht ihn erst mit der Antwort — jeder Schreibvorgang zog so ein,
+ * zwei volle Lesevorgänge des EIGENEN Stands nach sich, und jeder wartende Blick stellte sich hinten an, auch wenn
+ * schon drei davor standen. Auf einem großen Board dauerte das Lesen länger, als neue dazukamen: Das Hochladen kam
+ * minutenlang nicht an die Reihe. Darum: höchstens EIN solcher Blick steht an, und er prüft erst, ob es noch etwas
+ * zu holen gibt.
+ */
+let blickWartet: Promise<EinarbeitenErgebnis | null> | null = null;
+export async function checkKontoRemote(erzwingen = false, nurWennNeu = false): Promise<EinarbeitenErgebnis | null> {
   const now = Date.now();
   if (!erzwingen && now - lastRemoteCheck < 20_000) return null;
   if (getWriterRole() !== 'writer') return null;
   if (!loadKonto()) return null;
+  if (nurWennNeu && blickWartet) return blickWartet;
   lastRemoteCheck = now;
-  return exklusiv(async (): Promise<EinarbeitenErgebnis | null> => {
+  const blick = exklusiv(async (): Promise<EinarbeitenErgebnis | null> => {
+    if (nurWennNeu) {
+      blickWartet = null;   // er läuft — ein neuer Wunsch stellt sich wieder an
+      const k = await kennLesen();
+      const kopf = await laufwerk().kopf(UMGEBUNG);
+      // der eigene, inzwischen verbuchte Schreibvorgang (oder längst gelesen und eingearbeitet): nichts zu holen
+      if (kopf !== null && kopf === k.etag && kennMarke(k) === angewandt) return null;
+    }
     const r = await kontoLesen();
     if (!r) return null;
     // M360: Ein Rollenwechsel (bearbeiten ↔ nur lesen) ändert keinen Inhalt und keinen Zeitstempel — er zählt trotzdem
@@ -1376,15 +1430,34 @@ export async function checkKontoRemote(erzwingen = false): Promise<EinarbeitenEr
     } else if (e === 'fehler') {
       emitSyncStatus('konto', 'error');
     } else if (e === 'spaeter') {
-      setTimeout(() => { void checkKontoRemote(true).catch(() => {}); }, 3000);
+      setTimeout(() => { void checkKontoRemote(true, true).catch(() => {}); }, 3000);
     } else {
       staleHintShown = false;
     }
     return e;
   });
+  if (nurWennNeu) blickWartet = blick;
+  return blick;
 }
 
+/** M524: Es läuft immer nur EIN Hochladen; was währenddessen dazukommt, stößt danach genau eines an (statt sich mit
+ *  eigenen Lese- und Schreibvorgängen dahinter einzureihen) */
+let pushLaeuft = false;
+let pushNochmal = false;
 async function autoPush(): Promise<void> {
+  if (pushLaeuft) { pushNochmal = true; return; }
+  pushLaeuft = true;
+  try {
+    await autoPushEinmal();
+  } finally {
+    pushLaeuft = false;
+    if (pushNochmal) {
+      pushNochmal = false;
+      if (localStorage.getItem(KONTO_DIRTY_KEY)) setTimeout(() => { void autoPush(); }, 0);
+    }
+  }
+}
+async function autoPushEinmal(): Promise<void> {
   if (getWriterRole() !== 'writer') return;
   if (!loadKonto()) return;
   emitSyncStatus('konto', 'pending');
@@ -1398,7 +1471,7 @@ async function autoPush(): Promise<void> {
       // darf jetzt nichts geschrieben werden — die Kenntnis trägt schon den fremden
       // Stand, ein Schreiben überführe ihn mit dem alten lokalen (M330: verlor im
       // Wettlauf mit 1 s Tipp-Pause eine Karte). checkKontoRemote holt es später nach.
-      const erg = await checkKontoRemote(true);
+      const erg = await checkKontoRemote(true, true);
       if (erg === 'spaeter' || erg === 'konflikt' || erg === 'fehler') { setTimeout(() => { void autoPush(); }, 3000); return; }
       if (localStorage.getItem(KONTO_DIRTY_KEY)) await kontoWrite();
       return;
@@ -1428,10 +1501,15 @@ export function initKontoSync(): void {
     void exklusiv(async () => {
       const kenn = await kennLesen();
       if (!kenn.dateien.includes(id)) return;
-      await idbSet(KENN_KEY, { ...kenn, dateien: kenn.dateien.filter((d) => d !== id) });
+      // M524: … und merken, dass die Fassung im Konto die ÄLTERE ist — ein Lesen vor dem Hochladen holte sie sonst
+      // zurück und überschrieb den eben ersetzten Quelltext
+      await idbSet(KENN_KEY, { ...kenn, dateien: kenn.dateien.filter((d) => d !== id), ersetzt: [...new Set([...(kenn.ersetzt ?? []), id])] });
     }).then(() => { try { localStorage.setItem(KONTO_DIRTY_KEY, '1'); } catch { /* voll */ } }).catch(() => {});
   });
   let timer: ReturnType<typeof setTimeout> | undefined;
+  /** M524: seit wann eine Änderung auf das Hochladen wartet (0 = keine) */
+  let wartetSeit = 0;
+  const WARTE_HOECHSTENS = 6000;
   // M328: Rückkehr vom E-Mail-Link — die Sitzung hängt an der Adresse
   try {
     const rkLink = sbRueckkehrLesen();
@@ -1472,9 +1550,19 @@ export function initKontoSync(): void {
       try { localStorage.setItem(KONTO_DIRTY_KEY, '1'); } catch { /* voll */ }
     }
     if (!loadKonto()) return;
+    // M524: Abgeleitetes (erkannter Text eines Bilds, gemessene Kartenhöhe, eingesammelte Tickets) entsteht auf
+    // jedem Gerät von selbst — auch auf einem, das nur offen steht. Es löst allein kein Hochladen mehr aus: Ein
+    // ruhendes Gerät schrieb sonst ganze Karten (mit seiner vielleicht älteren Lage) ins Konto und stieß bei allen
+    // anderen einen Abgleich an. Es reist mit der nächsten echten Änderung dieses Geräts.
+    if (inDerived() && !localStorage.getItem(KONTO_DIRTY_KEY)) return;
     clearTimeout(timer);
-    // M330: Mit Live-Verbindung reicht eine Sekunde Tipp-Pause — die anderen Geräte warten
-    timer = setTimeout(() => { void autoPush(); }, kontoLiveVerbunden() ? 1000 : 2500);
+    // M330: Mit Live-Verbindung reicht eine Sekunde Tipp-Pause — die anderen Geräte warten.
+    // M524: … aber nicht endlos: Wer ohne Pause weiterarbeitet (ziehen, tippen, ziehen), lud sonst gar nichts hoch,
+    // solange er arbeitete. Spätestens WARTE_HOECHSTENS nach der ersten ungesicherten Änderung geht der Stand hinaus.
+    const jetzt = Date.now();
+    if (!wartetSeit) wartetSeit = jetzt;
+    const pause = kontoLiveVerbunden() ? 1000 : 2500;
+    timer = setTimeout(() => { wartetSeit = 0; void autoPush(); }, Math.max(0, Math.min(pause, wartetSeit + WARTE_HOECHSTENS - jetzt)));
   });
   // M388: Das Netz ist wieder da → Ungesichertes gleich hochladen (vorher erst mit der nächsten Änderung)
   window.addEventListener('online', () => { if (loadKonto() && localStorage.getItem(KONTO_DIRTY_KEY)) void autoPush(); });
@@ -1509,11 +1597,11 @@ export function initKontoSync(): void {
       }
       const kopf = await laufwerk().kopf(UMGEBUNG);
       if (kopf === null || kopf === kenn.etag) return;
-      await checkKontoRemote(true);
+      await checkKontoRemote(true, true);
     })().catch(() => {});
   }, TAKT_MS);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') void checkKontoRemote().catch(() => {});
-    else if (loadKonto() && localStorage.getItem(KONTO_DIRTY_KEY)) { clearTimeout(timer); void autoPush(); }
+    else if (loadKonto() && localStorage.getItem(KONTO_DIRTY_KEY)) { clearTimeout(timer); wartetSeit = 0; void autoPush(); }
   });
 }

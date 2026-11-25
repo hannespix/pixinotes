@@ -10,12 +10,28 @@
  * (vor oder nach dem Schreiben), verlieren oder mit einem Fehler beantworten, Realtime lässt sich je Gerät
  * anhalten — und jede Anfrage steht mit Zeit im Protokoll.
  *
+ *   L   Logik (src/lib/syncMerge.ts, gebündelt mit esbuild): Eine Karte, die zwei Geräte verschieden geändert haben,
+ *       wird Feld für Feld zusammengeführt (Lage von dort, erkannter Text von hier); Bubbles-Karten folgen derselben
+ *       Regel; was sich nicht geändert hat, bleibt dasselbe Objekt; die Reihenfolge von Schlüsseln ist keine Änderung.
+ *   E1  Übernommenes ist nichts Eigenes: Scheitert nach dem Einarbeiten das eigene Schreiben, hält das Gerät den
+ *       übernommenen Stand später nicht für seine Änderung — es schreibt die alte Lage nicht zurück.
+ *   E3  Ein hier ersetzter Tool-Quelltext wird von der älteren Fassung im Konto nicht überschrieben.
+ *   E4  Das Gerät liest seinen eigenen, gerade geschriebenen Stand nicht zurück (späte Antworten).
+ *   E6  Wer ohne Pause weiterarbeitet, lädt trotzdem hoch.
+ *   D   Dauerlauf: drei Geräte, eines arbeitet, zwei ruhen und wachen auf; Antworten verspätet, verloren, mit
+ *       Fehler. Am Ende haben alle drei und der Server denselben Stand, nichts wurde zurückgesetzt, und die
+ *       ruhenden Geräte haben weder Lage noch Inhalt geschrieben.
+ *
  * Aufruf: `node pruefungen/m524-konto-ruecksetzer.mjs [Abschnitt …]` — ohne Angabe alle Abschnitte.
+ * `PN_DIST=<alter Build>` und `M524_SRC=<alter src-Ordner>` zeigen den Stand davor (rot).
  */
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 const __repo = fileURLToPath(new URL('..', import.meta.url));
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 const CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
 import { chromium } from 'playwright-core';
 import http from 'node:http';
@@ -40,6 +56,87 @@ let ok = 0; let bad = 0;
 const pruefe = (n, gut, info = '') => {
   if (gut) { ok += 1; console.log(`  ✓ ${n}`); } else { bad += 1; console.log(`  ✗ ${n} ${info}`); }
 };
+// ══ L: Logik der Zusammenführung ═══════════════════════════════════════
+if (will('L')) {
+  console.log('\n════ L: Zusammenführen – Feld für Feld, dieselben Objekte, keine Schein-Änderungen ════');
+  const SRC = process.env.M524_SRC ?? path.join(__repo, 'src');
+  const datei = path.join(mkdtempSync(path.join(tmpdir(), 'm524-')), 'merge.mjs');
+  execFileSync(path.join(__repo, 'node_modules/.bin/esbuild'), [path.join(SRC, 'lib/syncMerge.ts'), '--bundle', '--format=esm', '--platform=node', `--outfile=${datei}`, '--log-level=error']);
+  const { dreiWegeMerge } = await import(pathToFileURL(datei).href);
+  const klon = (x) => structuredClone(x);
+  const spaces = [{ id: 's', name: 'S', projects: [{ id: 'p', name: 'P', boardIds: ['b'] }] }];
+  const stand = (nodes) => ({ boards: [{ id: 'b', name: 'B', edges: [], nodes }], spaces });
+  const karte = (id, type, x, data, mehr = {}) => ({ id, type, position: { x, y: 0 }, width: 200, data, measured: { width: 200, height: 100 }, ...mehr });
+  const bild = (x, data = {}) => karte('i', 'image', x, { src: 'data:image/svg+xml;base64,AAAA', ...data });
+  const blase = (x, m, data = {}) => karte('u', 'bubbles', x, { titel: 'Ideen', ideen: { a: { text: 'eins', von: 'x', t: 1 }, b: { text: 'zwei', von: 'y', t: 2 } }, stimmen: {}, gruppen: {}, abstimmung: { t: 0 }, ...data }, { measured: { width: 300, height: m } });
+  const notiz = (id, x, text) => karte(id, 'note', x, { blocks: [{ type: 'paragraph', content: text }] });
+  const von = (erg, id) => erg.boards[0].nodes.find((n) => n.id === id);
+  {
+    // Gerät A hat die Bubbles-Karte verschoben; hier wurde sie nur anders gemessen (jedes Gerät misst selbst)
+    const basis = stand([blase(0, 240), notiz('n', 400, 'x')]);
+    const lokal = stand([blase(0, 263), notiz('n', 400, 'x')]);
+    const fremd = stand([blase(500, 240), notiz('n', 400, 'x')]);
+    const erg = dreiWegeMerge(basis, lokal, fremd);
+    pruefe('L1 Bubbles-Karte drüben verschoben, hier nur anders gemessen → die neue Lage gilt', von(erg, 'u').position.x === 500, `x=${von(erg, 'u').position.x}`);
+    pruefe('L2 … und dieses Gerät hat dem Konto nichts Eigenes zu melden (schreibt die alte Lage nicht zurück)', JSON.stringify(von(erg, 'u').position) === JSON.stringify(von(fremd, 'u').position) && erg.bericht.konflikte === 0);
+  }
+  {
+    // Hier kam eine Idee dazu, drüben wurde die Karte verschoben → beides
+    const basis = stand([blase(0, 240)]);
+    const lokal = stand([blase(0, 240, { ideen: { a: { text: 'eins', von: 'x', t: 1 }, b: { text: 'zwei', von: 'y', t: 2 }, c: { text: 'drei', von: 'z', t: 3 } } })]);
+    const fremd = stand([blase(500, 240)]);
+    const erg = dreiWegeMerge(basis, lokal, fremd);
+    pruefe('L3 hier eine Idee mehr, drüben verschoben → neue Lage UND die Idee', von(erg, 'u').position.x === 500 && !!von(erg, 'u').data.ideen.c, `x=${von(erg, 'u').position.x} ideen=${Object.keys(von(erg, 'u').data.ideen)}`);
+  }
+  {
+    // Hier hat die Texterkennung das Bild gelesen, drüben wurde es verschoben
+    const basis = stand([bild(0)]);
+    const lokal = stand([bild(0, { ocrText: 'Hallo', ocrAm: 1000, ocrFuer: 'f1' })]);
+    const fremd = stand([{ ...bild(700), zIndex: 9 }]);
+    const erg = dreiWegeMerge(basis, lokal, fremd);
+    const k = von(erg, 'i');
+    pruefe('L4 hier Text erkannt, drüben verschoben → neue Lage UND der erkannte Text, kein Konflikt', k.position.x === 700 && k.zIndex === 9 && k.data.ocrText === 'Hallo' && erg.bericht.konflikte === 0, `x=${k.position.x} text=${k.data.ocrText} konflikte=${erg.bericht.konflikte}`);
+  }
+  {
+    // Beide haben dieselbe Karte verschoben → die hiesige Lage bleibt, und es zählt als Konflikt; der Text von drüben kommt trotzdem
+    const basis = stand([notiz('n', 0, 'alt')]);
+    const lokal = stand([notiz('n', 100, 'alt')]);
+    const fremd = stand([notiz('n', 900, 'neu')]);
+    const erg = dreiWegeMerge(basis, lokal, fremd);
+    const k = von(erg, 'n');
+    pruefe('L5 beide verschoben, drüben auch der Text geändert → hiesige Lage (ein Konflikt), Text von drüben', k.position.x === 100 && k.data.blocks[0].content === 'neu' && erg.bericht.konflikte === 1, `x=${k.position.x} text=${k.data.blocks[0].content} konflikte=${erg.bericht.konflikte}`);
+  }
+  {
+    // Nur EINE Karte ist drüben anders: alle anderen bleiben dieselben Objekte (nichts zeichnet neu)
+    const nodes = Array.from({ length: 30 }, (_, i) => notiz(`n${i}`, i * 10, `T${i}`));
+    const lokal = stand(nodes);
+    const basis = klon(lokal);
+    const fremd = klon(lokal);
+    fremd.boards[0].nodes[7].position.x = 999;
+    for (const n of fremd.boards[0].nodes) n.measured = { width: 201, height: 99 };   // vom anderen Gerät gemessen
+    const erg = dreiWegeMerge(basis, lokal, fremd);
+    const gleich = erg.boards[0].nodes.filter((n, i) => n === lokal.boards[0].nodes[i]).length;
+    pruefe('L6 eine Karte drüben geändert → die 29 anderen bleiben dieselben Objekte', gleich === 29 && von(erg, 'n7').position.x === 999 && erg.lokalNeu, `${gleich} gleich`);
+    const fremd2 = klon(lokal);
+    for (const n of fremd2.boards[0].nodes) n.measured = { width: 201, height: 99 };
+    const erg2 = dreiWegeMerge(basis, lokal, fremd2);
+    pruefe('L7 drüben nur anders gemessen → hier ändert sich nichts (kein Einspielen)', !erg2.lokalNeu && erg2.boards[0] === lokal.boards[0] && erg2.geaendert.length === 0, `lokalNeu=${erg2.lokalNeu} geaendert=${erg2.geaendert}`);
+  }
+  {
+    // Derselbe Inhalt, andere Reihenfolge der Schlüssel (jedes Gerät mischt die Tabellen in seiner Reihenfolge)
+    const dateiP = datei.replace('merge.mjs', 'patch.mjs');
+    // (ein Quellstand außerhalb des Repositorys findet seine Pakete nicht von selbst — darum der Verweis auf node_modules)
+    execFileSync(path.join(__repo, 'node_modules/.bin/esbuild'), [path.join(SRC, 'lib/gastPatch.ts'), '--bundle', '--format=esm', '--platform=node', `--outfile=${dateiP}`, '--log-level=error'], { env: { ...process.env, NODE_PATH: path.join(__repo, 'node_modules') } });
+    const { patchAus } = await import(pathToFileURL(dateiP).href);
+    const server = stand([blase(0, 240), notiz('n', 400, 'x')]).boards[0];
+    const hier = stand([blase(0, 240, { ideen: { b: { von: 'y', t: 2, text: 'zwei' }, a: { t: 1, text: 'eins', von: 'x' } } }), notiz('n', 400, 'x')]).boards[0];
+    const p = patchAus(server, hier);
+    pruefe('L8 gleiche Ideen in anderer Schlüsselfolge → es gibt nichts zu schreiben', p === null, JSON.stringify(p)?.slice(0, 120));
+    const p2 = patchAus(server, stand([blase(0, 240), notiz('n', 401, 'x')]).boards[0]);
+    pruefe('L9 … eine echte Änderung reist weiter als genau diese Karte', p2?.nodes?.set?.length === 1 && p2.nodes.set[0].id === 'n');
+  }
+}
+
 const browser = await chromium.launch({ executablePath: CHROMIUM, args: ['--no-sandbox'] });
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 const T0 = Date.now();
@@ -273,8 +370,13 @@ const SPALTEN = 7; const ZEILEN = 5;
 const KARTEN = Array.from({ length: SPALTEN * ZEILEN }, (_, i) => note(`k${String(i).padStart(2, '0')}`, `K${String(i).padStart(2, '0')}`, (i % SPALTEN) * 165, Math.floor(i / SPALTEN) * 125));
 /** Ohne Schwung und Einrasten: Eine gezogene Karte liegt genau dort, wo sie losgelassen wurde, und schiebt keine andere an */
 const RUHIG = { ziehBewegung: false, fangLinien: false, gridSnap: false };
+/** Quelltext eines eigenen Tools (liegt in der Geräte-Ablage, nicht im Board) — zwei Fassungen verschiedener Länge */
+const tool = (fassung, fuell) => `<!doctype html><html><head><title>Rechner</title></head><body><h1 id="fassung">${fassung}</h1><p>${'x'.repeat(fuell)}</p></body></html>`;
+const TOOL_1 = tool('Fassung eins', 4000);
+const TOOL_2 = tool('Fassung zwei', 9000);
+const TOOL_KARTE = { id: 'h1', type: 'htmlapp', width: 360, height: 280, position: { x: 1180, y: 0 }, data: { name: 'Rechner.html', size: TOOL_1.length } };
 const standA = () => ({
-  boards: [board('bx', 'Planung', structuredClone(KARTEN)), board('by', 'Ideen', [note('y1', 'Ideen Notiz')])],
+  boards: [board('bx', 'Planung', [...structuredClone(KARTEN), structuredClone(TOOL_KARTE)]), board('by', 'Ideen', [note('y1', 'Ideen Notiz')])],
   spaces: [{ id: 's1', name: 'Arbeit', projects: [{ id: 'p1', name: 'Allgemein', boardIds: ['bx', 'by'] }] }],
   activeId: 'bx', view: 'board', ...RUHIG,
 });
@@ -435,7 +537,22 @@ const wuerfel = (n) => Math.floor(zufall() * n);
 
 // ══ Aufbau: drei Geräte desselben Kontos ═══════════════════════════════
 console.log('\n════ Aufbau: drei Geräte, ein Konto, ein Board mit 35 Karten ════');
+/** Ein Eintrag der Geräte-Ablage (IndexedDB) lesen oder schreiben */
+const ablage = (P, schluessel, wert) => P.evaluate(([k, v]) => new Promise((fertig, fehler) => {
+  const q = indexedDB.open('pixinotes-sync', 1);
+  q.onupgradeneeded = () => q.result.createObjectStore('kv');
+  q.onerror = () => fehler(q.error);
+  q.onsuccess = () => {
+    const tx = q.result.transaction('kv', v === undefined ? 'readonly' : 'readwrite');
+    const os = tx.objectStore('kv');
+    if (v === undefined) { const g = os.get(k); g.onsuccess = async () => fertig(g.result instanceof Blob ? await g.result.text() : g.result ?? null); g.onerror = () => fehler(g.error); return; }
+    os.put(v, k); tx.oncomplete = () => fertig(true); tx.onerror = () => fehler(tx.error);
+  };
+}), [schluessel, wert]);
+/** Der Quelltext des Tools, wie er auf diesem Gerät liegt (als Tool oder noch als mitgereiste Datei) */
+const toolHier = async (P) => (await ablage(P, 'happ:h1')) ?? (await ablage(P, 'file:h1'));
 const A = await geraet('A', standA());
+await ablage(A.P, 'happ:h1', TOOL_1);
 await anmelden(A.P, 'anna@example.de', 'geheim123', true);
 uid = sb.nutzer.get('anna@example.de')?.id ?? '';
 await warteBis(A.P, () => !!zeile(uid, 'umgebung.json') && !!zeile(uid, 'board-bx.json'), 10000);
@@ -475,6 +592,115 @@ async function pruefeSoll(wo) {
   for (const [id, lage] of Object.entries(soll)) {
     if (ist[id] !== lage) { ruecksetzer.push({ t: Date.now() - T0, wo, id, soll: lage, ist: ist[id] }); if (LAUT) console.log(`    ${zeit()} RÜCKSETZER ${wo}: ${id} soll ${lage}, ist ${ist[id]}`); soll[id] = ist[id]; }
   }
+}
+
+const lageServer = (id) => lagen(serverBoard())[id];
+const patchesVon = (marke, geraet) => seit(marke, (e) => e.geraet === geraet && e.art === 'patch' && e.status === 200);
+
+// ══ E1: Übernommenes ist nichts Eigenes ════════════════════════════════
+if (will('E1') && !process.env.M524_BOARD) {
+  console.log('\n════ E1: Nach dem Einarbeiten scheitert das eigene Schreiben – der übernommene Stand gilt trotzdem nicht als eigene Änderung ════');
+  await serverRuhig(3000);
+  const K = 'k08'; const J = 'k10';
+  const m = protokoll.length;
+  // Gerät B erreicht das Konto gerade nur lesend (jedes Schreiben scheitert)
+  steuer.fehler = (g, art) => (g === 'B' && (art === 'patch' || art === 'stapel') ? 503 : null);
+  await ziehen(B.P, J, 24, 14); await leerKlick(B.P);
+  await warteBis(B.P, () => seit(m, (e) => e.geraet === 'B' && e.art === 'patch' && e.status === 503).length > 0, 12000);
+  // Anna verschiebt K — B übernimmt das (und will danach sein Eigenes schreiben: scheitert)
+  const x1 = await ziehen(A.P, K, 22, 12); await leerKlick(A.P);
+  const b1 = await warteBis(B.P, async () => (await lagenVon(B.P))[K] === x1, 15000);
+  const versuche = seit(m, (e) => e.geraet === 'B' && e.status === 503).length;
+  await warteBis(B.P, () => seit(m, (e) => e.geraet === 'B' && e.status === 503).length > versuche, 8000);
+  // Anna verschiebt K noch einmal
+  const x2 = await ziehen(A.P, K, 22, 12); await leerKlick(A.P);
+  soll[K] = x2;
+  await warteBis(A.P, () => lageServer(K) === x2, 12000);
+  await warteBis(B.P, async () => (await lagenVon(B.P))[K] === x2, 9000);
+  // B kommt wieder durch — eine weitere eigene Änderung stößt sein Hochladen an
+  steuerZurueck();
+  const j2 = await ziehen(B.P, J, 10, 8); await leerKlick(B.P);
+  soll[J] = j2;
+  await warteBis(B.P, () => lageServer(J) === j2, 15000);
+  await serverRuhig(3500); await warte(1500);
+  const a = await lagenVon(A.P); const b = await lagenVon(B.P);
+  pruefe('E1.1 B hat Annas erste Lage übernommen (Aufbau)', b1 && !!x1 && !!x2 && x1 !== x2, `${x1} → ${x2}`);
+  pruefe('E1.2 bei Anna bleibt die Karte, wo sie sie zuletzt hingelegt hat', a[K] === x2, `soll ${x2}, ist ${a[K]}`);
+  pruefe('E1.3 der Server hat Annas letzte Lage', lageServer(K) === x2, `soll ${x2}, Server ${lageServer(K)}`);
+  pruefe('E1.4 Gerät B zeigt Annas letzte Lage', b[K] === x2, `soll ${x2}, B ${b[K]}`);
+  pruefe('E1.5 B hat Annas Karte nie selbst geschrieben', !patchesVon(m, 'B').some((e) => e.info.includes(`${K}[`)), `\n${zeigeProtokoll(patchesVon(m, 'B'), 6)}`);
+  pruefe('E1.6 die eigene Änderung von B ist bei Anna und auf dem Server', a[J] === j2 && lageServer(J) === j2, `soll ${j2}, A ${a[J]}, Server ${lageServer(J)}`);
+}
+
+// ══ E4: Kein Zurücklesen des eigenen Stands ════════════════════════════
+if (will('E4') && !process.env.M524_BOARD) {
+  console.log('\n════ E4: Späte Antworten – das Gerät liest seinen eigenen Stand nicht zurück ════');
+  await serverRuhig(3000);
+  const m = protokoll.length;
+  steuer.verzug = (g, art) => (g === 'A' && art === 'patch' ? { vor: 0, nach: 1700 } : { vor: 0, nach: 0 });
+  for (let i = 0; i < 6; i += 1) {
+    const id = `k${14 + i}`;
+    const neu = await ziehen(A.P, id, 18, 10); if (neu) soll[id] = neu;
+    await leerKlick(A.P); await warte(900);
+  }
+  await serverRuhig(4000);
+  steuerZurueck();
+  const zurueck = seit(m, (e) => e.geraet === 'A' && e.art === 'lesen');
+  pruefe('E4.1 Anna liest während ihrer eigenen Schreibvorgänge nichts vom Server zurück', zurueck.length === 0, `\n${zeigeProtokoll(zurueck, 6)}`);
+  const srv = lagen(serverBoard());
+  pruefe('E4.2 alle sechs Züge sind auf dem Server', [14, 15, 16, 17, 18, 19].every((n) => srv[`k${n}`] === soll[`k${n}`]));
+  await pruefeSoll('E4');
+}
+
+// ══ E6: Ohne Pause arbeiten ════════════════════════════════════════════
+if (will('E6') && !process.env.M524_BOARD) {
+  console.log('\n════ E6: Wer ohne Pause weiterarbeitet, lädt trotzdem hoch ════');
+  await serverRuhig(3000);
+  const m = protokoll.length;
+  const start = Date.now() - T0;
+  let i = 0;
+  while (Date.now() - T0 - start < 13000) {
+    const id = `k${21 + (i % 6)}`;
+    const neu = await ziehen(A.P, id, i % 2 ? -14 : 14, i % 2 ? -8 : 8, { schritte: 4 }); if (neu) soll[id] = neu;
+    i += 1;
+    await warte(200);
+  }
+  const erster = seit(m, (e) => e.geraet === 'A' && e.art === 'patch' && e.status === 200)[0];
+  pruefe('E6.1 spätestens nach 9 s ist etwas im Konto, obwohl ohne Pause weitergearbeitet wird', !!erster && erster.t - start <= 9500, erster ? `nach ${((erster.t - start) / 1000).toFixed(1)} s` : `nichts in 13 s (${i} Züge)`);
+  await leerKlick(A.P);
+  await serverRuhig(3500);
+  await pruefeSoll('E6');
+}
+
+// ══ E3: Ersetzter Tool-Quelltext ═══════════════════════════════════════
+if (will('E3') && !process.env.M524_BOARD) {
+  console.log('\n════ E3: Ein hier ersetzter Tool-Quelltext wird von der älteren Fassung im Konto nicht überschrieben ════');
+  await serverRuhig(3000);
+  const da = await warteBis(B.P, async () => (await toolHier(B.P)) === TOOL_1, 15000);
+  pruefe('E3.1 das zweite Gerät hat den Quelltext des Tools (Aufbau)', da && (await toolHier(A.P)) === TOOL_1);
+  const m = protokoll.length;
+  // Die neue Datei kommt vorerst nicht hinauf (Funkloch beim Hochladen der Datei)
+  steuer.fehler = (g, art) => (g === 'A' && art === 'datei-auf' ? 503 : null);
+  await A.P.locator('.react-flow__node[data-id="h1"] input[type="file"]').setInputFiles({ name: 'Rechner.html', mimeType: 'text/html', buffer: Buffer.from(TOOL_2) });
+  await warteBis(A.P, async () => (await toolHier(A.P)) === TOOL_2, 8000);
+  await warteBis(A.P, () => seit(m, (e) => e.geraet === 'A' && e.art === 'datei-auf' && e.status === 503).length > 0, 12000);
+  // Das zweite Gerät ändert etwas → Anna liest den Stand des Kontos (dort liegt noch die alte Fassung)
+  const j = await ziehen(B.P, 'k12', 16, 10); await leerKlick(B.P);
+  soll.k12 = j;
+  const angekommen = await warteBis(A.P, async () => (await lagenVon(A.P)).k12 === j, 20000);
+  await warte(2500);
+  pruefe('E3.2 Anna hat die Änderung des zweiten Geräts bekommen (Aufbau)', angekommen && !!j);
+  pruefe('E3.3 Annas neuer Quelltext ist noch da', (await toolHier(A.P)) === TOOL_2, `Länge ${String(await toolHier(A.P)).length}, erwartet ${TOOL_2.length}`);
+  pruefe('E3.4 … und die alte Fassung wurde gar nicht erst geholt', seit(m, (e) => e.geraet === 'A' && e.art === 'datei-ab').length === 0, `\n${zeigeProtokoll(seit(m, (e) => e.geraet === 'A' && e.art === 'datei-ab'), 4)}`);
+  // Das Hochladen geht wieder — die nächste Änderung nimmt die neue Fassung mit
+  steuerZurueck();
+  const k = await ziehen(A.P, 'k13', 14, 8); await leerKlick(A.P);
+  if (k) soll.k13 = k;
+  const oben = await warteBis(A.P, () => seit(m, (e) => e.geraet === 'A' && e.art === 'datei-auf' && e.status === 200).length > 0, 20000);
+  const beiB = await warteBis(B.P, async () => (await toolHier(B.P)) === TOOL_2, 25000);
+  pruefe('E3.5 danach reist die neue Fassung ins Konto und zum zweiten Gerät', oben && beiB, `oben=${oben} beiB=${beiB}`);
+  await serverRuhig(3500);
+  await pruefeSoll('E3');
 }
 
 // ══ D: Dauerlauf ═══════════════════════════════════════════════════════
@@ -526,8 +752,10 @@ if (will('D')) {
     const ist = await lagenVon(g.P);
     pruefe(`D3 Gerät ${g.name} hat Annas Stand`, abw(ist).length === 0, abw(ist).map((id) => `${id}: soll ${soll[id]}, hier ${ist[id]}`).slice(0, 6).join(' · '));
   }
-  const fremd = seit(m0, (e) => e.geraet !== 'A' && ['patch', 'stapel'].includes(e.art) && e.status === 200);
-  pruefe('D4 die ruhenden Geräte haben nichts geschrieben', fremd.length === 0, `\n${zeigeProtokoll(fremd, 12)}`);
+  // Ein ruhendes Gerät darf höchstens Zeit- und Merkfelder nachreichen (lib/abgleichZeiten.ts) — nie Lage oder Inhalt
+  const nurZeit = (info) => [...info.matchAll(/\[[^:\]]*: ?([^\]]*)\]/g)].every((t) => t[1].split(',').filter(Boolean).every((f) => f === 'data.ocrAm' || f === 'geaendert'));
+  const fremd = seit(m0, (e) => e.geraet !== 'A' && ['patch', 'stapel'].includes(e.art) && e.status === 200 && !(e.art === 'patch' && nurZeit(e.info)));
+  pruefe('D4 die ruhenden Geräte haben weder Lage noch Inhalt geschrieben', fremd.length === 0, `\n${zeigeProtokoll(fremd, 12)}`);
   pruefe('D5 keine Fehler in den Seiten', GERAETE.every((g) => g.fehler.length === 0), GERAETE.map((g) => g.fehler.join(' | ')).join(' · '));
   if (bad > 0 && !LAUT) console.log(`    Hinweise auf A: ${A.toasts.map((x) => `${(x.t / 1000).toFixed(1)} s „${x.text}"`).join(' · ')}`);
 }

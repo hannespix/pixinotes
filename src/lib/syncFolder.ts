@@ -131,6 +131,16 @@ export async function idbGet<T>(key: string): Promise<T | undefined> {
   });
 }
 
+/** M524: Gibt es den Eintrag? — ohne seinen Inhalt zu laden (Quelltexte und Dateien sind oft Megabyte groß) */
+export async function idbHat(key: string): Promise<boolean> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const req = db.transaction('kv', 'readonly').objectStore('kv').count(key);
+    req.onsuccess = () => resolve(req.result > 0);
+    req.onerror = () => reject(req.error);
+  });
+}
+
 export async function idbKeys(): Promise<IDBValidKey[]> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
@@ -512,6 +522,39 @@ export const notiereAenderung = (): void => { letzteAenderung = Date.now(); };
 const tippt = (): boolean => Date.now() - letzteAenderung < 2500;
 
 /**
+ * M524: Fiele der Abgleich dem Nutzer gerade in die Hand? Nur dann wartet er („später").
+ *
+ * Vorher wartete er, sobald IRGENDETWAS auf dem offenen Board anders würde und in den letzten 2,5 s irgendeine eigene
+ * Änderung lag. Wer zügig arbeitete (alle ein, zwei Sekunden eine Karte verschob), während ein zweites Gerät etwas
+ * schrieb, kam nie an die Reihe: nichts wurde eingearbeitet — und nichts hochgeladen, minutenlang. Seit M364 baut
+ * der Abgleich das Board nicht mehr neu auf; er ersetzt nur die geänderten Karten. Stören kann er also nur dort, wo
+ * gerade gearbeitet wird:
+ *   · in der Karte, in der der Cursor steht (ihr Text ist vielleicht noch nicht im Speicher),
+ *   · an einer Karte, die gerade gezogen wird,
+ *   · überall, wenn in einem Fenster über dem Board getippt wird (Fokus-Ansicht: welche Karte, ist hier unbekannt),
+ *   · wenn das offene Board selbst kommt oder geht (dann wird neu aufgebaut).
+ */
+function trifftEingabe(hier: BoardDoc | undefined, neu: BoardDoc | undefined): boolean {
+  if (!hier || !neu) return true;
+  const inArbeit = new Set<string>();
+  const el = typeof document === 'undefined' ? null : document.activeElement;
+  if (el instanceof HTMLElement && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) {
+    const id = el.closest('.react-flow__node')?.getAttribute('data-id');
+    if (!id) return true;
+    inArbeit.add(id);
+  }
+  for (const n of hier.nodes) if ((n as { dragging?: boolean }).dragging) inArbeit.add(n.id);
+  if (inArbeit.size === 0) return false;
+  const N = new Map(neu.nodes.map((n) => [n.id, n]));
+  for (const n of hier.nodes) {
+    if (!inArbeit.has(n.id)) continue;
+    const m = N.get(n.id);
+    if (!m || (m !== n && JSON.stringify(m) !== JSON.stringify(n))) return true;
+  }
+  return false;
+}
+
+/**
  * Fremden Stand einarbeiten. `nebenkopie` = eine Konfliktkopie des Cloud-
  * Clients: Sie liefert nur Inhalte, trägt aber nie Stempel oder Basis —
  * beides gehört der Hauptdatei; was aus der Kopie übernommen wurde, wird
@@ -536,7 +579,8 @@ export async function fremdStandEinarbeiten(remote0: SyncPayload, weg: SyncWeg, 
   const s = useBoard.getState();
   const erg = dreiWegeMerge(basis, { boards: s.boards.map((b) => liveHaken.vor(b)), spaces: s.spaces }, remote);
   if (erg.lokalNeu) {
-    if (erg.geaendert.includes(s.activeId) && tippt()) return 'spaeter';
+    if (erg.geaendert.includes(s.activeId) && tippt()
+      && trifftEingabe(s.boards.find((b) => b.id === s.activeId), erg.boards.find((b) => b.id === s.activeId))) return 'spaeter';
     useBoard.getState().importSync(erg.boards.map((b) => liveHaken.nach(b)), erg.spaces, s.activeId, { geaendert: erg.geaendert });
     if (!flushPersist()) return 'fehler';
     // Beipack (M269) nachgelagert — Karten holen ihre Vorschau, sobald er da ist
@@ -553,6 +597,12 @@ export async function fremdStandEinarbeiten(remote0: SyncPayload, weg: SyncWeg, 
     return erg.lokalNeu ? 'zusammengefuehrt' : 'gleich';
   }
   if (erg.fremdNeu) {
+    // M524: Der fremde Stand steckt jetzt im lokalen — ab hier ist ER der gemeinsame Vorfahre, auch wenn das
+    // Schreiben gleich scheitert (ein anderes Gerät war schneller, das Netz reißt ab, der Server lehnt ab). Vorher
+    // blieb dann die alte Basis stehen: Beim nächsten Abgleich galt alles eben Übernommene als „hier geändert" und
+    // schlug die inzwischen neuere Fassung des anderen Geräts — das ruhende Gerät schrieb dessen ALTEN Stand zurück,
+    // und beim Arbeitenden sprang die Karte auf die frühere Lage.
+    await basisMerken(weg.source, remote);
     await weg.schreiben();
   } else {
     try {
