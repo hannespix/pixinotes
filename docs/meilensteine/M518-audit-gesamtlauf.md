@@ -1,5 +1,5 @@
 # M518 — Audit: Gesamtlauf aller Prüfreihen („läuft alles?“)
-PR: siehe Merge-Commit · Prüfreihen: geändert `m377`–`m504` (Liste unten), Werkzeug `werkzeug/maschinen-last.mjs`,
+PR: siehe Merge-Commit · Prüfreihen: geändert `m304`, `m332`, `m378`, `m389`, `m415`, `m419`, `m425`, `m427`, `m440`, `m481`, `m485`, `m491`, `m500`, `m504`, Werkzeug `werkzeug/maschinen-last.mjs`,
 `werkzeug/alle-pruefungen.mjs` · Datum: 2026-11-25
 
 ## Warum
@@ -11,17 +11,20 @@ Hauptzweig; jede rote Reihe wird allein wiederholt und eingestuft: (a) Fehler de
 | Lauf | Stand | Reihen | grün im ersten Lauf | erst allein grün | rot | Prüfpunkte | Dauer |
 |---|---|---|---|---|---|---|---|
 | 1 (Ausgangslage) | Hauptzweig `8272a97`, sechs Agenten zugleich (Last 10–25 auf vier Kernen) | 239 | 231 | 7 | 1 (`m485` L2, danach allein 3 von 3 grün) | 6 382 gezählt (zwölf Reihen ohne lesbare Schlusszeile fehlen in der Zahl) | 94,5 min bei 2 Bahnen |
-| 2 (Schluss) | @@STAND@@ | @@REIHEN@@ | @@ERST@@ | @@ZWEIT@@ | @@ROT@@ | @@PUNKTE@@ | @@DAUER@@ |
+| 2 (nach den Fixes) | Hauptzweig `a0998a2` (mit M520–M523) + dieser Zweig, zwei bis vier Agenten zugleich (Last 5–19) | 243 | 241 | 2 (`m304` wacklig, `m332` veraltet – beide unten) | 0 | 7 047 grün, 0 rot | 90,0 min bei 2 Bahnen |
+| 3 (Schluss) | @@STAND@@ | @@REIHEN@@ | @@ERST@@ | @@ZWEIT@@ | @@ROT@@ | @@PUNKTE@@ | @@DAUER@@ |
 
-Kein Prüfpunkt war wegen eines Fehlers der App rot, der sich allein und ohne Last zeigt; keine Reihe war veraltet
-(Einstufung b: keine). Alle Auffälligkeiten waren Reihen, die unter Last anders messen als allein (c) — und eine
-davon (`m377`) belegt einen echten Fehler der App, der nur unter Last auftritt (unten, „Für andere Bereiche“).
+Kein Prüfpunkt war wegen eines Fehlers der App rot, der sich allein und ohne Last zeigt. Eine Reihe war veraltet
+(b: `m332` H1, durch M523). Alle übrigen Auffälligkeiten waren Reihen, die unter Last anders messen als allein (c) —
+und eine davon (`m377`) belegt einen echten Fehler der App, der nur unter Last auftritt (unten, „Für andere
+Bereiche“). Die drei Datenbank-Reihen (`m383b`, `m388b`, `m391b`) liefen gegen das lokale Postgres mit, nicht
+übersprungen.
 
 Daneben geprüft (Schlussstand): `npm run check`, `npm run build`, `npm run build:single`, `npm run build:mcp` ohne
 Fehler; einzige Warnung des Builds ist die bekannte Größe des nachgeladenen Mermaid-Pakets (3,6 MB, kein Start-JS).
-`werkzeug/ohne-emoji.mjs --pruefen`: 0 Textstellen. `werkzeug/sprache-ernten.mjs --fehlend`: @@SPRACHE@@.
+`werkzeug/ohne-emoji.mjs --pruefen`: 0 Textstellen. `werkzeug/sprache-ernten.mjs --fehlend`: 0 von 3 717 Texten fehlen.
 `werkzeug/kontrast-pruefen.mjs dist` hell/dunkel, Text, `--rand`, `--fokus`: keine Stelle unter der Grenze.
-Die portable Datei aus `build:single` startet per `file://` ohne Konsolenfehler (@@SINGLE@@).
+Die portable Datei aus `build:single` startet per `file://` ohne Seitenfehler, ohne Konsolenmeldung und ohne gescheiterte Anfrage (ohne Netz, 1440 × 900 und 390 × 780); die sieben Reihen, die die portable Datei bzw. den MCP-Server lesen (`m321`, `m443`, `m446`, `m463`, `m467`, `m476`, `m500`), liefen gegen den frischen Bau grün (214 Prüfpunkte). `release/*` ist nicht Teil des PR.
 
 ## Rote und wacklige Reihen
 Wiederholt wurde mit `node werkzeug/alle-pruefungen.mjs … --wiederhole N --bahnen 2` neben der Last der anderen
@@ -44,6 +47,9 @@ Agenten bzw. neben acht bis zehn rechnenden Prozessen (`node -e "for(;;);"`).
 | `m440` B1 Neigung beim schnellen Zug | im Gesamtlauf rot, danach 5 von 5 | c · 14 Schritte mit je einer Abfrage: unter Last war der „schnelle“ Zug langsam (1,18° statt > 1,2°) | Strecke in festen 300 ms (Ort folgt der Uhr), Neigung schreibt die Seite je Bild mit | 9 von 9 |
 | `m389` C4 Schließen-Kreuz 44 Punkte | gemeldet (44 × 43,99999), hier nicht nachgestellt | c · mitten im Öffnen des Fensters gemessen, Vergleich ohne Rundung | warten, bis das Maß steht; auf Hundertstel runden | 3 von 3 |
 | `m377` C3/C9 „Gerds Text ist bei allen angekommen“ | 2 von 3 | **a · Fehler der App unter Last** (unten) | nicht behoben (fremder Bereich, kein kleiner Fix) | unverändert |
+| `m304` B5 „am Finger liegt es in der Arbeit“ | in Lauf 2 rot, allein grün | c · nach „Alles einpassen“ federte das Netz unter Last länger als die festen 4,5 s; die Maus drückte neben den gewanderten Punkt, nichts wurde gezogen | greifen erst, wenn der Punkt steht, und prüfen, dass er am Finger hängt (sonst noch einmal, höchstens dreimal) | 4 von 4 |
+| `m304` A3b/A8/A9 Ruhe, Bereichsname, Neuladen | 2 von 4 (neben acht rechnenden Prozessen) | c · feste Pausen (4,5 s + 1,5 s, 6 s), danach „muss ruhen“ – unter Last rechnet die Physik langsamer | `zurRuhe`: mindestens so lange wie bisher, dann bis sich nichts mehr rührt (höchstens 30 s); ob Ruhe eintrat, prüft weiter A3b | 4 von 4 |
+| `m332` H1 Meldung „… passten nicht mehr in den Kontext“ | in Lauf 2 rot, auch allein | **b · veraltet:** M523 nennt die Zahl mit richtigem Wort („3 Karten“, `zahlWort`, Regel M461); die Prüfung verlangte noch „Karte(n)“ | H1 verlangt „n Karten passten …“ und dass „Karte(n)“ nicht zurückkommt (Gegenprobe: der alte Wortlaut fällt durch) | 4 von 4 |
 | `m312`, `m402`, `m505` | von anderen Agenten je einmal rot gemeldet | nicht nachgestellt (vier Läufe auf ruhiger Maschine, drei unter Last: alle grün) | – | 7 von 7 |
 
 ### Gegenprobe (wie M517): Die geänderten Prüfpunkte werden weiter rot, wenn das Verhalten fehlt
