@@ -9,6 +9,8 @@ import { kontakteHerunterladen } from '../lib/kontaktExport';
 import { aiBriefing, aiEdges, aiPolish, aiPraesentation, aiPraesentationUeberarbeiten, aiProcess, aiTasks } from '../lib/aiActions';
 /** M410: Die Freitext-Anweisung wird erst geladen, wenn sie gebraucht wird (lib/kiAnweisung.ts) */
 const aiCommand: typeof import('../lib/kiAnweisung').aiCommand = (...a) => import('../lib/kiAnweisung').then((m) => m.aiCommand(...a));
+/** M521: „Markierungen lösen" (store/stricheLoesen.ts) lädt erst beim Aufruf — hier schon einmal holen, damit es ohne Verzug und offline geht */
+void import('../store/stricheLoesen').catch(() => null);
 import { kiBeispiel, kiBlaettern } from '../lib/kiVerlauf';
 import { KACHEL_TYPEN, STICKY_COLORS, type AppNode } from '../types';
 import { FARB_NAMEN } from '../lib/notiz';
@@ -371,6 +373,21 @@ export function SelectionToolbar() {
         : 'dock';
     setSeite((alt) => (alt === naechste ? alt : naechste));
   }, [auswahlIds, transform, phone, imFokus]);
+  // M521: Waagerecht im Bild bleiben. Über einer Karte am Rand ragte die Leiste hinaus — am Telefon war „Löschen" halb
+  // abgeschnitten. Verschoben wird nur der innere Kasten; die Verankerung an der Karte rechnet weiter React Flow.
+  // Gemessen bei jedem Zeichnen (die Leiste zeichnet ohnehin mit jeder Kamerabewegung neu).
+  useLayoutEffect(() => {
+    const l = leisteRef.current;
+    if (!l || l.classList.contains('sel-toolbar-dock')) return;
+    const k = wurzelZoom() || 1;
+    const alt = parseFloat(l.style.translate) || 0;
+    const r = l.getBoundingClientRect();
+    const links = r.left - alt * k; const rechts = r.right - alt * k;
+    const breite = window.innerWidth; const rand = 8;
+    const dx = rechts > breite - rand ? Math.max(rand - links, breite - rand - rechts) : links < rand ? rand - links : 0;
+    const neu = Math.round(dx / k);
+    if (neu !== alt) l.style.translate = neu ? `${neu}px` : '';
+  });
 
 
   if (selected.length === 0 && selFrames.length === 0) return null;
@@ -745,7 +762,7 @@ export function SelectionToolbar() {
                 <button
                   className="sel-typo-reset"
                   onClick={() => setCardTypo(ids, { font: null, fontSize: null })}
-                  title="Schriftart und Textgröße dieser Karte(n) zurück auf Standard"
+                  title={ids.length === 1 ? 'Schriftart und Textgröße dieser Karte zurück auf Standard' : 'Schriftart und Textgröße dieser Karten zurück auf Standard'}
                 >
                   <IUndo size={13} /> Zurück auf Standard
                 </button>

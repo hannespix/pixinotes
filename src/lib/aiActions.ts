@@ -2,6 +2,7 @@
 // Aufgaben/Termine extrahieren, Prozesse ableiten, Briefings, Verbindungen.
 // Alle Aktionen sind NICHT destruktiv: sie legen neue Karten an bzw. ordnen
 // nur Positionen — und jede läuft über die Undo-History.
+import { zahlWort } from './sprache';
 import { tagLokal } from './tag';
 import { askAi as askAiRoh, askAiVoll as askAiVollRoh, kiAbgebrochen, MD_HINT, mdToBlocks, prepImageForAi, type KiOptionen } from './ai';
 import { aufDemselbenBoard } from './zielBoard';
@@ -65,7 +66,7 @@ let letzteAuslassung = 0;
 /** Hinweis für die Ergebnis-Meldung, wenn Karten weggelassen wurden */
 export function auslassungsHinweis(): string {
   return letzteAuslassung > 0
-    ? ` – ${letzteAuslassung} Karte(n) passten nicht mehr in den Kontext und blieben unberücksichtigt (weniger Karten auswählen oder die Freitext-Anweisung nutzen, die in Portionen arbeitet)`
+    ? ` – ${zahlWort(letzteAuslassung, 'Karte', 'Karten')} ${letzteAuslassung === 1 ? 'passte nicht mehr in den Kontext und blieb' : 'passten nicht mehr in den Kontext und blieben'} unberücksichtigt (weniger Karten auswählen oder die Freitext-Anweisung nutzen, die in Portionen arbeitet)`
     : '';
 }
 
@@ -372,7 +373,7 @@ export async function aiTasks(nodes: AppNode[], pos: { x: number; y: number }): 
     linkSources(nodes, kanbanId);
   });
   const withDue = clean.filter((t) => t.due).length;
-  return `${clean.length} Aufgabe(n) extrahiert${withDue ? `, davon ${withDue} mit Termin` : ''} – als Kanban aufs Board gelegt${auslassungsHinweis()}`;
+  return `${zahlWort(clean.length, 'Aufgabe', 'Aufgaben')} extrahiert${withDue ? `, davon ${withDue} mit Termin` : ''} – als Kanban aufs Board gelegt${auslassungsHinweis()}`;
 }
 
 /** Prozess/Workflow aus dem Inhalt ableiten → Mermaid-Flowchart */
@@ -466,7 +467,7 @@ export async function aiEdges(nodes: AppNode[]): Promise<string> {
     }
   });
   if (created === 0) throw new Error('Keine neuen sinnvollen Verbindungen gefunden.');
-  return `${created} Verbindung(en) mit Beziehungs-Label gezogen${auslassungsHinweis()}`;
+  return `${zahlWort(created, 'Verbindung', 'Verbindungen')} mit Beziehungs-Label gezogen${auslassungsHinweis()}`;
 }
 
 /** Notiz-Politur: verbesserte Fassung als NEUE Notiz daneben (Original bleibt) */

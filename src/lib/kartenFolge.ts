@@ -146,10 +146,22 @@ export function kartenFolge(karten: AppNode[], edges: Edge[]): AppNode[] {
   const zeige = (ids: string[]) => { for (const id of ids) if (!gezeigt.has(id)) { gezeigt.add(id); aus.push(vonId.get(id)!); } };
   /** Eine Karte zeigen – mit allem, was an ihr hängt */
   const mitGruppe = (id: string) => zeige(ordne(gruppen[gruppeVon.get(id)!]));
-  // leere Rahmen: vor der ersten Karte, die unter ihrer Oberkante beginnt
+  // Leere Rahmen stehen in der Lesefolge: vor der ersten Karte, die nach ihnen kommt.
+  // M521: Vorher zählte allein die Höhe („vor der ersten Karte, die unter ihrer Oberkante beginnt") – ein leerer
+  // Rahmen stand damit vor ALLEM in seiner Zeile, auch vor dem, was links von ihm liegt: In einer Reihe von Rahmen kam
+  // der leere zuerst, Rahmen-Reise und Vortrag begannen in der Mitte. Jetzt gilt die Zeile wie in `leseFolge`: Ein
+  // Rahmen steht mit seinem Kopf (Titel und oberer Teil) in einer Zeile; verglichen wird mit der Karte bzw. – liegt
+  // sie in einem Rahmen – mit dessen Kopf, denn dort beginnt ihr Abschnitt.
+  /** [links, oben, Höhe] — beim Rahmen nur sein Kopf (höchstens 120 Punkte) */
+  const kopf = (k: AppNode): [number, number, number] => { const h = mass(k).h; return [k.position.x, k.position.y, k.type === 'frame' ? Math.min(h, 120) : h]; };
+  const liegtVor = (f: AppNode, n: AppNode) => {
+    const [ax, ao, ah] = kopf(f); const [bx, bo, bh] = kopf(vonId.get(rahmenVon.get(n.id)!) ?? n);
+    // eine Zeile (Überdeckung wie in leseFolge): links vor rechts — sonst oben vor unten
+    return Math.min(ao + ah, bo + bh) - Math.max(ao, bo) >= 0.5 * Math.min(ah, bh) ? ax <= bx : ao <= bo;
+  };
   const leer = rahmen.filter((f) => ![...rahmenVon.values()].includes(f.id)).sort((a, b) => (a.position.y - b.position.y) || (a.position.x - b.position.x));
   for (const n of teil) {
-    while (leer.length && leer[0].position.y <= n.position.y) zeige([leer.shift()!.id]);
+    for (const f of leer) if (liegtVor(f, n)) zeige([f.id]);
     if (gezeigt.has(n.id)) continue;
     const f = rahmenVon.get(n.id);
     if (!f) { mitGruppe(n.id); continue; }

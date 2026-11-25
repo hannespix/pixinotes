@@ -446,7 +446,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
         return;
       }
       if (col === done && openSubs(item) > 0) {
-        showToast(`☑ Noch ${openSubs(item)} Checklisten-Punkt(e) offen.`);
+        showToast(`☑ Noch ${zahlWort(openSubs(item), 'Checklisten-Punkt', 'Checklisten-Punkte')} offen.`);
         return;
       }
     }
@@ -903,7 +903,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
             ><ILock size={11} /></em>
           )}
           {(it.links?.length ?? 0) > 0 && (
-            <em className="k-links" title={`${it.links!.length} verknüpfte Karte(n) – Ticket öffnen`} onClick={() => setDetailId(it.id)}><ILink size={11} />{it.links!.length}</em>
+            <em className="k-links" title={`${zahlWort(it.links!.length, 'verknüpfte Karte', 'verknüpfte Karten')} – Ticket öffnen`} onClick={() => setDetailId(it.id)}><ILink size={11} />{it.links!.length}</em>
           )}
           {it.who && <em className="k-who" translate="no" title={it.who}>{it.who.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()}</em>}
           {it.note && <em className="k-note" title="Hat Beschreibung – Ticket öffnen" onClick={() => setDetailId(it.id)}>≡</em>}

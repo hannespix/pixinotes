@@ -74,7 +74,9 @@ dl.leer-wege dd { margin: 0; }
   background: rgba(255, 255, 255, 0.42); padding: 12px 18px;
 }
 .ovc-space-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.ovc-space-name { font-size: 19px; font-weight: 800; letter-spacing: -0.01em; color: var(--bereich-farbe, var(--ink)); }
+/* M523: Die Bereichsfarbe als Schrift lag im Hellen bei 2,8:1 (Orange) bis 3,9:1 — mit der Schriftfarbe abgedunkelt
+   (≥ 4,7:1 für alle fünf Bereichsfarben), der Farbton bleibt erkennbar; das Dunkle regelt die Zeile darunter (M492) */
+.ovc-space-name { font-size: 19px; font-weight: 800; letter-spacing: -0.01em; color: color-mix(in srgb, var(--bereich-farbe, var(--ink)) 70%, var(--ink)); }
 /* M492: Die Bereichsfarbe als Schrift auf der dunklen Fläche lag bei 4,3:1 (Blau) bis 3:1 — im Dunkeln mit der
    Schriftfarbe aufgehellt, der Farbton bleibt erkennbar */
 [data-theme='dark'] .ovc-space-name { color: color-mix(in srgb, var(--bereich-farbe, var(--ink)) 62%, var(--ink)); }

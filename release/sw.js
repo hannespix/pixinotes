@@ -7,9 +7,28 @@
 //    Cache, im Hintergrund aktualisieren.
 const CACHE = 'pixinotes-v1';
 
+/**
+ * M523: Die Einstiegsdateien der App-Seite gleich mit in den Cache legen.
+ *
+ * Beim allerersten Besuch lädt der Browser Skript und Stylesheet, BEVOR dieser Service Worker die Seite übernimmt —
+ * sie liefen an ihm vorbei und fehlten im Cache. Wer danach ohne Netz startete (gerade nach „Als App installieren"),
+ * bekam die Seite ohne ihr Skript: eine weiße Fläche. Erst der zweite Besuch mit Netz füllte den Cache. Jetzt liest
+ * die Installation die eben gecachte Seite und holt, was sie einbindet (Skript, vorgeladene Module, Stylesheets).
+ * Was die App danach nachlädt, kommt wie bisher über den fetch-Zuhörer unten in den Cache.
+ */
+async function einstiegVorladen(cache) {
+  try {
+    const seite = await cache.match('./');
+    const html = seite ? await seite.text() : '';
+    const pfade = [...html.matchAll(/(?:src|href)="(\.\/assets\/[^"]+\.(?:js|css))"/g)].map((m) => m[1]);
+    // jede Datei für sich: eine fehlende soll die Installation nicht scheitern lassen
+    await Promise.all([...new Set(pfade)].map((pfad) => cache.add(pfad).catch(() => {})));
+  } catch (e) { /* ohne Vorrat geht es weiter wie bisher */ }
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(['./'])).then(() => self.skipWaiting()),
+    caches.open(CACHE).then((c) => c.addAll(['./']).then(() => einstiegVorladen(c))).then(() => self.skipWaiting()),
   );
 });
 
@@ -115,7 +134,9 @@ self.addEventListener('fetch', (event) => {
           }
           return res;
         })
-        .catch(() => caches.match('./')),
+        // M523: Die gecachte App-Seite ist nur der Ersatz für die App-Seite selbst. Vorher bekam ohne Netz auch die
+        // Teilnehmer-Seite (mitmachen.html) die App geliefert — unter fremder Adresse und ohne ihren Link-Inhalt.
+        .catch(() => (/\/(index\.html)?$/.test(new URL(req.url).pathname) ? caches.match('./') : Response.error())),
     );
     return;
   }

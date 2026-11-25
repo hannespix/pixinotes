@@ -27,7 +27,7 @@ import {
  IBubbles , IUsers, IArchive, IFolien, IUhr, IPerson, IFluessig, IPixi
 } from './Icons';
 import { ablageNehmen, ablageVerwerfen } from '../lib/kontextmenue';
-import { t } from '../lib/sprache';
+import { t, zahlWort } from '../lib/sprache';
 import { taste } from '../lib/tasten';
 import { nurBoardSetzen } from '../lib/nurBoard';
 import { appInstallieren } from '../lib/appInstallieren';
@@ -129,7 +129,7 @@ export function Dock() {
     }
     if (dupes.length) {
       mutedHistory(() => st.onEdgesChange(dupes.map((id) => ({ type: 'remove' as const, id }))));
-      showToast(`${dupes.length} doppelte Verbindung(en) zusammengefasst.`);
+      showToast(`${zahlWort(dupes.length, 'doppelte Verbindung', 'doppelte Verbindungen')} zusammengefasst.`);
     }
     setArranging(true);
     const DUR = 700;
@@ -217,7 +217,11 @@ export function Dock() {
       e.stopPropagation();
       // M316: In der Palette leert Esc zuerst die Suche
       if (addMenu && suche) { setSuche(''); return; }
+      // M523: Der Fokus stand im Menü (Suchfeld der Palette) und fiel mit ihm ins Leere — zurück auf den Knopf
+      const knopf = dockRef.current?.contains(document.activeElement)
+        ? dockRef.current.querySelector<HTMLElement>('.dock-add-wrap > button[aria-expanded="true"]') : null;
       closeDockMenus();
+      knopf?.focus({ preventScroll: true });
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);

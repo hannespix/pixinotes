@@ -18,7 +18,7 @@ import { nodesToText } from './serialize';
 import { makeNote } from './nodes';
 import { findFreeSpot } from './arrange';
 import { mutedHistory, selectActiveBoard, useBoard } from '../store';
-import { t } from './sprache';
+import { t, zahlWort } from './sprache';
 import { sammleQuellen, type Quelle } from './webQuellen';
 import type { AppNode } from '../types';
 
@@ -102,7 +102,7 @@ export async function fuehreRechercheAus(
   });
 
   melde(quellen.length
-    ? `${quellen.length} Quelle(n) gefunden – schreibe die Antwort…`
+    ? `${zahlWort(quellen.length, 'Quelle', 'Quellen')} gefunden – schreibe die Antwort…`
     : 'Keine Quellen erreichbar – schreibe eine ehrliche Antwort…');
 
   const dialog = dialogText;
@@ -155,7 +155,7 @@ ${plan.suchbegriffe.length ? `Nützliche Suchrichtungen: ${plan.suchbegriffe.joi
   );
 
   melde(quellen.length
-    ? `${quellen.length} Netz-Quelle(n) gelesen – lege die Notiz an…`
+    ? `${zahlWort(quellen.length, 'Netz-Quelle', 'Netz-Quellen')} gelesen – lege die Notiz an…`
     : 'Antwort da – lege die Notiz an…');
   const fussnoten = quellen.length
     ? `\n\n## Quellen\n${quellen.map((q) => `- Web: [${q.titel}](${q.url})`).join('\n')}`

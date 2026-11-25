@@ -44,24 +44,31 @@ export function Tastatur() {
       // ── Überall ───────────────────────────────────────────────────────
       if (passt(e, 'hilfe')) return tun(() => st.setHelpOpen(!st.helpOpen));
       if (passt(e, 'einstellungen')) return tun(() => st.setSettingsOpen(!st.settingsOpen));
-      if (passt(e, 'aufgaben')) return tun(() => st.setTasksOpen(!st.tasksOpen));
+      /* M523: Aufgaben, Spalte, Navigation und Netz wirkten noch HINTER einem offenen Fenster (M390 hatte nur die Kürzel
+         darunter gesperrt): Mit offenen Einstellungen wechselte Alt+G die Ansicht dahinter, Alt+U klappte die Spalte weg,
+         Alt+W öffnete die Navigation hinter dem Fenster und zog den Fokus hinaus, Alt+T die Aufgaben-Zentrale. */
+      const offenesFenster = overlayOffen();
+      if (passt(e, 'aufgaben')) { if (offenesFenster) return; return tun(() => st.setTasksOpen(!st.tasksOpen)); }
 
       // ── Ansichten ─────────────────────────────────────────────────────
       // M297: Alt+U schaltet die linke Navigationsspalte — am Telefon (keine
       // Spalte) öffnet es die Ausstülpung wie Alt+W
       if (passt(e, 'ueberblick')) {
+        if (offenesFenster) return;
         return tun(() => {
           if (window.matchMedia('(min-width: 861px)').matches) st.setNavLinks(!st.navLinks);
           else window.dispatchEvent(new CustomEvent('pixinotes:navigator'));
         });
       }
       if (passt(e, 'navigator')) {
+        if (offenesFenster) return;
         // Der Navigator lebt als lokaler Zustand in der Reiter-Leiste — ein
         // Fenster-Ereignis ist hier ehrlicher, als seinen Zustand nur für
         // dieses Kürzel in den globalen Speicher zu heben.
         return tun(() => window.dispatchEvent(new CustomEvent('pixinotes:navigator')));
       }
       if (passt(e, 'netz')) {
+        if (offenesFenster) return;
         return tun(() => {
           if (st.view === 'overview') st.setView('board');
           else { st.setOverviewMode('netz'); st.setView('overview'); }
@@ -75,7 +82,7 @@ export function Tastatur() {
        * die Präsentation über die Einstellungen; in der Präsentation wechselte Alt+→ zusätzlich zum Blättern das
        * Board. `fenster` = irgendein Fenster oder die Präsentation liegt darüber; `amBoard` = das Board ist zu sehen.
        */
-      const fenster = overlayOffen();
+      const fenster = offenesFenster;
       const amBoard = st.view === 'board' && !st.tasksOpen && !fenster;
       // M514: Rahmen für Rahmen präsentieren (und wieder beenden)
       if (passt(e, 'rahmenReise')) {
@@ -156,6 +163,9 @@ export function Tastatur() {
       if (imText(e)) return;
       if (passt(e, 'alleWaehlen') && amBoard) {
         return tun(() => {
+          // M521: Im Karten-Fokus ist nur EINE Karte zu sehen — „alle" wählte die übrigen unsichtbar dahinter mit
+          // (Entf oder Strg+D trafen danach das ganze Board)
+          if (st.focusCard) return;
           const sichtbar = selectActiveBoard(st).nodes
             .filter((n) => !n.archived || st.showArchived)
             .map((n) => ({ id: n.id, type: 'select' as const, selected: true }));

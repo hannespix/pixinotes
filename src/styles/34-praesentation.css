@@ -92,6 +92,12 @@
 .slide-shape { width: min(640px, 90%); height: min(360px, calc(60vh / var(--pn-anz, 1))); position: relative; align-self: center; flex: none; }
 .slide-shape .shape-body { font-size: 22px; }
 .slide-shape-input { font-size: 22px !important; text-align: center; }
+/* M521: Die Höhe des Textfelds folgt dem Text — als Flex-Kind von .shape-body steht er dann wie auf dem Board in der
+   Mitte der Form. Vorher war das Feld fest 80 % hoch und der Text begann oben: in der Raute an der schmalen Spitze,
+   schon ein kurzer Satz ragte dort über die Form hinaus. Browser ohne field-sizing zeigen es wie bisher. */
+@supports (field-sizing: content) {
+  .slide-shape-input { field-sizing: content; height: auto; max-height: 80%; }
+}
 /* Kanban: volle Interaktion, etwas größer gesetzt */
 .slide-kanban {
   width: min(1040px, 100%); align-self: center;
