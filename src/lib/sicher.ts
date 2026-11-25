@@ -59,18 +59,6 @@ export function wordEntschaerfen(wurzel: HTMLElement): void {
   });
 }
 
-/** M529: Speicherstand eines eigenen Tools von außen (Konto) — eine flache Liste aus Texten, höchstens 5 MB */
-export function toolSpeicherVonAussen(roh: unknown): Record<string, string> | null {
-  if (!roh || typeof roh !== 'object' || Array.isArray(roh)) return null;
-  let summe = 0;
-  for (const [k, v] of Object.entries(roh as Record<string, unknown>)) {
-    if (typeof v !== 'string') return null;
-    summe += k.length + v.length;
-    if (summe > 5_000_000) return null;
-  }
-  return roh as Record<string, string>;
-}
-
 /**
  * M450: Foto einer Kontakt-Karte — nur ein eingebettetes Rasterbild (data:image/png|jpeg|gif|webp). Keine Webadresse
  * (die fragte beim Anzeigen einen fremden Server an), kein SVG (darin können Skripte stehen), nichts über 1,5 MB.

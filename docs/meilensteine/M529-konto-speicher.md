@@ -62,7 +62,7 @@ drei sind geschlossen. Liegen die Inhalte noch auf einem seiner Geräte, lädt e
 - `lib/kontoZustand.ts` (nachgeladen): `zustandMelden(id, data)` aus dem Speicher-Kanal der Karte → nach ≥ 1,5 s,
   höchstens alle 10 s, nur bei geänderter Prüfsumme → `<Nutzer>/zustand-<id>`. `zustandHolen(id, hierAm)` beim Start
   des Tools (`freshestState`): nur wenn das Verzeichnis ein solches Objekt nennt (keine 400 für Tools ohne Stand), nur
-  wenn neuer; geprüft mit `toolSpeicherVonAussen` (`lib/sicher.ts`: nur Texte, höchstens 5 MB). Nur eigene Boards.
+  wenn neuer; geprüft mit `toolSpeicherVonAussen` (`lib/sicherGestalt.ts`, die nachgeladene Prüf-Schicht: nur Texte, höchstens 5 MB). Nur eigene Boards.
 - `lib/kontoAufraeumen.ts` + `components/KontoAufraeumen.tsx`: `speicherPruefen()` = Verzeichnis gegen Verweise
   (`kontoVerweise()`: Kennungen aller Karten in den Board-Zeilen des Kontos und Dateien der Umgebung; dazu Karten dieses
   Geräts, Vorlagen, Anhänge von Versionen). Nur `datei-…`/`zustand-…`, älter als 24 h. `speicherAufraeumen()` prüft

@@ -13,7 +13,7 @@
 // lib/sicher.ts (nur Texte, höchstens 5 MB). Nur eigene Boards: Geteilte gehören einem anderen Konto.
 import { useBoard } from '../store';
 import { kontoAnfrage, kontoObjekte, loadKonto, stempel } from './kontoSync';
-import { toolSpeicherVonAussen } from './sicher';
+import { toolSpeicherVonAussen } from './sicherGestalt';
 import { idbGet, idbSet } from './syncFolder';
 
 export const ZUSTAND_PREFIX = 'zustand-';
