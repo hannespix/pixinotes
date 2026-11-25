@@ -63,13 +63,17 @@ const paletteAuf = async (P) => {
   if (!(await P.locator('.modul-palette').count())) { await P.locator('.dock .dock-add-wrap').nth(0).locator('button').first().click(); await P.waitForTimeout(400); }
 };
 const knoten = (P) => P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state.boards[0].nodes);
-const vibeRahmen = (P) => P.frames().find((f) => f !== P.mainFrame() && f.url().startsWith('about:srcdoc'));
 // M448: 20 s statt 8 s – unter Last (parallele Prüfungen, nachgeladene Module seit M446) brauchte der Editor
 // im Rahmen gelegentlich länger; gewartet wird weiter nur, bis „#edit" da ist
-const warteRahmen = async (P, ms = 20000) => {
+// M518: 30 s, und der Rahmen wird am Inhalt erkannt statt an seiner Adresse – unter Last meldet Playwright für den
+// srcdoc-Rahmen zeitweise "" statt "about:srcdoc" (Regel aus M484, docs/AGENTEN.md; so steht es schon in m428).
+// Im Gesamtlauf fand die Reihe den Rahmen deshalb nicht (B3, C1, C2 rot, danach Abbruch), allein lief sie grün.
+const warteRahmen = async (P, ms = 30000) => {
   for (let t = 0; t < ms; t += 250) {
-    const f = vibeRahmen(P);
-    if (f && await f.locator('#edit').count().catch(() => 0)) return f;
+    for (const f of P.frames()) {
+      if (f === P.mainFrame()) continue;
+      if (await f.locator('#edit').count().catch(() => 0)) return f;
+    }
     await P.waitForTimeout(250);
   }
   return null;
