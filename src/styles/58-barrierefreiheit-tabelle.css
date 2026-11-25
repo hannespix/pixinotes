@@ -174,6 +174,19 @@
 .sheet-zelle.fehler { color: #c0392b; font-weight: 600; }
 [data-theme='dark'] .sheet-zelle.fehler { color: #ff8b7a; }
 .sheet-zelle:hover { background: var(--accent-soft); }
+/* M528: Auswahl (Umschalt+Klick, Ziehen, Köpfe) — die Fläche wie beim Zeigen, der Anker mit Rahmen; Ziehen markiert
+   Zellen statt Text. Ausgeschnittenes trägt bis zum Einfügen eine gestrichelte Linie. */
+.sheet-grid td.sheet-zelle { -webkit-user-select: none; user-select: none; }
+.sheet-grid td.sheet-zelle.gewaehlt { background: var(--accent-soft); }
+.sheet-grid td.sheet-zelle.anker { box-shadow: inset 0 0 0 2px var(--accent); }
+.sheet-grid td.sheet-zelle.ausgeschnitten { outline: 1px dashed var(--accent-strong); outline-offset: -3px; }
+.sheet-kopf.gewaehlt { color: var(--accent-strong); background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--surface-card); }
+.sheet-grid thead .sheet-kopf, .sheet-zeilenkopf { cursor: pointer; }
+.sheet-scroll { position: relative; }
+.sheet-ablage {
+  position: absolute; top: 0; left: 0; width: 1px; height: 1px; padding: 0; border: 0; opacity: 0; resize: none;
+  overflow: hidden; pointer-events: none; font-size: 16px; color: transparent; background: transparent;
+}
 .sheet-eingabe {
   width: 100%; height: 24px; box-sizing: border-box; border: 2px solid var(--accent);
   border-radius: var(--r-xs); background: var(--surface-2); color: var(--ink);

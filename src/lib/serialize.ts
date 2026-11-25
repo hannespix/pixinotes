@@ -5,7 +5,7 @@ import { bubblesAlsText } from './bubbles';
 import { fluessigText } from './fluessigDaten';
 import { EDITOR_GRUND, EDITOR_SCHRIFT } from './editorFarben';
 import { formatBytes } from './parseEmail';
-import { indexZuAdresse, rechneBlatt, zeigeWert } from './formel';
+import { indexZuAdresse, plus, rechneBlatt, zeigeWert } from './formel';
 
 /**
  * M256: Rechen-Tabelle als Zeilen — für Suche, Text- und HTML-Export.
@@ -17,6 +17,8 @@ function sheetZeilen(s: SheetData): string[][] {
   const zellen = s.cells ?? {};
   const spalten = Math.max(1, s.cols ?? 5);
   const zeilen = Math.max(1, s.rows ?? 8);
+  // M528: Datumsrechnung, ganze Spalten — liegen nicht im Start-Paket; ab dem nächsten Aufruf rechnen sie mit
+  if (!plus.rechne) void import('./formelPlus').catch(() => null);
   const werte = rechneBlatt(zellen);
   const aus: string[][] = [];
   for (let z = 0; z < zeilen; z += 1) {

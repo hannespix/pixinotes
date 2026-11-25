@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Handle, NodeResizer, Position, useReactFlow, useUpdateNodeInternals } from '@xyflow/react';
-import { mutedHistory, runDerived, selectActiveBoard, useBoard } from '../../store';
+import { mutedHistory, runDerived, selectActiveBoard, useBoard, useKarteFestId } from '../../store';
 import { groesseGedreht, istDrehbar, winkelNorm, winkelRaste, winkelVon } from '../../lib/drehung';
 import { sizeOf } from '../../lib/arrange';
 import { IDrehen } from '../Icons';
@@ -65,6 +65,8 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
   const winkelRoh = useBoard((s) => winkelVon(selectActiveBoard(s)?.nodes.find((x) => x.id === id)));
   const drehbar = useBoard((s) => istDrehbar(selectActiveBoard(s)?.nodes.find((x) => x.id === id)));
   const nurLesen = useBoard((s) => selectActiveBoard(s)?.geteiltRolle === 'lesen');
+  // M531: Darf ich die Karte nicht ändern (Board nur lesen, Gast ohne Recht), blendet das Stylesheet ihre Bearbeiten-Leisten aus
+  const fest = useKarteFestId(id);
   const winkel = imFokus ? 0 : winkelRoh;
   const winkelRef = useRef(winkel);
   winkelRef.current = winkel;
@@ -468,7 +470,7 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
   // Wichtig: Lösch-Knopf & Handles liegen AUSSERHALB des card-body,
   // damit dessen overflow:hidden sie nicht abschneidet.
   return (
-    <div className="card-shell" data-ruhig={ruhig && !alsKachel ? '' : undefined} data-ohne-hoehe={ohneHoehe ? '' : undefined} data-winkel={winkel ? winkel : undefined}
+    <div className="card-shell" data-fest={fest ? '' : undefined} data-ruhig={ruhig && !alsKachel ? '' : undefined} data-ohne-hoehe={ohneHoehe ? '' : undefined} data-winkel={winkel ? winkel : undefined}
       style={rollt || winkel ? ({ ...(rollt ? { '--notiz-max': `${NOTIZ_MAX}px`, ...(typeof festeHoehe === 'number' ? { '--karte-h': `${festeHoehe}px` } : {}) } : {}), ...(winkel ? { '--winkel': `${winkel}deg` } : {}) } as CSSProperties) : undefined}>
       {/* Resize-Griffe: weiße Quadrate mit neutralem Rand (klassischer
           Auswahlrahmen) — bewusst ANDERS als die runden Akzent-Verbindungs-

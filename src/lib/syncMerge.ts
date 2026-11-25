@@ -268,6 +268,16 @@ const vergleichsKarte = (n: AppNode): string => {
  * verschieden → hiesig (zählt als Konflikt). Die Lage ist ein Feld, `data` wird eine Ebene tiefer entschieden.
  * Zeitfelder (abgleichZeiten.ts) nehmen den späteren Wert. Maße bleiben die hiesigen.
  */
+/**
+ * M528: Rechen-Tabellen mischen nach ihrem Umbau-Protokoll (lib/tabellenUmbau.ts, nachgeladen; syncFolder lädt es vor
+ * dem Einarbeiten). Fügt ein Gerät eine Zeile ein und ändert ein anderes eine Zelle, wird die Änderung durch den Umbau
+ * geschickt und landet in der richtigen Zelle. `null` = geht nicht (beide haben umgebaut) → Feld für Feld wie bisher.
+ */
+export const tabellenMischen: {
+  f?: (b: Record<string, unknown>, l: Record<string, unknown>, f: Record<string, unknown>) => { daten: Record<string, unknown>; konflikt: boolean } | null;
+  felder?: readonly string[];
+} = {};
+
 function karteFeldweise(b: AppNode, l: AppNode, f: AppNode, z: Zaehler): AppNode {
   type Satz = Record<string, unknown>;
   const gleich = (x: unknown, y: unknown): boolean => x === y || kanonText(x) === kanonText(y);
@@ -288,7 +298,16 @@ function karteFeldweise(b: AppNode, l: AppNode, f: AppNode, z: Zaehler): AppNode
   };
   const tabellen: string[] = l.type === 'bubbles' && f.type === 'bubbles' ? [...BUBBLES_TABELLEN] : [];
   const karte = mische(b as unknown as Satz, l as unknown as Satz, f as unknown as Satz, new Set(['data', 'measured', 'selected', 'dragging']), ZEIT_FELDER_KARTE);
-  const daten = mische((b.data ?? {}) as Satz, (l.data ?? {}) as Satz, (f.data ?? {}) as Satz, new Set(['punkte', ...tabellen]), ZEIT_FELDER_DATEN);
+  const tab = l.type === 'sheet' && f.type === 'sheet' && tabellenMischen.f ? tabellenMischen.f((b.data ?? {}) as Satz, (l.data ?? {}) as Satz, (f.data ?? {}) as Satz) : null;
+  let daten = mische((b.data ?? {}) as Satz, (l.data ?? {}) as Satz, (f.data ?? {}) as Satz, new Set(['punkte', ...tabellen, ...(tab ? tabellenMischen.felder ?? [] : [])]), ZEIT_FELDER_DATEN);
+  if (tab) {
+    if (tab.konflikt) konflikt = true;
+    for (const [k, v] of Object.entries(tab.daten)) {
+      if (gleich(daten[k], v)) continue;
+      if (daten === l.data) daten = { ...daten };
+      if (v === undefined) delete daten[k]; else daten[k] = v;
+    }
+  }
   if (konflikt) z.konflikte += 1;
   if (karte === (l as unknown as Satz) && daten === l.data) return l;
   return { ...karte, data: daten } as unknown as AppNode;

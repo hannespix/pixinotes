@@ -351,6 +351,24 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
 .board-wrap.nur-lesen .react-flow__resize-control,
 .board-wrap.nur-lesen .react-flow__handle { visibility: hidden; pointer-events: none; }
 .board-wrap.nur-lesen .bn-editor { cursor: default; }
+/* M531: Bearbeiten-Leisten in Karten, die ich nicht ändern darf (Board nur lesen, Gast ohne Recht an der Karte), gibt
+   es gar nicht erst — vorher standen sie da, und jeder Klick meldete nur „nur zum Lesen freigegeben". data-fest setzt
+   die Hülle (CardShell, Form) über useKarteFestId. Was nur die ANSICHT ändert (Blättern, Ansicht, Filter, Sortieren,
+   Skala, Export) bleibt — das geht lokal (M520, lib/kartenAnsicht.ts). Neue Bearbeiten-Leisten hier eintragen. */
+[data-fest] :is(
+    .color-dot, .note-farben,
+    .shape-toolbar,
+    .kanban-add,
+    .gantt-tools > button[aria-label='Vorgang hinzufügen'], .gantt-addzeile,
+    .sheet-tools > button[aria-label='Zeile anhängen'],
+    .time-rec, .time-add,
+    .week-tools,
+    .minutes-setup-btn, .minutes-new, .pr-werkzeuge > button,
+    .kontakt-tools button[aria-label='Bearbeiten'],
+    .fl-werkzeuge, .pixi-tools,
+    .cal-dayedit-add, .cal-dayedit-more, .cal-dayedit-row button[title='Termin löschen']
+),
+.board-wrap.nur-lesen .mm-toolbar { display: none !important; }
 
 /* ---------- M362: Kommentare bearbeiten ---------- */
 .comment-msg-meta { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 20px; }
