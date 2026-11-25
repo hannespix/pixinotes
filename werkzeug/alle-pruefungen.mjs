@@ -18,6 +18,9 @@
 //                                                       meldet je Reihe „x von 10 grün" und Flattern (M484)
 //   node werkzeug/alle-pruefungen.mjs … --ablage ordner → volle Ausgabe jedes roten Laufs als Datei dorthin (M484)
 //
+// M518: Reihen mit Zeitmessung (sie binden werkzeug/maschinen-last.mjs ein) laufen allein, wenn sonst keine Bahn belegt
+// ist – meist am Ende. Die Schlusszeile und das JSON zählen die Prüfpunkte (Zeilen ✓/✗) über alle Reihen.
+//
 // Jede Prüfung startet ihren eigenen kleinen Server und Browser. Was sich dabei in die Quere käme, läuft nie
 // gleichzeitig: Dateien mit demselben Port, und die Prüfungen an der lokalen Datenbank (eine gemeinsame Datenbank).
 // Fällt eine Datei durch, wird sie am Ende EINMAL allein wiederholt – unter Last kann eine Wartezeit knapp werden;
@@ -109,6 +112,11 @@ const sperren = (name) => {
   for (const m of text.matchAll(/\bPORT\w*\s*=\s*(\d{4,5})\b|listen\(\s*(\d{4,5})\b|localhost:(\d{4,5})\b|127\.0\.0\.1:(\d{4,5})\b/g)) s.add(`port:${m[1] ?? m[2] ?? m[3] ?? m[4]}`);
   // nur, wer wirklich die lokale Datenbank startet – „postgres_changes" in den Gruppen-Prüfungen ist ein Ereignisname
   if (/\bpsql\b|pntest/.test(text)) s.add('datenbank');
+  // M518: Reihen, die ZEIT messen (Bildzeit, Bilder je Sekunde) und dafür die Maschine mitmessen
+  // (werkzeug/maschinen-last.mjs), laufen allein: nicht neben einer anderen Reihe dieses Laufs und – über die
+  // gemeinsame Sperre – nicht neben der Zeitmessung eines anderen Worktrees. Sie kommen dran, sobald keine Bahn
+  // mehr belegt ist. So gilt ihre Grenze im Nachtlauf unverändert; umgerechnet wird nur bei fremder Last.
+  if (/maschinen-last\.mjs/.test(text)) s.add('zeitmessung');
   return [...s];
 };
 // M468: --ohne-datenbank – dieselbe Erkennung wie für die Sperre („braucht Datenbank", M448). Ausgelassen, nicht
@@ -162,10 +170,13 @@ const merkeJson = (name, r, zweiter) => {
   const reihe = name.replace(/\.mjs$/, '');
   const summe = (r.aus.match(/^.*\d+ bestanden.*$/gm) ?? []).pop()?.trim() ?? '';
   const fehler = r.rc === 0 ? [] : r.aus.split('\n').filter((z) => /✗|Error|error/.test(z)).slice(0, 8).map((z) => z.slice(0, 300));
+  // M518: Prüfpunkte zählen – an den Zeilen ✓/✗ der Reihe, nicht an ihrer Schlusszeile (die heißt je nach Reihe
+  // „bestanden", „ok", „grün" oder „✓"; zwölf Reihen hatten deshalb keine Summe und fehlten in jeder Gesamtzahl)
+  const gut = (r.aus.match(/^\s*✓/gm) ?? []).length; const schlecht = (r.aus.match(/^\s*✗/gm) ?? []).length;
   const alt = jsonStand.reihen[reihe];
   jsonStand.reihen[reihe] = zweiter
-    ? { ...alt, rot: r.rc !== 0, rc: r.rc, sek: alt.sek + r.sek, summe: summe || alt.summe, wiederholt: true, fehler: r.rc === 0 ? alt.fehler : fehler }
-    : { reihe, rot: r.rc !== 0, rc: r.rc, sek: r.sek, summe, wiederholt: false, fehler };
+    ? { ...alt, rot: r.rc !== 0, rc: r.rc, sek: alt.sek + r.sek, summe: summe || alt.summe, gut, schlecht, wiederholt: true, fehler: r.rc === 0 ? alt.fehler : fehler }
+    : { reihe, rot: r.rc !== 0, rc: r.rc, sek: r.sek, summe, gut, schlecht, wiederholt: false, fehler };
   jsonSchreiben();
 };
 jsonSchreiben();
@@ -205,7 +216,8 @@ await new Promise((alleFertig) => {
   const weiter = () => {
     if (offen.length === 0 && laufend === 0) { alleFertig(); return; }
     while (laufend < bahnen) {
-      const i = offen.findIndex((d) => d.sperren.every((s) => !belegt.has(s)) && allesNehmen(d.sperren));
+      if (belegt.has('zeitmessung')) break;                        // M518: eine Zeitmessung läuft – nichts daneben
+      const i = offen.findIndex((d) => (laufend === 0 || !d.sperren.includes('zeitmessung')) && d.sperren.every((s) => !belegt.has(s)) && allesNehmen(d.sperren));
       if (i < 0) { if (offen.length && !wartet) { wartet = true; setTimeout(() => { wartet = false; weiter(); }, 3000); } break; }
       const d = offen.splice(i, 1)[0];
       for (const s of d.sperren) belegt.add(s);
@@ -264,7 +276,8 @@ for (const name of rot) {
   if (r.rc !== 0) { bleibtRot.push(name); if (!bericht) console.log(r.aus.split('\n').filter((z) => /✗|Error/.test(z)).slice(0, 12).join('\n')); }
 }
 const minuten = ((Date.now() - start) / 60000).toFixed(1);
-console.log(`\n${dateien.length - bleibtRot.length} von ${dateien.length} Dateien grün · ${rot.length - bleibtRot.length} erst beim zweiten Mal · ${minuten} min bei ${bahnen} Bahnen`);
+const punkte = Object.values(jsonStand.reihen).reduce((a, x) => [a[0] + (x.gut ?? 0), a[1] + (x.schlecht ?? 0)], [0, 0]);
+console.log(`\n${dateien.length - bleibtRot.length} von ${dateien.length} Dateien grün · ${rot.length - bleibtRot.length} erst beim zweiten Mal · ${punkte[0]} Prüfpunkte grün, ${punkte[1]} rot · ${minuten} min bei ${bahnen} Bahnen`);
 if (bleibtRot.length) console.log(`rot: ${bleibtRot.join(', ')}`);
 if (ausgelassen.length) console.log(`ausgelassen (Datenbank): ${ausgelassen.map((n) => n.replace(/\.mjs$/, '')).join(', ')}`);
 jsonStand.fertig = true;
