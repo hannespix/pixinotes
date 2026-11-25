@@ -14,7 +14,7 @@ import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, u
 import { standGeprueft } from './sicher';
 import {
   basisMerken, basisVergessen, buildSyncPayloadMitDateien, DATEI_BUDGET_MB, emitSyncStatus, fremdStandEinarbeiten,
-  KONTO_DIRTY_KEY, notiereAenderung, SYNC_DIRTY_KEY, uebernimmDateien, WEBDAV_DIRTY_KEY, type SyncPayload, type SyncWeg,
+  KONTO_DIRTY_KEY, merkeUngesichert, notiereAenderung, SYNC_DIRTY_KEY, uebernimmDateien, WEBDAV_DIRTY_KEY, type SyncPayload, type SyncWeg,
 } from './syncFolder';
 import { nurAuswahlAnders } from './syncMerge';
 
@@ -319,7 +319,7 @@ export function initWebdavSync(): void {
     // Änderungen (Auto-Einsammeln) zählen nicht als eigene Bearbeitung.
     if (!inDerived()) {
       notiereAenderung();
-      try { localStorage.setItem(WEBDAV_DIRTY_KEY, '1'); localStorage.setItem(SYNC_DIRTY_KEY, '1'); localStorage.setItem(KONTO_DIRTY_KEY, '1'); } catch { /* voll → sicherer ohne Fast-Forward */ }
+      try { merkeUngesichert(WEBDAV_DIRTY_KEY, SYNC_DIRTY_KEY, KONTO_DIRTY_KEY); } catch { /* voll → sicherer ohne Fast-Forward */ }
     }
     if (!loadWebdav()?.auto) return;
     clearTimeout(timer);

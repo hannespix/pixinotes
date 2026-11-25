@@ -1,4 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { zugLaeuft } from '../lib/zugAnzeige';
+import { useImZugFest } from '../lib/imZugFest';
 import { createPortal } from 'react-dom';
 import { NodeToolbar, Position, useReactFlow, useStore } from '@xyflow/react';
 import { selectActiveBoard, useBoard } from '../store';
@@ -45,8 +47,20 @@ import { taste } from '../lib/tasten';
  * teilen, kopieren, duplizieren, löschen — verdeckt keine anderen Karten
  * und wandert beim Pannen/Zoomen mit. Muss als Kind von <ReactFlow> gerendert werden.
  */
+/**
+ * M525: Im Zug bleibt die Leiste, wie sie ist (lib/imZugFest.ts). Was sie zeigt, hängt an der Auswahl und am Inhalt
+ * der Karten, nicht an deren Lage; den Platz an der Karte rechnet weiter React Flow (NodeToolbar).
+ * Offenes Board und seine Auswahl — ändert sich die Auswahl mitten im Zug, liest die Leiste trotzdem neu.
+ */
+const auswahlSchluessel = (s: ReturnType<typeof useBoard.getState>): string => {
+  const b = selectActiveBoard(s);
+  let k = b?.id ?? '';
+  for (const n of b?.nodes ?? []) if (n.selected) k += `,${n.id}`;
+  return k;
+};
+
 export function SelectionToolbar() {
-  const board = useBoard(selectActiveBoard);
+  const board = useImZugFest(selectActiveBoard, auswahlSchluessel);
   const setArchived = useBoard((s) => s.setArchived);
   const setAutoFit = useBoard((s) => s.setAutoFit);
   const removeNodes = useBoard((s) => s.removeNodes);
@@ -261,7 +275,7 @@ export function SelectionToolbar() {
   const setCardTypo = useBoard((s) => s.setCardTypo);
   const setLookup = useBoard((s) => s.setLookup);
   const spaces = useBoard((s) => s.spaces);
-  const boards = useBoard((s) => s.boards);
+  const boards = useImZugFest((s) => s.boards);   // M525: die Board-Liste (Menü „Verschieben") ändert sich im Zug nicht
   const [attrKey, setAttrKey] = useState('');
   const [attrVal, setAttrVal] = useState('');
   const [cmd, setCmd] = useState('');
@@ -379,6 +393,8 @@ export function SelectionToolbar() {
   useLayoutEffect(() => {
     const l = leisteRef.current;
     if (!l || l.classList.contains('sel-toolbar-dock')) return;
+    // M525: nicht mitten im Zug messen (jede Messung erzwingt eine Stil- und Layout-Rechnung) — nach dem Ablegen wieder
+    if (zugLaeuft()) return;
     const k = wurzelZoom() || 1;
     const alt = parseFloat(l.style.translate) || 0;
     const r = l.getBoundingClientRect();

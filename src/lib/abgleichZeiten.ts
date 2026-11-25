@@ -60,6 +60,8 @@ const kanonisch = (x: unknown): unknown => {
   if (x && typeof x === 'object') return Object.fromEntries(Object.keys(x).sort().map((k) => [k, kanonisch((x as Satz)[k])]));
   return x;
 };
+/** M524: Derselbe Inhalt ergibt denselben Text — gleich in welcher Reihenfolge die Felder entstanden sind */
+export const kanonText = (x: unknown): string => JSON.stringify(kanonisch(x)) ?? '';
 /** Vergleichstext einer Karte ohne Zeit- und Merkfelder */
 export function vergleichsText(n: AppNode): string {
   return JSON.stringify(kanonisch(ohneZeiten(n)));
