@@ -102,6 +102,9 @@ export function kantenScheibe(_set: Setzen, get: Holen, patchActive: AufsOffene)
       }));
     },
 
+    // M530: Reihenfolge der Ausgänge eines Rahmens (Rahmen-Reise an einer Verzweigung) — `ids` in der neuen Folge
+    ausgaengeOrdnen: (ids) => { void import('./ausgaenge').then((m) => m.ausgaengeOrdnen(get, patchActive, ids)); },
+
     removeEdge: (id) => {
       get().pushHistory();
       patchActive((b) => ({ edges: b.edges.filter((e) => e.id !== id) }));

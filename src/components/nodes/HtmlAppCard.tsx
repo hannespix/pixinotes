@@ -5,7 +5,7 @@ import { useBoard } from '../../store';
 import type { HtmlAppNode } from '../../types';
 import { fassungTauschen, htmlUebernehmen, loadAppState, loadAppStateAt, loadHtml, saveAppState, saveHtml, vorigeFassung } from '../../lib/htmlStore';
 import { composeSrcdoc } from '../../lib/htmlShim';
-import { kontoDateiNachladen } from '../../lib/kontoSync';
+import { FEHLT_EREIGNIS, kontoDateiFehlt, kontoDateiNachladen, kontoIstEigenes } from '../../lib/kontoSync';
 import { appMelden, EINGABE_EREIGNIS, eingabeAus, eingabeMelden, eingabenErbitten, folgeIch, ichFuehreVor, ROLL_EREIGNIS, rollMelden, rollVergessen, SPIEGEL_EREIGNIS, spiegelBild, spiegelDa, spiegelErbitten, VORFUEHR_EREIGNIS, werFuehrtVor, type Eingabe, type Roll } from '../../lib/vorfuehren';
 import { loadAppStateFromTeam, loadAttachment, saveAppStateToTeam } from '../../lib/attachments';
 import { triggerDownload } from '../../lib/download';
@@ -174,6 +174,8 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
   const showToast = useBoard((s) => s.showToast);
   /** null = lädt noch, false = Inhalt fehlt auf diesem Gerät */
   const [hasSrc, setHasSrc] = useState<boolean | null>(null);
+  /** M529: Der Inhalt fehlt auch im Konto (dort nachgesehen) — die Karte sagt, wo er noch liegen kann */
+  const [fehltImKonto, setFehltImKonto] = useState(false);
   const [srcdoc, setSrcdoc] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [full, setFull] = useState(false);
@@ -247,11 +249,18 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
     let alive = true;
     if (isLive) { setHasSrc(true); return; } // Live: kein lokaler Quelltext nötig
     // M159: Kopie im Team-Ordner · M371: der Quelltext reist mit dem Board (Konto, Gast-Link, kurzer Link)
-    const pruefen = () => { void quelleHolen(id, data.ref).then((da) => { if (alive) setHasSrc(da); }); };
+    const pruefen = () => { void quelleHolen(id, data.ref).then(async (da) => {
+      if (!alive) return;
+      setHasSrc(da);
+      setFehltImKonto(!da && await kontoDateiFehlt(id).catch(() => false));
+    }); };
     pruefen();
     // Anhänge trudeln nach dem Board ein — dann noch einmal nachsehen
     window.addEventListener('pixinotes:dateien-da', pruefen);
-    return () => { alive = false; window.removeEventListener('pixinotes:dateien-da', pruefen); };
+    // M529: Das Konto hat festgestellt, dass dieser Inhalt dort fehlt (oder wieder da ist)
+    const fehltGeaendert = (e: Event) => { if ((e as CustomEvent<string>).detail === id) pruefen(); };
+    window.addEventListener(FEHLT_EREIGNIS, fehltGeaendert);
+    return () => { alive = false; window.removeEventListener('pixinotes:dateien-da', pruefen); window.removeEventListener(FEHLT_EREIGNIS, fehltGeaendert); };
   }, [id, data.ref, isLive]);
 
   // Speicher-Meldungen der App (localStorage-Shim) entgegennehmen → IndexedDB.
@@ -274,6 +283,8 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
       });
       clearTimeout(teamSaveT.current);
       teamSaveT.current = setTimeout(() => { void saveAppStateToTeam(id, nameRef.current, store).catch(() => {}); }, 4000);
+      // M529: … und ins PixiNotes-Konto (nur bei Änderung, höchstens alle zehn Sekunden je Tool)
+      if (kontoIstEigenes()) void import('../../lib/kontoZustand').then((m) => m.zustandMelden(id, store)).catch(() => {});
     };
     window.addEventListener('message', onMsg);
     return () => { window.removeEventListener('message', onMsg); clearTimeout(teamSaveT.current); };
@@ -298,6 +309,16 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
         return team.data;
       }
     } catch { /* Team-Ordner nicht erreichbar → lokaler Stand */ }
+    // M529: Speicherstand aus dem PixiNotes-Konto — das zweite Gerät sieht so denselben Stand
+    if (kontoIstEigenes()) {
+      try {
+        const konto = await import('../../lib/kontoZustand').then((m) => m.zustandHolen(id, st ? at : undefined));
+        if (konto) {
+          await saveAppState(id, konto.data, konto.savedAt);
+          return konto.data;
+        }
+      } catch { /* Konto nicht erreichbar → lokaler Stand */ }
+    }
     return st ?? {};
   };
 
@@ -571,7 +592,9 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
             <div className="happ-poster">
               {hasSrc === false ? (
                 <>
-                  <p>Der Inhalt dieser App liegt auf diesem Gerät (noch) nicht vor. Mit dem PixiNotes-Konto und in geteilten Boards reist er mit; sonst die HTML-Datei hier laden.</p>
+                  <p>{fehltImKonto
+                    ? 'Der Inhalt dieser App fehlt auf diesem Gerät und im Konto. Öffne PixiNotes auf dem Gerät, auf dem die App angelegt wurde – von dort wird er nachgeladen. Oder die HTML-Datei hier laden.'
+                    : 'Der Inhalt dieser App liegt auf diesem Gerät (noch) nicht vor. Mit dem PixiNotes-Konto und in geteilten Boards reist er mit; sonst die HTML-Datei hier laden.'}</p>
                   <button className="happ-load nodrag" onClick={() => fileRef.current?.click()}>HTML-Datei wählen</button>
                 </>
               ) : (

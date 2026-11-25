@@ -78,7 +78,7 @@ export function kontoAbmelden(): void {
   // aus dem Konto nach dem nächsten Anmelden still alles, was seit dem letzten Abgleich hier entstanden war.
   void basisVergessen('konto');
   void idbDel(KENN_KEY);
-  void idbDel(BASEN_KEY);
+  void basenVergessen();
   anmeldungNoetig = false;
   angewandt = null;
 }
@@ -151,7 +151,7 @@ export async function kontoLoeschen(): Promise<void> {
   try { localStorage.setItem(KONTO_DIRTY_KEY, '1'); } catch { /* voll */ }
   void basisVergessen('konto');
   void idbDel(KENN_KEY);
-  void idbDel(BASEN_KEY);
+  void basenVergessen();
   anmeldungNoetig = false;
   angewandt = null;
 }
@@ -557,10 +557,192 @@ function laufwerk(): Laufwerk {
 export async function kontoDateiNachladen(id: string): Promise<Blob | null> {
   const s = loadKonto();
   if (!s || s.anbieter !== 'supabase' || getWriterRole() !== 'writer') return null;
+  // M529: Fehlt die Datei im Konto, fragt die Karte nicht bei jedem Aufbau und jedem Abgleich wieder (HTTP 400)
+  if (!(await fehltFaellig(id))) return null;
   const blob = await laufwerk().lesenBlob(`${DATEI_PREFIX}${id}`);
-  if (!blob) return null;
+  if (!blob) { await fehltMerken(id); return null; }
+  await fehltVergessen(id);
   try { await idbSet(`file:${id}`, blob); } catch { /* Platte voll — die Karte zeigt den Blob trotzdem */ }
   return blob;
+}
+
+/** M529: Nennt das Konto diese Datei (zuletzt gelesene Umgebung)? Fragt nichts beim Server */
+export const kontoDateiBekannt = async (id: string): Promise<boolean> => (await kennLesen()).dateien.includes(id);
+
+// ---------- M529: Dateien, die im Konto fehlen ----------
+// Befund beim Besitzer: Karten (eigene Tools) verwiesen auf `datei-<Kennung>`, die es im Dateispeicher nicht gab —
+// jedes Gerät fragte bei jedem Aufbau der Karte und bei jedem Abgleich erneut (HTTP 400 in der Konsole), und niemand
+// lud die Datei je nach. Zwei Lücken:
+//   1. Eine Datei, die ein Gerät hat, die aber nicht im Konto steht (Import oder Kopie: die Karten kamen vor ihren
+//      Inhalten, das Gerät wurde danach geschlossen), ging erst mit der NÄCHSTEN Änderung dieses Geräts hinaus — gab
+//      es keine, nie.
+//   2. Steht eine Datei in der Umgebung, gilt sie überall als „liegt im Konto" — auch wenn das Objekt fehlt. Kein Gerät
+//      lud sie je wieder hoch.
+// Jetzt: (a) Ein fehlendes Objekt wird gemerkt und erst nach wachsender Pause wieder angefragt (2 min … 6 h), sofort
+// wieder, wenn die Umgebung meldet, dass es nachgereicht wurde (`am`); die Karte sagt, dass es auch im Konto fehlt.
+// (b) Einmal je Sitzung (und alle 6 h) prüft das Gerät, ob Dateien, die es selbst hat, im Konto fehlen, und lädt sie hoch.
+const FEHLT_KEY = 'konto:fehlt';
+const FEHLT_STUFEN = [2 * 60_000, 10 * 60_000, 3600_000, 6 * 3600_000];
+interface FehltEintrag { seit: number; naechster: number; n: number }
+let fehlt: Record<string, FehltEintrag> | null = null;
+export const FEHLT_EREIGNIS = 'pixinotes:konto-datei-fehlt';
+async function fehltLaden(): Promise<Record<string, FehltEintrag>> {
+  fehlt ??= (await idbGet<Record<string, FehltEintrag>>(FEHLT_KEY).catch(() => undefined)) ?? {};
+  return fehlt;
+}
+/** Fehlt diese Datei (nach dem letzten Versuch) auch im Konto? Für den Hinweis an der Karte */
+export const kontoDateiFehlt = async (id: string): Promise<boolean> => !!(await fehltLaden())[id];
+async function fehltFaellig(id: string): Promise<boolean> {
+  const e = (await fehltLaden())[id];
+  return !e || Date.now() >= e.naechster;
+}
+async function fehltMerken(id: string): Promise<void> {
+  const f = await fehltLaden();
+  const n = (f[id]?.n ?? 0) + 1;
+  f[id] = { seit: f[id]?.seit ?? Date.now(), n, naechster: Date.now() + FEHLT_STUFEN[Math.min(n, FEHLT_STUFEN.length) - 1] };
+  await idbSet(FEHLT_KEY, f).catch(() => {});
+  window.dispatchEvent(new CustomEvent(FEHLT_EREIGNIS, { detail: id }));
+}
+async function fehltVergessen(id: string): Promise<void> {
+  const f = await fehltLaden();
+  if (!f[id]) return;
+  delete f[id];
+  await idbSet(FEHLT_KEY, f).catch(() => {});
+  window.dispatchEvent(new CustomEvent(FEHLT_EREIGNIS, { detail: id }));
+}
+/** Nachgereicht (die Umgebung nennt einen Zeitpunkt nach dem Merken): sofort wieder fragen */
+async function fehltNachgereicht(id: string, am: number | undefined): Promise<void> {
+  const e = (await fehltLaden())[id];
+  if (e && am && am > e.seit) e.naechster = 0;
+}
+
+/** M529: Alle Objekte im eigenen Ordner des Dateispeichers (Name → Größe, letzte Änderung). `null`: nicht lesbar */
+export async function kontoObjekte(): Promise<Map<string, { groesse: number; am: string }> | null> {
+  const s = loadKonto();
+  if (s?.anbieter !== 'supabase' || !s.userId) return null;
+  const aus = new Map<string, { groesse: number; am: string }>();
+  const SEITE = 1000;
+  try {
+    for (let offset = 0; offset < 100_000; offset += SEITE) {
+      const res = await anfrage(`${s.url ?? ''}/storage/v1/object/list/${BUCKET}`, {
+        method: 'POST', headers: JSON_KOPF,
+        body: JSON.stringify({ prefix: s.userId, limit: SEITE, offset, sortBy: { column: 'name', order: 'asc' } }),
+      });
+      if (!res.ok) return null;
+      const z = (await res.json()) as Array<{ name?: unknown; id?: unknown; updated_at?: unknown; created_at?: unknown; metadata?: { size?: unknown } | null }>;
+      if (!Array.isArray(z)) return null;
+      for (const o of z) {
+        if (typeof o.name !== 'string' || !o.id) continue;    // Unterordner
+        aus.set(o.name, { groesse: typeof o.metadata?.size === 'number' ? o.metadata.size : 0, am: String(o.updated_at ?? o.created_at ?? '') });
+      }
+      if (z.length < SEITE) break;
+    }
+    return aus;
+  } catch { return null; }
+}
+/** Liegt dieses Objekt im Dateispeicher? true/false — `null`: nicht feststellbar */
+async function objektDa(name: string): Promise<boolean | null> {
+  const s = loadKonto();
+  try {
+    const res = await anfrage(`${s?.url ?? ''}/storage/v1/object/info/authenticated/${BUCKET}/${encodeURIComponent(s?.userId ?? '')}/${encodeURIComponent(name)}`, { cache: 'no-store' });
+    if (res.ok) return true;
+    return res.status === 400 || res.status === 404 ? false : null;
+  } catch { return null; }
+}
+
+/**
+ * M529: Worauf das Konto verweist — für „Speicher aufräumen" (lib/kontoAufraeumen.ts). Liest die Umgebung und jede
+ * Board-Zeile so, wie sie auf dem Server stehen (ohne den Abgleich anzufassen): Kennungen aller Karten und alle
+ * Dateien, die die Umgebung nennt. `null`: nicht vollständig lesbar — dann darf nichts als verwaist gelten.
+ */
+export async function kontoVerweise(): Promise<{ karten: Set<string>; dateien: Set<string> } | null> {
+  if (loadKonto()?.anbieter !== 'supabase') return null;
+  try {
+    const lw = laufwerk();
+    const text = await lw.lesenText(UMGEBUNG);
+    if (!text) return { karten: new Set(), dateien: new Set() };
+    const u = JSON.parse(text) as Umgebung;
+    if (!u || typeof u !== 'object' || !u.boards) return null;
+    const karten = new Set<string>();
+    const dateien = new Set(Object.keys(u.dateien ?? {}));
+    for (const z of await lw.liste()) {
+      if (!z.name.startsWith(BOARD_PREFIX) || !z.name.endsWith('.json')) continue;
+      const t = await lw.lesenText(z.name);
+      if (!t) continue;
+      const b = JSON.parse(t) as { nodes?: Array<{ id?: unknown }> };
+      if (!Array.isArray(b?.nodes)) return null;
+      for (const n of b.nodes) if (typeof n?.id === 'string') karten.add(n.id);
+    }
+    return { karten, dateien };
+  } catch { return null; }
+}
+/** M529: Objekte im eigenen Ordner des Dateispeichers löschen (nur nach Bestätigung, lib/kontoAufraeumen.ts) */
+export async function kontoObjekteLoeschen(namen: string[]): Promise<number> {
+  const s = loadKonto();
+  if (s?.anbieter !== 'supabase' || !s.userId) return 0;
+  let n = 0;
+  for (const name of namen) {
+    const res = await anfrage(`${s.url ?? ''}/storage/v1/object/${BUCKET}/${encodeURIComponent(s.userId)}/${encodeURIComponent(name)}`, { method: 'DELETE' }).catch(() => null);
+    if (res && (res.ok || res.status === 404 || res.status === 400)) n += 1;
+  }
+  return n;
+}
+
+let nachreichenAm = 0;
+/**
+ * M529 (b): Dateien, die dieses Gerät hat und die im Konto fehlen, hochladen. Zwei Fälle: Die Umgebung nennt die
+ * Datei gar nicht (sie kam nie hinaus) — oder sie nennt sie, aber das Objekt ist nicht da. Für den zweiten Fall
+ * zählt das Verzeichnis des Dateispeichers (eine Anfrage), und jede vermisste Datei wird einzeln nachgesehen, bevor
+ * sie als fehlend gilt. Dateien, die auch hier fehlen, werden nur gemerkt (die Karte zeigt es).
+ */
+export async function dateienNachreichen(erzwingen = false, nurUngenannte = false): Promise<number> {
+  if (!nurUngenannte && !erzwingen && Date.now() - nachreichenAm < 6 * 3600_000) return 0;
+  const s = loadKonto();
+  if (s?.anbieter !== 'supabase' || !s.userId || getWriterRole() !== 'writer') return 0;
+  if (!nurUngenannte) nachreichenAm = Date.now();
+  const kenn = await kennLesen();
+  if (!kenn.etag) return 0;
+  const karten = new Map<string, true>();
+  for (const b of useBoard.getState().boards) {
+    if (b.geteiltVon || b.gastLink) continue;
+    // zu groß für den Dateispeicher: bleibt außen vor (sonst stieße jede Prüfung ein Hochladen an, das nichts tut)
+    for (const n of b.nodes) { const k = anhangKarte(n); if (k && k.size <= dateiMaxBytes(s)) karten.set(n.id, true); }
+  }
+  const bekannt = new Set(kenn.dateien);
+  const ersetzt = new Set(kenn.ersetzt ?? []);
+  // (i) nennt das Konto nicht: Das nächste Schreiben nimmt sie ohnehin mit — es muss nur eines geben
+  const ungenannt: string[] = [];
+  for (const id of karten.keys()) if (!bekannt.has(id) && !ersetzt.has(id) && await dateiLokal(id)) ungenannt.push(id);
+  // (ii) nennt das Konto, das Objekt fehlt aber
+  const fehlend: string[] = [];
+  const genannt = kenn.dateien.filter((id) => karten.has(id));
+  if (genannt.length && !nurUngenannte) {
+    const objekte = await kontoObjekte();
+    if (objekte) {
+      // Dateien aus der Zeit vor M329 liegen noch in der Tabelle
+      const zeilen = new Set((await laufwerk().liste().catch(() => [])).map((z) => z.name));
+      for (const id of genannt) {
+        const name = `${DATEI_PREFIX}${id}`;
+        if (objekte.has(name) || zeilen.has(name)) continue;
+        if ((await objektDa(name)) !== false) continue;
+        if (await dateiLokal(id)) fehlend.push(id); else await fehltMerken(id);
+      }
+    }
+  }
+  if (!ungenannt.length && !fehlend.length) return 0;
+  let noetig = fehlend.length;
+  await exklusiv(async () => {
+    const k = await kennLesen();
+    // inzwischen hinaufgegangen (ein Schreiben lief gerade): nichts mehr zu tun
+    noetig += ungenannt.filter((id) => !k.dateien.includes(id)).length;
+    // Fehlende wie ein hier ersetztes Tool verbuchen (M524 `ersetzt`): nicht holen, beim nächsten Schreiben hochladen —
+    // sonst machte das nächste Lesen sie wieder zu „bekannt", ehe sie hinausgingen
+    if (fehlend.length) await idbSet(KENN_KEY, { ...k, dateien: k.dateien.filter((id) => !fehlend.includes(id)), ersetzt: [...new Set([...(k.ersetzt ?? []), ...fehlend])] } satisfies Kenn);
+  });
+  if (!noetig) return 0;
+  try { localStorage.setItem(KONTO_DIRTY_KEY, '1'); } catch { /* voll */ }
+  void autoPush();
+  return noetig;
 }
 
 // ---------- M328: Realtime — Änderungen anderer Geräte sofort ----------
@@ -615,7 +797,8 @@ interface Umgebung {
   spaces: Space[];
   reihe: string[];                   // Board-Ids in Reihenfolge
   boards: Record<string, string>;    // Board-Id → Stempel (Hash des Inhalts)
-  dateien: Record<string, { name: string; mime?: string; groesse?: number }>;
+  /** M529 `am`: wann die Datei (wieder) hochgeladen wurde — wer sie als fehlend gemerkt hat, fragt dann sofort neu */
+  dateien: Record<string, { name: string; mime?: string; groesse?: number; am?: number }>;
   /** eTag/Version des Server-Stands, auf dem dieser Schreibvorgang aufbaute —
    *  damit ein Leser den RICHTIGEN gemeinsamen Vorfahren für die Zusammen-
    *  führung wählt, auch wenn zwei Geräte sich gegenseitig überschrieben haben */
@@ -639,26 +822,110 @@ function ohneMasse(b: BoardDoc): BoardDoc {
 }
 const SERVER_STEMPEL = /^v\d+$/;
 const fingerabdruck = (b: BoardDoc): string => stempel(JSON.stringify(ohneMasse(b)));
+/**
+ * M529: Der Ring liegt nicht mehr als EIN Wert in der Ablage. Bisher wurden bei jedem Lesen und Schreiben alle sechs
+ * Stände ganz gelesen und ganz neu geschrieben — bei Boards mit großen Bildern mehrere Megabyte je Abgleich, obwohl
+ * sich meist ein Board geändert hatte. Jetzt: ein kleines Verzeichnis (`konto:basen`, je Stand Kennung, Marke,
+ * „eingearbeitet" und die Schlüssel seiner Boards) und je Board-Fassung ein eigener Eintrag (`konto:bb:<Board>:<n>`).
+ * Ein Board, das sich nicht geändert hat, ist dasselbe Objekt (M524) — es wird nicht noch einmal geschrieben, der neue
+ * Stand nennt nur seinen Schlüssel. Was kein Stand mehr nennt, wird gelöscht.
+ */
+interface BasisVerzeichnis {
+  etag: string; marke?: string; drin?: boolean; boards: string[]; spaces: Space[];
+  /** Fingerabdruck je Board-Schlüssel (gleiche Reihenfolge) — nach einem Neustart findet ein unverändertes Board so
+   *  seine schon abgelegte Fassung wieder, statt noch einmal geschrieben zu werden */
+  fp?: string[];
+}
+const BB = 'konto:bb:';
+/** Board-Objekt → Schlüssel, unter dem genau diese Fassung liegt (nur solange er im Verzeichnis steht: `bbLebt`) */
+const bbSchluessel = new WeakMap<BoardDoc, string>();
+const bbLebt = new Set<string>();
+/** Schlüssel → Fingerabdruck der abgelegten Fassung */
+const bbFp = new Map<string, string>();
+let bbZaehler = Date.now();
+/** Messwerte für die Prüfreihe (window.pixinotesKontoBasen): wie viele Board-Fassungen geschrieben wurden */
+const basenZaehler = { boardsGeschrieben: 0, verzeichnisGeschrieben: 0 };
+if (typeof window !== 'undefined') (window as unknown as { pixinotesKontoBasen?: typeof basenZaehler }).pixinotesKontoBasen = basenZaehler;
+async function verzeichnisLesen(): Promise<BasisVerzeichnis[]> {
+  const roh = (await idbGet<Array<BasisVerzeichnis | BasisEintrag>>(BASEN_KEY)) ?? [];
+  // Altes Format (bis M528: ganze Stände im Verzeichnis) — einmal aufteilen
+  if (roh.some((e) => Array.isArray(e.boards) && e.boards.some((b) => typeof b !== 'string'))) {
+    const neu: BasisVerzeichnis[] = [];
+    for (const e of roh) {
+      const boards = await Promise.all((e.boards as Array<BoardDoc | string>).map((b) => (typeof b === 'string' ? b : boardAblegen(b))));
+      neu.push({ etag: e.etag, marke: e.marke, drin: e.drin, boards, fp: boards.map((k) => bbFp.get(k) ?? ''), spaces: e.spaces ?? [] });
+    }
+    await idbSet(BASEN_KEY, neu);
+    return neu;
+  }
+  const v = roh as BasisVerzeichnis[];
+  for (const e of v) e.boards.forEach((k, i) => { bbLebt.add(k); if (e.fp?.[i]) bbFp.set(k, e.fp[i]); });
+  return v;
+}
+async function boardAblegen(b: BoardDoc): Promise<string> {
+  const k = bbSchluessel.get(b);
+  if (k && bbLebt.has(k)) return k;
+  // Ein anderes Objekt, aber vielleicht derselbe Inhalt (nach einem Neustart, frisch gelesen): einmal je Sitzung vergleichen
+  const fp = stempel(JSON.stringify(b));
+  const praefix = `${BB}${b.id}:`;
+  for (const l of bbLebt) {
+    if (l.startsWith(praefix) && bbFp.get(l) === fp) { bbSchluessel.set(b, l); return l; }
+  }
+  const neu = `${praefix}${(bbZaehler++).toString(36)}`;
+  await idbSet(neu, b);
+  basenZaehler.boardsGeschrieben += 1;
+  bbSchluessel.set(b, neu); bbLebt.add(neu); bbFp.set(neu, fp);
+  return neu;
+}
+async function verzeichnisSchreiben(v: BasisVerzeichnis[], vorher: BasisVerzeichnis[]): Promise<void> {
+  await idbSet(BASEN_KEY, v);
+  basenZaehler.verzeichnisGeschrieben += 1;
+  const genannt = new Set(v.flatMap((e) => e.boards));
+  for (const k of new Set(vorher.flatMap((e) => e.boards))) {
+    if (genannt.has(k)) continue;
+    bbLebt.delete(k);
+    await idbDel(k).catch(() => {});
+  }
+}
 async function basenMerken(etag: string, stand: { boards: BoardDoc[]; spaces: Space[] }, marke: string, drin: boolean): Promise<void> {
-  const alle = (await idbGet<BasisEintrag[]>(BASEN_KEY)) ?? [];
+  const alle = await verzeichnisLesen();
   const vorher = alle.find((b) => b.etag === etag);
-  const alt = alle.filter((b) => b.etag !== etag);
+  const boards: string[] = [];
+  for (const b of stand.boards) boards.push(await boardAblegen(b));
   // derselbe Stand noch einmal gelesen: Was schon eingearbeitet war, bleibt es
-  alt.push({ etag, boards: stand.boards, spaces: stand.spaces, marke, drin: drin || (vorher?.drin === true && vorher.marke === marke) });
-  await idbSet(BASEN_KEY, alt.slice(-6));
+  const eintrag: BasisVerzeichnis = { etag, boards, fp: boards.map((k) => bbFp.get(k) ?? ''), spaces: stand.spaces, marke, drin: drin || (vorher?.drin === true && vorher.marke === marke) };
+  if (vorher && vorher.marke === eintrag.marke && vorher.drin === eintrag.drin && vorher.spaces === eintrag.spaces
+    && vorher.boards.length === boards.length && vorher.boards.every((k, i) => k === boards[i]) && alle[alle.length - 1] === vorher) return;
+  await verzeichnisSchreiben([...alle.filter((b) => b.etag !== etag), eintrag].slice(-6), alle);
 }
 /** M383: Der gelesene Stand steckt jetzt im lokalen */
 async function basisIstDrin(k: Kenn): Promise<void> {
   if (!k.etag) return;
-  const alle = (await idbGet<BasisEintrag[]>(BASEN_KEY)) ?? [];
+  const alle = await verzeichnisLesen();
   const e = alle.find((b) => b.etag === k.etag);
   if (!e || e.drin === true || (e.marke !== undefined && e.marke !== kennMarke(k))) return;
   e.drin = true;
   await idbSet(BASEN_KEY, alle);
+  basenZaehler.verzeichnisGeschrieben += 1;
 }
 async function basisFinden(etag: string | null | undefined): Promise<BasisEintrag | null> {
   if (!etag) return null;
-  return ((await idbGet<BasisEintrag[]>(BASEN_KEY)) ?? []).find((b) => b.etag === etag) ?? null;
+  const e = (await verzeichnisLesen()).find((b) => b.etag === etag);
+  if (!e) return null;
+  const boards: BoardDoc[] = [];
+  for (const k of e.boards) {
+    const b = await idbGet<BoardDoc>(k);
+    if (!b) return null;   // ein Teil fehlt (Ablage geleert): lieber kein Vorfahre als ein falscher
+    bbSchluessel.set(b, k);
+    boards.push(b);
+  }
+  return { etag: e.etag, boards, spaces: e.spaces, marke: e.marke, drin: e.drin };
+}
+/** M529: Ring und alle Board-Fassungen vergessen (Abmelden, Konto löschen) */
+async function basenVergessen(): Promise<void> {
+  const v = await verzeichnisLesen().catch(() => [] as BasisVerzeichnis[]);
+  await idbDel(BASEN_KEY).catch(() => {});
+  for (const k of new Set(v.flatMap((e) => e.boards))) { bbLebt.delete(k); await idbDel(k).catch(() => {}); }
 }
 /** Was wir zuletzt vom Konto wissen — damit nur Geändertes reist */
 interface Kenn {
@@ -828,9 +1095,13 @@ export async function kontoLesen(): Promise<{ payload: SyncPayload; kenn: Kenn }
     if (!veraltet && await dateiLokal(id)) continue;
     // M329: Große Anhänge holt die Karte beim Öffnen (kontoDateiNachladen) — nicht jeder Abgleich
     if ((meta.groesse ?? 0) > DATEI_SOFORT_BYTES) continue;
+    // M529: Fehlt sie im Konto, nicht bei jedem Lesen wieder fragen — außer, sie wurde inzwischen nachgereicht
+    await fehltNachgereicht(id, meta.am);
+    if (!(await fehltFaellig(id))) continue;
     try {
       const blob = await lw.lesenBlob(`${DATEI_PREFIX}${id}`);
-      if (blob) dateien[id] = { name: meta.name, mime: meta.mime ?? (blob.type || undefined), b64: await alsBase64(blob) };
+      if (blob) { dateien[id] = { name: meta.name, mime: meta.mime ?? (blob.type || undefined), b64: await alsBase64(blob) }; await fehltVergessen(id); }
+      else await fehltMerken(id);
     } catch { /* eine Datei darf den Abgleich nicht aufhalten */ }
   }
   const kenn: Kenn = {
@@ -1030,14 +1301,38 @@ let ohneBoardAendern = false;
 /** Größere Patches reisen als ganzes Board (der Server nimmt bis 6 Mio. Zeichen) */
 const PATCH_MAX_ZEICHEN = 4_000_000;
 interface AendernAntwort { version: number; vor: number; umgebung: number | null; umgebung_vor: number | null }
-/** `null`: auf diesem Weg nicht möglich (Funktion fehlt, abgelehnt) → das ganze Board schreiben */
-async function boardAendern(besitzer: string, boardId: string, p: Patch, savedAt?: string): Promise<AendernAntwort | null> {
-  const res = await anfrage(`${restUrl()}/rpc/board_aendern`, { method: 'POST', headers: JSON_KOPF, body: JSON.stringify({ p_besitzer: besitzer, p_board_id: boardId, p_patch: p, p_saved_at: savedAt ?? null }) });
+/**
+ * M529: Vorbedingung beim kartenweisen Schreiben. Mit der Migration 20261125100000 nimmt board_aendern
+ * `p_wenn_umgebung` (Version der Umgebung des Besitzers, die das Gerät kennt) bzw. `p_wenn_version` (Version der
+ * Board-Zeile, für Gäste mit Konto) und schreibt NICHTS, wenn inzwischen ein anderer geschrieben hat („vorbedingung").
+ * Das Gerät liest dann neu, führt Feld für Feld zusammen und schreibt erneut — vorher ersetzte die später eintreffende
+ * ganze Karte die eines anderen Geräts (M524, „Grenzen"). Ohne Migration antwortet der Server mit 404 (Funktion mit
+ * diesen Parametern unbekannt): dann ohne Vorbedingung wie bisher, und vor dem Schreiben bleibt der Mini-Abruf.
+ * 'ja' erst, wenn der Server bestätigt, geprüft zu haben (`geprueft`) — ein Server, der die Parameter nur hinnähme,
+ * gilt als 'nein'.
+ */
+let vorbedingung: 'unbekannt' | 'ja' | 'nein' = 'unbekannt';
+/** `null`: auf diesem Weg nicht möglich (Funktion fehlt, abgelehnt) → das ganze Board schreiben. Wirft
+ *  VorbedingungFehler, wenn der Server wegen einer fremden Änderung nichts geschrieben hat. */
+async function boardAendern(besitzer: string, boardId: string, p: Patch, savedAt?: string, wenn?: { umgebung?: string | null; version?: string | null }): Promise<AendernAntwort | null> {
+  const wennU = wenn?.umgebung ? Number(wenn.umgebung) : null;
+  const wennV = wenn?.version ? Number(wenn.version) : null;
+  const mitWenn = vorbedingung !== 'nein' && (wennU !== null || wennV !== null);
+  const res = await anfrage(`${restUrl()}/rpc/board_aendern`, { method: 'POST', headers: JSON_KOPF, body: JSON.stringify({
+    p_besitzer: besitzer, p_board_id: boardId, p_patch: p, p_saved_at: savedAt ?? null,
+    ...(mitWenn ? { p_wenn_umgebung: wennU, p_wenn_version: wennV } : {}),
+  }) });
+  if (res.status === 404 && mitWenn) { vorbedingung = 'nein'; return boardAendern(besitzer, boardId, p, savedAt); }
   if (res.status === 404) { ohneBoardAendern = true; return null; }
-  if (res.status >= 400 && res.status < 500) return null;     // keine Freigabe, Board fehlt, ungültig: der bisherige Weg klärt es
+  if (res.status >= 400 && res.status < 500) {
+    const t = await res.text().catch(() => '');
+    if (mitWenn && /vorbedingung/i.test(t)) { vorbedingung = 'ja'; throw new VorbedingungFehler(); }
+    return null;     // keine Freigabe, Board fehlt, ungültig: der bisherige Weg klärt es
+  }
   if (!res.ok) throw new Error(`PixiNotes-Konto: Schreiben fehlgeschlagen (HTTP ${res.status}).`);
-  const j = (await res.json().catch(() => null)) as Partial<AendernAntwort> | null;
+  const j = (await res.json().catch(() => null)) as (Partial<AendernAntwort> & { geprueft?: unknown }) | null;
   if (!j || typeof j.version !== 'number' || typeof j.vor !== 'number') { ohneBoardAendern = true; return null; }
+  if (mitWenn) vorbedingung = j.geprueft === true ? 'ja' : 'nein';
   return { version: j.version, vor: j.vor, umgebung: typeof j.umgebung === 'number' ? j.umgebung : null, umgebung_vor: typeof j.umgebung_vor === 'number' ? j.umgebung_vor : null };
 }
 /** Geteiltes Board ohne die Angaben, die nur dieses Gerät betreffen */
@@ -1132,7 +1427,8 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
     // (autoPush) und hier liegen die Warteschlange und das Zusammenstellen des Stands, bei großen Boards Sekunden.
     // Darum unmittelbar vor dem Schreiben noch einmal der Mini-Abruf: Hat inzwischen ein anderer geschrieben, erst
     // dessen Stand einarbeiten (das schreibt dann selbst, mit beiden Anteilen).
-    if (nochmal && sitz?.anbieter === 'supabase' && !ohneBoardAendern && kenn.etag) {
+    // M529: Prüft der Server die Vorbedingung selbst (board_aendern mit p_wenn_umgebung), braucht es den Blick nicht
+    if (nochmal && sitz?.anbieter === 'supabase' && !ohneBoardAendern && kenn.etag && vorbedingung !== 'ja') {
       const kopf = await lw.kopf(UMGEBUNG);
       if (kopf !== null && kopf !== kenn.etag) throw new VorbedingungFehler();
     }
@@ -1158,7 +1454,7 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
             if (!f) continue;                                     // Name, Reihenfolge … geändert: das ganze Board
             if (!f.p) { stempelNeu[b.id] = alt; aliasBleibt[b.id] = { st: alt, hash: fingerabdruck(b) }; continue; }   // nur anders gemessen
             if (JSON.stringify(f.p).length > PATCH_MAX_ZEICHEN) continue;
-            const r = await boardAendern(sitz.userId, b.id, f.p, payload.savedAt);
+            const r = await boardAendern(sitz.userId, b.id, f.p, payload.savedAt, { umgebung: kenn.etag });
             if (!r || r.umgebung === null) continue;
             // Hat inzwischen ein anderer geschrieben, liegt die eigene Änderung jetzt auf dessen Stand — den erst holen
             if (String(r.umgebung_vor) !== kenn.etag) throw new VorbedingungFehler();
@@ -1179,7 +1475,7 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
             if (!pf || !vor || !kf) continue;
             if (!pf.p) { fremdNeu[f.b.id] = { ...kf, stempel: f.st }; fremdErledigt.add(f.b.id); continue; }
             if (JSON.stringify(pf.p).length > PATCH_MAX_ZEICHEN) continue;
-            const r = await boardAendern(f.b.geteiltVon!, f.b.id, pf.p);
+            const r = await boardAendern(f.b.geteiltVon!, f.b.id, pf.p, undefined, { version: kf.version });
             if (!r) continue;                                     // etwa: Freigabe beendet oder nur noch lesend — das klärt der bisherige Weg
             if (String(r.vor) !== kf.version) throw new VorbedingungFehler();
             fremdNeu[f.b.id] = { besitzer: f.b.geteiltVon!, version: String(r.version), stempel: f.st };
@@ -1206,7 +1502,7 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
       if (!stempelNeu[id]) plan.loeschen.push(`${BOARD_PREFIX}${id}.json`);
     }
     // 3) Dateien: neue hinauf (Drive/OneDrive bis 4 MB, PixiNotes-Konto bis 50 MB), verwaiste weg
-    const dateienMeta: Record<string, { name: string; mime?: string; groesse?: number }> = {};
+    const dateienMeta: Record<string, { name: string; mime?: string; groesse?: number; am?: number }> = {};
     const bekannt = new Set(kenn.dateien);
     const maxBytes = dateiMaxBytes(sitz);
     // Name, Typ und Größe jeder Datei-Karte — damit bekannte Dateien ihre Angaben behalten, auch ohne Beipack
@@ -1222,6 +1518,7 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
       if (blob.size > maxBytes) continue;
       dateienMeta[id] = { name: d.name, mime: d.mime, groesse: blob.size };
       if (bekannt.has(id)) continue;
+      dateienMeta[id].am = Date.now();   // M529: neu oder nachgereicht
       plan.schreiben.push({ name: `${DATEI_PREFIX}${id}`, body: blob, mime: d.mime ?? 'application/octet-stream' });
     }
     // Bekannte Dateien, die diesmal nicht im Beipack sind (Budget oder schon hochgeladen),
@@ -1276,6 +1573,8 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
       for (const name of plan.loeschen) await lw.loeschen(name);
       etag = await lw.schreiben(UMGEBUNG, JSON.stringify(u), 'application/json', kenn.etag);
     }
+    // M529: was eben hinaufging, fehlt nicht mehr
+    for (const d of plan.schreiben) if (d.name.startsWith(DATEI_PREFIX)) await fehltVergessen(d.name.slice(DATEI_PREFIX.length));
     const groessen = Object.fromEntries(Object.entries(dateienMeta).filter(([, m]) => !!m.groesse).map(([id, m]) => [id, m.groesse as number]));
     await idbSet(KENN_KEY, { boards: stempelNeu, dateien: Object.keys(dateienMeta), etag, savedAt: payload.savedAt, kern, fremd: fremdNeu, groessen, ...(Object.keys(aliasBleibt).length ? { alias: aliasBleibt } : {}) } satisfies Kenn);
     angewandt = kennMarke({ etag, fremd: fremdNeu });
@@ -1589,13 +1888,24 @@ export function initKontoSync(): void {
     void checkKontoRemote(true).then(() => {
       if (localStorage.getItem(KONTO_DIRTY_KEY)) void autoPush();
     }).catch(() => {});
+    // M529: Was dieses Gerät hat und im Konto fehlt, nachreichen — nach dem Start, wenn Ruhe ist
+    setTimeout(() => { void dateienNachreichen().catch(() => {}); }, 20_000);
   }
+  // M529: Inhalte, die nach ihren Karten ankommen (Import einer Board-Datei, Kopie), gehen gleich hinaus — nicht erst
+  // mit der nächsten Änderung dieses Geräts (gab es keine, kamen sie nie ins Konto)
+  let nachTimer: ReturnType<typeof setTimeout> | undefined;
+  window.addEventListener('pixinotes:dateien-da', () => {
+    if (loadKonto()?.anbieter !== 'supabase') return;
+    clearTimeout(nachTimer);
+    nachTimer = setTimeout(() => { void dateienNachreichen(false, true).catch(() => {}); }, 3000);
+  });
   // Takt: nur der Mini-Abruf (eTag / Version); erst eine Änderung lädt
   let takt = 0;
   setInterval(() => {
     void (async () => {
       if (document.visibilityState !== 'visible' || getWriterRole() !== 'writer' || !loadKonto() || anmeldungNoetig) return;
       takt += 1;
+      if (takt % 30 === 0) void dateienNachreichen().catch(() => {});   // M529: höchstens alle 6 h (zählt selbst)
       const kenn = await kennLesen();
       // M330: Alle 60 s die Freigaben prüfen — neue Einladungen oder fremde Änderungen ohne Realtime
       if (loadKonto()?.anbieter === 'supabase' && takt % 6 === 0) {

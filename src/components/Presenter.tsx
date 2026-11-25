@@ -3,6 +3,7 @@ import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import type { PartialBlock } from '@blocknote/core';
 import { de as blockNoteDe, en as blockNoteEn } from '@blocknote/core/locales';
+import { fensterDarueber } from '../lib/overlay';
 import { sprache } from '../lib/sprache';
 import { selectActiveBoard, selectNurLesen, useBoard } from '../store';
 import { nodeToHtml } from '../lib/serializeFormate';
@@ -459,6 +460,8 @@ export function Presenter() {
       // Und Tab bleibt dem Browser: Die Knöpfe der Präsentation waren mit der Tastatur sonst nicht zu erreichen.
       if (e.key === 'Tab') return;
       if (e.key === 'Escape' && document.querySelector('.ticket-modal-backdrop, .modal-backdrop, .pdf-backdrop')) return;
+      // M530: … und jedes andere Fenster darüber (Suche per Strg+K): Esc schließt nur das (lib/overlay.ts)
+      if (e.key === 'Escape' && fensterDarueber(null, e)) return;
       const frei = !e.ctrlKey && !e.metaKey && !e.altKey;
       const taste = e.key.toLowerCase();
       // M394: Esc legt erst den Stift weg, schließt dann die Kommentare — erst das dritte beendet die Präsentation

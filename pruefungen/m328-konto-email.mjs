@@ -467,6 +467,8 @@ console.log('\n════ H: Anhänge über 4 MB wandern in den Dateispeicher 
   await B.P.reload({ waitUntil: 'networkidle' }); await B.P.waitForTimeout(1500);
   const hoch = await warteBis(B.P, () => sb.objekte.has(`${uidA}/datei-f6`) && sb.objekte.has(`${uidA}/datei-f10`), 30000);
   pruefe('H1 beide Anhänge liegen im Dateispeicher (Ordner des Nutzers), nicht in der Tabelle', hoch && !zeile(uidA, 'datei-f6') && !zeile(uidA, 'datei-f10') && sb.objekte.get(`${uidA}/datei-f10`)?.buffer.length === 10 * MB, `objekte ${[...sb.objekte.keys()].join(',')}`);
+  // M529: Die Umgebung geht NACH den Dateien hinaus (sie macht den Stand gültig) — auf sie warten, nicht nur auf die Dateien
+  await warteBis(B.P, () => { try { const x = JSON.parse(zeileText(uidA, 'umgebung.json')); return !!x.dateien?.f6 && !!x.dateien?.f10; } catch { return false; } }, 15000);
   const u = JSON.parse(zeileText(uidA, 'umgebung.json'));
   pruefe('H2 die Umgebung nennt beide mit Größe', u.dateien?.f6?.groesse === 6 * MB && u.dateien?.f10?.groesse === 10 * MB && u.dateien.f10.name === 'zehn.bin', JSON.stringify(u.dateien));
   const idbGroesse = (P, id) => P.evaluate(async (id) => {
