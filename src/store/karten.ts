@@ -198,7 +198,9 @@ export function kartenScheibe(set: Setzen, get: Holen, patchActive: AufsOffene) 
         // Maß-/Auswahl-Änderungen schreibt React Flow schon beim Mount in
         // den Store — das ist Mechanik, keine Bearbeitung, und darf das
         // automatische Übernehmen eines Sync-Stands nicht blockieren
-        const mechanical = rest.every((c) => c.type === 'dimensions' || c.type === 'select');
+        // M542: … außer der Größe, die jemand am Griff zieht (NodeResizer meldet `resizing`) — die ist Bearbeitung und
+        // muss hochgeladen werden (am rechten/unteren Griff kommt sie ohne Positions-Änderung, galt also als Mechanik)
+        const mechanical = rest.every((c) => (c.type === 'dimensions' && typeof c.resizing !== 'boolean') || c.type === 'select');
         const apply = () => patchActive((b) => ({ nodes: applyNodeChanges(rest, b.nodes) as AppNode[] }));
         if (mechanical) runDerived(apply); else apply();
       }
