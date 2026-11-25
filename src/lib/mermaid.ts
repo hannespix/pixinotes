@@ -74,6 +74,127 @@ export function mermaidResteWeg(renderId: string): void {
 }
 
 // ---------------------------------------------------------------------------
+// M535: Diagramme abseits des Board-Dokuments zeichnen.
+//
+// mermaid misst beim Zeichnen: Es hängt sein Arbeits-Element an `document.body`, setzt Schritt für Schritt Kästen und
+// Beschriftungen ein und liest ihre Maße (einhängen, messen, einhängen …). Im Board-Dokument macht jedes eingehängte
+// Element über die `:has()`-Regeln den Stil des GANZEN Dokuments ungültig — beim Öffnen eines Boards mit neun
+// Diagrammen gemessen 180 Stil-Rechnungen über rund 27 000 Elemente (M525, Grenzen; derselbe Mechanismus wie M491).
+// Jetzt zeichnet mermaid in einem unsichtbaren Rahmen (iframe, gleiche Herkunft) mit einem eigenen, winzigen
+// Dokument; nur das fertige SVG kommt in die Karte. Damit es dort genauso aussieht wie bisher, misst der Rahmen unter
+// denselben Bedingungen: dieselben Stylesheets, dieselben Merkmale an <html> und <body>, dieselbe Fenstergröße und die
+// Handschrift (Kalam). Geht etwas schief (kein Rahmen möglich), zeichnet mermaid wie bisher im Board-Dokument.
+type Rahmen = { win: Window & { mermaid?: MermaidApi }; doc: Document; stil: HTMLStyleElement; blaetter: string; theme: string | null; el: HTMLIFrameElement; schriften: Set<string> };
+let rahmen: Promise<Rahmen> | null = null;
+
+function rahmenHolen(): Promise<Rahmen> {
+  if (!rahmen) {
+    rahmen = import('mermaid/dist/mermaid.min.js?raw').then(({ default: quelle }) => {
+      const el = document.createElement('iframe');
+      el.setAttribute('aria-hidden', 'true');
+      el.tabIndex = -1;
+      el.title = 'Diagramm-Werkstatt';
+      el.dataset.mermaidWerkstatt = '';
+      el.style.cssText = 'position:fixed;top:0;left:-30000px;border:0;visibility:hidden;pointer-events:none;contain:strict';
+      document.body.appendChild(el);   // einmal je Sitzung
+      const win = el.contentWindow as (Window & { mermaid?: MermaidApi }) | null;
+      const doc = el.contentDocument;
+      if (!win || !doc) throw new Error('Kein Rahmen');
+      doc.open(); doc.write('<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>'); doc.close();
+      const stil = doc.createElement('style');
+      doc.head.appendChild(stil);
+      const s = doc.createElement('script');
+      s.textContent = quelle;
+      doc.head.appendChild(s);   // läuft im Rahmen und setzt dort `mermaid`
+      s.remove();
+      if (!win.mermaid) throw new Error('mermaid im Rahmen fehlt');
+      return { win, doc, stil, blaetter: '', theme: null, el, schriften: new Set<string>() };
+    }).catch((e) => { rahmen = null; throw e; });
+  }
+  return rahmen;
+}
+
+/** Messbedingungen des Board-Dokuments in den Rahmen übernehmen (nur, was sich geändert hat) */
+function bedingungenAbgleichen(r: Rahmen): void {
+  const blaetter = Array.from(document.styleSheets);
+  const kennung = blaetter.map((b) => `${b.href ?? 'inline'}:${(() => { try { return b.cssRules.length; } catch { return -1; } })()}`).join('|');
+  if (kennung !== r.blaetter) {
+    let css = '';
+    for (const b of blaetter) {
+      // Adressen in url(…) gelten relativ zum Stylesheet (Schriften liegen neben der CSS-Datei) — im Rahmen steht der
+      // Text in einem <style>, also absolut machen; sonst lädt die Schrift dort nicht und gemessen wird die Ersatzschrift
+      const basis = b.href ?? document.baseURI;
+      const absolut = (t: string) => t.replace(/url\((["']?)([^"')]+)\1\)/g, (ganz, q: string, u: string) => {
+        if (/^(data:|blob:|[a-z][a-z0-9+.-]*:|#)/i.test(u)) return ganz;
+        try { return `url(${q}${new URL(u, basis).href}${q})`; } catch { return ganz; }
+      });
+      try { for (const regel of Array.from(b.cssRules)) css += `${absolut(regel.cssText)}\n`; } catch { /* fremdes Blatt */ }
+    }
+    r.stil.textContent = css;
+    r.blaetter = kennung;
+  }
+  const kopieren = (von: Element, nach: Element) => {
+    for (const a of Array.from(nach.attributes)) if (!von.hasAttribute(a.name)) nach.removeAttribute(a.name);
+    for (const a of Array.from(von.attributes)) if (nach.getAttribute(a.name) !== a.value) nach.setAttribute(a.name, a.value);
+  };
+  kopieren(document.documentElement, r.doc.documentElement);
+  kopieren(document.body, r.doc.body);
+  const w = `${window.innerWidth}px`; const h = `${window.innerHeight}px`;
+  if (r.el.style.width !== w) r.el.style.width = w;
+  if (r.el.style.height !== h) r.el.style.height = h;
+}
+
+/**
+ * Schriften, die das Board-Dokument geladen hat, auch im Rahmen laden, bevor gemessen wird. Manche Diagramme (etwa
+ * Sequenzen) messen Text in der Schrift der Seite; ohne geladene Schrift misst der Rahmen die Ersatzschrift (gemessen:
+ * 4 Punkte Unterschied in der Höhe).
+ */
+async function schriftenLaden(r: Rahmen): Promise<void> {
+  const neu: string[] = [];
+  document.fonts.forEach((f) => {
+    if (f.status !== 'loaded') return;
+    const name = `${f.style === 'normal' ? '' : `${f.style} `}${String(f.weight).split(' ')[0]} 16px "${f.family.replace(/["']/g, '')}"`;
+    if (!r.schriften.has(name)) { r.schriften.add(name); neu.push(name); }
+  });
+  if (neu.length) await Promise.all(neu.map((n) => r.doc.fonts.load(n).catch(() => [])));
+}
+
+/** Reste eines Zeichenversuchs im Rahmen wegräumen (wie mermaidResteWeg im Board-Dokument) */
+function rahmenReste(doc: Document, renderId: string): void {
+  for (const id of [`d${renderId}`, `i${renderId}`, renderId]) doc.getElementById(id)?.remove();
+}
+
+/**
+ * Ein Diagramm zeichnen und das SVG als Text liefern — im Rahmen, sonst wie bisher im Board-Dokument. Wirft bei
+ * ungültigem Code (wie `mermaid.render`). `source` kommt aus buildMermaidSource.
+ */
+export async function mermaidZeichnen(renderId: string, source: string): Promise<string> {
+  let r: Rahmen | null = null;
+  try { r = await rahmenHolen(); } catch { r = null; }
+  if (!r || !r.win.mermaid) {
+    const m = await getMermaid();
+    if (/Kalam/.test(source)) await preloadHandFont();
+    return (await m.render(renderId, source)).svg;
+  }
+  // Handschrift: erst im Board-Dokument anmelden (das Stylesheet kommt so mit in den Rahmen), dort laden
+  const hand = /Kalam/.test(source);
+  if (hand) await preloadHandFont();
+  bedingungenAbgleichen(r);
+  await schriftenLaden(r);
+  const m = r.win.mermaid;
+  const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'neutral';
+  if (theme !== r.theme) {
+    m.initialize({ startOnLoad: false, theme, securityLevel: 'strict', suppressErrorRendering: true });
+    r.theme = theme;
+  }
+  try {
+    return (await m.render(renderId, source)).svg;
+  } finally {
+    rahmenReste(r.doc, renderId);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Farbschemata (M91): pro Diagramm wählbar, hell/dunkel je eigene Werte.
 // Umgesetzt als init-Direktive (theme base + themeVariables) — der Code der
 // Karte bleibt sauber, der Stil liegt als eigenes Datenfeld daneben.
