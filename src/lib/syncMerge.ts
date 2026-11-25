@@ -220,7 +220,8 @@ function bubblesVereinen(nodes: AppNode[], lokal: AppNode[], fremd: AppNode[]): 
       const d = n.data as Partial<BubblesData>;
       // M524: nach Inhalt vergleichen, nicht nach der Reihenfolge der Schlüssel — die hängt davon ab, welches Gerät
       // mischt; zwei Geräte schrieben sich dieselbe Karte sonst endlos in ihrer eigenen Reihenfolge zu
-      if (kanonText([d.ideen, d.stimmen, d.gruppen, d.abstimmung, d.regeln ?? null]) !== kanonText([m.ideen, m.stimmen, m.gruppen, m.abstimmung, m.regeln ?? null])) {
+      // M543: dazu der Eintrag „KI gruppiert" (jüngster gewinnt)
+      if (kanonText([d.ideen, d.stimmen, d.gruppen, d.abstimmung, d.regeln ?? null, d.ki ?? null]) !== kanonText([m.ideen, m.stimmen, m.gruppen, m.abstimmung, m.regeln ?? null, m.ki ?? null])) {
         geaendert = true;
         n = { ...n, data: { ...n.data, ...m } } as AppNode;
       }
@@ -251,7 +252,9 @@ const ohnePunkte = (n: AppNode): string => {
 };
 
 /** M373: Was an einer Bubbles-Karte ohnehin vereinigt wird (bubblesVereinen) — zählt nicht als „anders" */
-const BUBBLES_TABELLEN = ['ideen', 'stimmen', 'gruppen', 'abstimmung', 'regeln'] as const;
+// M543: `ki` (die KI gruppiert gerade) wird ebenso vereinigt — er trägt seinen eigenen Stempel und ist darum kein
+// Zeitfeld für abgleichZeiten.ts: zwei Fassungen werden nie gegeneinander entschieden und zählen nie als Konflikt
+const BUBBLES_TABELLEN = ['ideen', 'stimmen', 'gruppen', 'abstimmung', 'regeln', 'ki'] as const;
 /** Die Karte, wie sie verglichen wird: ohne Punkte, Geräte-Eigenes, Zeitfelder — und bei Bubbles ohne ihre Tabellen */
 const vergleichsKarte = (n: AppNode): string => {
   if (n.type !== 'bubbles') return ohnePunkte(n);
