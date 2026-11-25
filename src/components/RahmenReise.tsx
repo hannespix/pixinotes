@@ -33,6 +33,17 @@ const BLASS_NACH = 2500;
 const ruhig = () => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const imFeld = (t: EventTarget | null) => !!(t as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable="true"], [contenteditable=""]');
 
+/**
+ * M521: Ansicht und „Oberfläche ausblenden" von VOR der Reise — am Modul, nicht am Bauteil. Aufgaben-Zentrale,
+ * Präsentation, Übersicht und ein Rückgängig im Notiztext hängen das Board aus (und dieses Bauteil mit ihm); die Reise
+ * läuft danach weiter. Das neu eingehängte Bauteil merkte sich aber die Ansicht des gerade erst aufgebauten Boards
+ * (0/0 bei 100 %) — Esc führte dorthin statt zum Ausschnitt von vorher.
+ */
+let vorReise: { boardId: string; ansicht: Viewport; nur: boolean } | null = null;
+let eingehaengt = false;
+// Endet die Reise, während das Board nicht zu sehen ist (Kürzel in der Aufgaben-Zentrale), gilt das Gemerkte nicht mehr
+reiseAbo(() => { if (!reiseStand() && !eingehaengt) vorReise = null; });
+
 export default function RahmenReise() {
   const stand = useSyncExternalStore(reiseAbo, reiseStand);
   const boardId = useBoard((s) => s.activeId);
@@ -54,10 +65,12 @@ export default function RahmenReise() {
   const maxZoom = useRfStore((s) => s.maxZoom);
 
   /* ---------- Beginn und Ende: Oberfläche zurücktreten lassen, Ansicht von vorher merken ---------- */
-  const vorher = useRef<Viewport | null>(null);
   const zurueck = useRef(true);
   useEffect(() => {
-    vorher.current = getViewport();
+    eingehaengt = true;
+    const reiseBoard = reiseStand()?.boardId ?? '';
+    // M521: nur beim Beginn merken — nicht, wenn das Board mitten in der Reise neu eingehängt wird
+    if (!vorReise || vorReise.boardId !== reiseBoard) vorReise = { boardId: reiseBoard, ansicht: getViewport(), nur: istNurBoard() };
     const st = useBoard.getState();
     // Eine offene Karte (Fokus) schließt; Auswahl weg — sonst stünden Griffe und Auswahl-Leiste im Bild
     if (st.focusCard) st.setFocusCard(null);
@@ -66,15 +79,19 @@ export default function RahmenReise() {
     (document.activeElement as HTMLElement | null)?.blur?.();
     document.documentElement.setAttribute('data-rahmen-reise', '');
     // Die Oberfläche tritt zurück wie bei „Oberfläche ausblenden" (M510) — war die schon an, bleibt sie es danach
-    const nurVorher = istNurBoard();
     nurBoardSetzen(true);
     return () => {
+      eingehaengt = false;
       document.documentElement.removeAttribute('data-rahmen-reise');
       reiseFlugSetzen(false);
-      if (!nurVorher) nurBoardSetzen(false);
+      // M521: Nur das Board ist weg (Aufgaben, Präsentation, Übersicht) — die Reise geht weiter, sobald es wieder da ist
+      if (reiseStand()) return;
+      const vor = vorReise;
+      vorReise = null;
+      if (!vor?.nur) nurBoardSetzen(false);
       // Erst wenn die Oberfläche wieder steht (die linke Spalte nimmt Platz, nurBoard gleicht die Kamera aus), zurück
       // zur Ansicht von vorher — sonst überschriebe der Ausgleich die Rückfahrt
-      const v = vorher.current;
+      const v = vor?.ansicht;
       if (zurueck.current && v) requestAnimationFrame(() => requestAnimationFrame(() => { void setViewport(v, { duration: ruhig() ? 0 : 420 }); }));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

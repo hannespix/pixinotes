@@ -163,6 +163,9 @@ export function Tastatur() {
       if (imText(e)) return;
       if (passt(e, 'alleWaehlen') && amBoard) {
         return tun(() => {
+          // M521: Im Karten-Fokus ist nur EINE Karte zu sehen — „alle" wählte die übrigen unsichtbar dahinter mit
+          // (Entf oder Strg+D trafen danach das ganze Board)
+          if (st.focusCard) return;
           const sichtbar = selectActiveBoard(st).nodes
             .filter((n) => !n.archived || st.showArchived)
             .map((n) => ({ id: n.id, type: 'select' as const, selected: true }));
