@@ -325,7 +325,10 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
        * scrollHeight sinkt nie unter clientHeight, deshalb wird der Inhalt
        * selbst vermessen: Unterkante des letzten Kindes, bereinigt um den Zoom.
        */
-      if (autoFitRef.current && schrumpftRef.current && bearbeitetRef.current && !imFokusRef.current && !body.contains(document.activeElement)) {
+      // M527: Die Formatier-Leiste und ihre Menüs (Aa, Farbe) liegen in einer eigenen Ebene außerhalb der Karte — wer
+      // dort klickt, schreibt noch in dieser Karte (sonst schrumpfte sie unter dem offenen Menü, und es ging wieder zu).
+      if (autoFitRef.current && schrumpftRef.current && bearbeitetRef.current && !imFokusRef.current && !body.contains(document.activeElement)
+        && !document.activeElement?.closest?.('.pn-format-schicht')) {
         const shell = body.parentElement as HTMLElement | null;
         let inhalt: number;
         if (winkelRef.current) {
