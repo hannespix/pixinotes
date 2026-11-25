@@ -243,8 +243,13 @@ export function kartenScheibe(set: Setzen, get: Holen, patchActive: AufsOffene) 
         const xs = wahl.map((n) => n.position.x); const ys = wahl.map((n) => n.position.y);
         const x0 = Math.min(...xs); const y0 = Math.min(...ys);
         const w = Math.max(...wahl.map((n) => n.position.x + sizeOf(n).w)) - x0; const h = Math.max(...wahl.map((n) => n.position.y + sizeOf(n).h)) - y0;
-        const frei = findFreeSpot(b.nodes, { x: x0 + w + 60, y: y0 }, { w, h });
-        dx = frei.x - x0; dy = frei.y - y0;
+        // rechts daneben, sonst darunter — weiter hinaus, bis nichts im Weg liegt (findFreeSpot ließ Ränder überlappen)
+        const andere = b.nodes.filter((n) => !set0.has(n.id) && !n.archived);
+        const frei = (x: number, y: number) => andere.every((n) => { const m = sizeOf(n); return x >= n.position.x + m.w + 40 || x + w + 40 <= n.position.x || y >= n.position.y + m.h + 40 || y + h + 40 <= n.position.y; });
+        for (let i = 1; i < 30; i += 1) {
+          if (frei(x0 + i * (w + 60), y0)) { dx = i * (w + 60); dy = 0; break; }
+          if (frei(x0, y0 + i * (h + 60))) { dx = 0; dy = i * (h + 60); break; }
+        }
       }
       const karte = new Map(wahl.map((n) => [n.id, uid()]));
       const neu = wahl.map((n) => frisch({

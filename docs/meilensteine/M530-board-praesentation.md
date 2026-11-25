@@ -10,7 +10,7 @@ vorher nachgestellt (rot) und gemessen; die Reihe ist jetzt grün.
 | Nr | Was der Nutzer jetzt merkt | Vorher |
 |----|----------------------------|--------|
 | 1 | **Strg+V im Karten-Fokus** gehört der offenen Karte: In eine Notiz kommt Text bzw. Bild in einem eigenen Absatz ans Ende ihres Texts (der Cursor steht danach dort); jede andere Karte sagt „In diese Karte lässt sich nichts einfügen. Esc schließt sie – dann landet Eingefügtes auf dem Board." — und nichts passiert. Ohne Fokus wie bisher. | Eine Notiz bzw. Bild-Karte entstand unsichtbar hinter der offenen Karte (M521 offen). |
-| 2 | **Strg+D am Rahmen** dupliziert ihn samt Inhalt (auch archivierte Karten darin, archiviert), Verbindungen zwischen den kopierten Karten kommen mit, Rahmenpfeile (Rahmen → Rahmen) nicht; ein Strg+Z nimmt alles zurück. Ein **Rahmen allein** hat im Rahmen-Menü „Duplizieren" und „In Board verschieben …" (samt Inhalt, archivierte mit — der Weg aus M521 B11). Die Leiste selbst bekommt keinen Knopf dazu. | Strg+D nahm Rahmen nicht mit; ein Rahmen allein ließ sich weder duplizieren noch verschieben. |
+| 2 | **Strg+D am Rahmen** dupliziert ihn samt Inhalt (auch archivierte Karten darin, archiviert) und legt die Kopie **frei daneben** (rechts, sonst darunter) — nicht 30 Punkte versetzt darüber wie bei Karten, denn zwei Rahmen übereinander fingen gegenseitig die Karten des anderen ein. Verbindungen zwischen den kopierten Karten kommen mit, Rahmenpfeile (Rahmen → Rahmen) nicht; ein Strg+Z nimmt alles zurück. Ein **Rahmen allein** hat im Rahmen-Menü „Duplizieren" und „In Board verschieben …" (samt Inhalt, archivierte mit — der Weg aus M521 B11). Die Leiste selbst bekommt keinen Knopf dazu. | Strg+D nahm Rahmen nicht mit; ein Rahmen allein ließ sich weder duplizieren noch verschieben. |
 | 3a | **Rahmen-Reise per Alt+Umschalt+P beendet, während die Aufgaben-Zentrale offen ist:** Das Board kommt in der Ansicht von **vor** der Reise zurück, die Oberfläche ist wieder da. | Ausschnitt des letzten Rahmens. |
 | 3b | **F in der Reise** passt den aktuellen Rahmen ein (wie die Landung), die Reise läuft weiter. | F passte das ganze Board ein und verließ den Rahmen-Ausschnitt. |
 | 3c | **0 im Karten-Fokus** heißt „zurück zur gewählten Darstellung": Die Karte wird wieder eingepasst (wie beim Öffnen, `fokusAnsicht`), die Stufe (−/+) zurückgesetzt. Ohne Fokus stellt 0 weiter 100 % ein. | 100 % — die offene Karte stand danach halb im Bild. |
@@ -31,6 +31,8 @@ vorher nachgestellt (rot) und gemessen; die Reihe ist jetzt grün.
   im Notiz-Text liegt). Nur lesend (`isEditable` falsch) oder andere Karte → Hinweis.
 - **Duplizieren:** `store/karten.ts` `dupliziere(ids)` nimmt zu jedem gewählten Rahmen `frameMembers(f, nodes, true, true)`
   dazu (verschachtelte Rahmen, archivierte Karten) und lässt Kanten zwischen zwei kopierten Rahmen weg (`istRahmen`).
+  Ist ein Rahmen dabei, rückt die ganze Kopie um die Breite (bzw. Höhe) der Auswahl + 60 nach rechts (sonst nach unten),
+  bis kein anderes Element im Weg liegt (40 Punkte Abstand) — `findFreeSpot` ließ Ränder überlappen.
   `boardTasten.ts` Strg+D reicht alle gewählten Karten **und** Rahmen (`mitRahmen`), Zähltext über `zahlWort`.
   `SelectionToolbar.tsx`: `duplicate()` mit `selFrames`; im Rahmen-Menü bei `framesOnly` `data-taste="rahmen-duplizieren"`
   und `data-taste="rahmen-verschieben"` (öffnet das vorhandene Menü `move` → `moveNodesToBoard`).
@@ -56,7 +58,7 @@ vorher nachgestellt (rot) und gemessen; die Reihe ist jetzt grün.
   `EbenenMenu.tsx` ohne `window.confirm`. Abgleich: Die Grabsteine des Boards (`lib/grabsteine.ts`) reisen nur, solange
   es fehlt (`grabsteineFuer` lässt Vorhandenes weg); im Konto schreibt der nächste Takt die Board-Datei neu, die
   Zusammenführung auf dem zweiten Gerät sieht es als „drüben neu" (Basis ohne Board). Nachgewiesen in Reihe K.
-- **Start-JS (m446/m459/m467/m483/m502):** + rund 1,5 KB (2 062 826 B gegen 2 061 342 B auf dem Hauptzweig, Grenze
+- **Start-JS (m446/m459/m467/m483/m502):** + rund 2 KB (2 063 324 B gegen 2 061 342 B auf dem Hauptzweig vor M518, Grenze
   2 065 000 B). Nachgeladen statt im Start-Paket: `lib/fokusEinfuegen.ts`, `store/boardZurueck.ts`.
 
 ## Prüfreihe
