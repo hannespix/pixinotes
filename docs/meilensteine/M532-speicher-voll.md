@@ -67,6 +67,27 @@ dem Neuladen eines Fensters mit ungespeicherter Arbeit: Einstellungen → Daten 
   `speicherFehlerText()` in `kontoSync.ts` baut daraus den Satz (drei Stellen). Der allgemeine Hinweis bei vollem
   Speicher (`pixinotes:quota` in `App.tsx`) nennt „Alles sichern".
 
+## Zweiter Schritt: Ersatzspeicher, wenn der localStorage trotzdem voll ist
+Seit der Auslagerung füllt nur noch sehr viel Text den localStorage. Damit auch dann nichts verloren geht:
+- **Schreiben:** Scheitert `flushPersist` an `QuotaExceededError`, geht derselbe Text in die IndexedDB
+  (`ablageIdb.ts → reserveSchreiben`, Schlüssel `pixinotes-stand-reserve`, `durability: 'strict'`; ein laufendes
+  Schreiben wird nicht gestapelt, es zählt der jeweils neueste Text). Dazu die Prüfsumme dessen, was in dem Moment im
+  localStorage steht (`basis`). Die Marke `pixinotes-reserve` steht **immer** im localStorage (`'0'`, beim Start
+  angelegt) und wird auf `'1'` gesetzt — gleich lang, passt also auch in einen vollen Speicher. Einmal je Sitzung sagt
+  ein Hinweis, dass die Arbeit sicher liegt, und nennt die drei größten Boards (Größe des gespeicherten Texts).
+- **Lesen beim Start (Reihenfolge):** Der Stand kommt wie immer synchron aus dem localStorage. Steht die Marke auf `'1'`
+  (oder lädt die Ablage ohnehin), sieht `nachDemLaden` im Ersatzspeicher nach, **bevor** die Oberfläche erscheint:
+  Stimmt der localStorage noch mit `basis` überein, ist der Ersatz neuer und wird übernommen (`useBoard.setState`, kein
+  `runDerived` — es ist eigene Arbeit, der Abgleich soll sie weitertragen; Bilder-Verweise darin werden eingesetzt).
+  Wurde der localStorage seitdem geschrieben, ist der Ersatz überholt und wird gelöscht.
+- **Aufräumen:** Gelingt ein Schreiben in den localStorage wieder (`reserve.da`), wird der Ersatz gelöscht und die
+  Marke auf `'0'` gesetzt.
+- **Single-Writer:** Nur der Schreiber legt einen Ersatz an. `adoptPersistedState` liest den Text sofort (ein
+  Nachfolger schreibt gleich selbst) und übernimmt ihn nachgeladen (`ablageIdb.ts → uebernehmen`).
+- **Start-Paket:** Alles Neue lädt nach; im Start-Paket stehen nur die Haken (m502: 2 064 836 B). Dafür lädt auch das
+  Übernehmen des Mitlese-Fensters nach, und eine Konsolenmeldung des Prüfbetriebs (M525) ist kürzer.
+- Prüfreihe m532, Abschnitt E (vorher rot: nach dem Neuladen fehlten drei von sechs Karten).
+
 ## Grenzen / offen
 - **Aufräumen** verwaister Einträge `pixinotes-ablage:*` gibt es noch nicht (ein gelöschtes Bild bleibt in der
   Ablage). Gleiche Bilder liegen nur einmal (Prüfsumme). Aufräumen bräuchte die Sicht aller Fenster und des Verlaufs.

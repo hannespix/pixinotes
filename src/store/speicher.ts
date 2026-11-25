@@ -7,7 +7,7 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { TimeSeg } from '../types';
 import { anchorStroke } from '../lib/strokeAnchor';
-import type { BoardDoc, Space, BoardState } from './typen';
+import type { BoardDoc, BoardState } from './typen';
 import { persistHaken } from './schutz';
 import { defaultHierarchy } from './start';
 import { useBoard } from '../store';
@@ -167,9 +167,10 @@ function setWriterRole(role: WriterRole): void {
  *  M525 `gruendlich` (Seite wird verlassen/verdeckt): Text ohne Gedächtnis, siehe speicherText. */
 export function flushPersist(gruendlich?: boolean): boolean {
   if (!pendingWrite) return true;
+  let text = '';
   try {
     const wert = pendingWrite.wert;
-    let text = speicherText(wert, gruendlich === true);
+    text = speicherText(wert, gruendlich === true);
     if (gruendlich !== true && pruefenAn()) {
       const soll = vollText(wert);
       if (soll !== text) { abweichung(); text = soll; }
@@ -181,10 +182,13 @@ export function flushPersist(gruendlich?: boolean): boolean {
     quotaWarned = false;
     letzterFehler = null;
     speicherZaehler.geschrieben += 1;
+    if (reserve.da) { reserve.da = false; void ablageModul().then((m) => m.reserveLoeschen()); }
     return true;
   } catch (e) {
     // M532: voll oder anders gesperrt? — der Abgleich nennt es beim Namen statt zu raten
     letzterFehler = /quota/i.test((e as Error)?.name) ? 'voll' : 'anderer';
+    // M532: voll → der Stand geht in den Ersatzspeicher (IndexedDB) statt verloren (ablageIdb.ts → reserveSchreiben)
+    if (text && letzterFehler === 'voll' && writerRole === 'writer') void ablageModul().then((m) => m.reserveSchreiben(text));
     if (!quotaWarned) {
       quotaWarned = true;
       window.dispatchEvent(new CustomEvent('pixinotes:quota'));
@@ -195,6 +199,8 @@ export function flushPersist(gruendlich?: boolean): boolean {
 /** M532: Warum das letzte Schreiben scheiterte (null = es gelang) */
 /* (die Meldung dazu baut kontoSync.ts → speicherFehlerText) */
 export let letzterFehler: 'voll' | 'anderer' | null = null;
+/** M532: Liegt ein Stand im Ersatzspeicher, der nach dem nächsten gelungenen Schreiben weg kann? (ablageIdb.ts setzt es) */
+export const reserve = { da: false };
 /** Meldung des Prüfbetriebs (kein Oberflächentext — Nutzer sehen sie nie) */
 const ABWEICHUNG = 'M525: gemerkter Speichertext weicht vom Stand ab';
 /** Der zuletzt MIT Gedächtnis geschriebene Stand — beim Verlassen der Seite einmal ohne Gedächtnis gegengeprüft */
@@ -202,7 +208,7 @@ let ungeprueft: { key: string; wert: Gespeichert } | null = null;
 function abweichung(): void {
   speicherZaehler.abweichungen += 1;
   textVon = new WeakMap();   // dem Gedächtnis ist nicht mehr zu trauen
-  console.error('PixiNotes: Der gemerkte Speichertext wich vom Stand ab (M525) – der Stand wurde vollständig neu geschrieben.');
+  console.error('PixiNotes: Speichertext wich vom Stand ab (M525), neu geschrieben.');
   // Im Prüfbetrieb laut scheitern (die Prüfreihen sammeln Seitenfehler) — geschrieben ist der richtige Stand trotzdem
   if (pruefenAn()) setTimeout(() => { throw new Error(ABWEICHUNG); }, 0);
   if (PRUEF_BAU === '2') document.documentElement.textContent = ABWEICHUNG;
@@ -275,9 +281,14 @@ export const speicherAblage = {
    ist; alles andere bleibt dasselbe Objekt. */
 let bereit: Promise<void> = Promise.resolve();
 const VERWEIS = '"pixinotes-ablage:';
+export const RESERVE_MARKE = 'pixinotes-reserve';
 /** Verweise einsetzen oder alte eingebettete Bilder umziehen — das Wie lädt nach (ablageIdb.ts) */
 function nachDemLaden(roh: string): void {
-  if (roh.includes(VERWEIS) || (roh.length > AUSLAGERN_AB && roh.includes('"data:'))) {
+  // (… oder liegt im Ersatzspeicher ein neuerer Stand? Die Marke steht immer da — '0' —, damit ablageIdb.ts sie auch
+  // in einem vollen Speicher auf '1' setzen kann: gleich lang, braucht keinen Platz)
+  let marke: string | null = '0';
+  try { marke = localStorage.getItem(RESERVE_MARKE); if (marke === null) localStorage.setItem(RESERVE_MARKE, '0'); } catch { /* voll: dann eben ohne */ }
+  if (roh.includes(VERWEIS) || (roh.length > AUSLAGERN_AB && roh.includes('"data:')) || marke === '1') {
     bereit = ablageModul().then((m) => m.nachDemLaden(roh)).catch(() => { /* keine IndexedDB: nichts wird überschrieben */ });
   }
 }
@@ -289,19 +300,13 @@ export const standBereit = (): Promise<void> => bereit;
  *  Mitleser folgen so dem Schreiber; ein Nachfolger übernimmt vor dem ersten
  *  eigenen Write, was der alte Schreiber zuletzt gesichert hat. */
 export function adoptPersistedState(): boolean {
-  try {
-    const raw = localStorage.getItem('pixinotes-board');
-    if (!raw) return false;
-    const st = (JSON.parse(raw) as { state?: { boards?: BoardDoc[]; spaces?: Space[]; activeId?: string } }).state;
-    if (!st || !Array.isArray(st.boards) || st.boards.length === 0 || !Array.isArray(st.spaces)) return false;
-    const uebernehmen = (boards: BoardDoc[]) => useBoard.getState().importSync(boards, st.spaces!, st.activeId ?? boards[0].id);
-    // M532: Verweise auf ausgelagerte Bilder erst durch ihre Inhalte ersetzen — der Store hält nie einen Verweis
-    if (!raw.includes(VERWEIS)) { uebernehmen(st.boards); return true; }
-    void ablageModul().then((m) => m.mitInhalten(raw, st.boards!)).then(uebernehmen, () => uebernehmen(st.boards!));
-    return true;
-  } catch {
-    return false;
-  }
+  // Der Text wird JETZT gelesen (ein Nachfolger schreibt gleich selbst) — Prüfen, Bilder einsetzen und Übernehmen laden
+  // nach (ablageIdb.ts → uebernehmen; M532: hält das Start-Paket klein, Mitlesen ist nicht eilig)
+  let raw: string | null = null;
+  try { raw = localStorage.getItem('pixinotes-board'); } catch { /* gesperrt */ }
+  if (!raw) return false;
+  void ablageModul().then((m) => m.uebernehmen(raw!));
+  return true;
 }
 
 const holdForever = () => new Promise<never>(() => {});

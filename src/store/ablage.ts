@@ -40,11 +40,13 @@ function streu(s: string, seed: number): number {
 }
 /** Kleiner Merkzettel: dieselbe data-URL nicht bei jedem Schreiben neu durchrechnen */
 const verweise = new Map<string, string>();
+/** Prüfsumme mit Länge (auch für den Ersatzspeicher: Hat sich der localStorage-Stand seitdem geändert?) */
+export const pruefsumme = (s: string): string => `${streu(s, 1).toString(36)}-${streu(s, 7).toString(36)}-${s.length}`;
 export function verweisVon(daten: string): string {
   let v = verweise.get(daten);
   if (v === undefined) {
     if (verweise.size > 2000) verweise.clear();
-    v = `${PRAEFIX}${streu(daten, 1).toString(36)}-${streu(daten, 7).toString(36)}-${daten.length}`;
+    v = PRAEFIX + pruefsumme(daten);
     verweise.set(daten, v);
   }
   return v;
