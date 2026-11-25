@@ -40,7 +40,7 @@ import { DragTitle } from './DragTitle';
 
 import { IBubbles, IQr, ITrash, IWand } from '../Icons';
 import { BubblesQr, MitmachenBuehne, useMitmachenStand } from '../BubblesQr';
-import { hierGastgeber, mitmachenOeffnen, mitmachenVon } from '../../lib/mitmachen';
+import { hierBeendet, hierGastgeber, mitmachenOeffnen, mitmachenVon } from '../../lib/mitmachen';
 import { supabaseKonfiguriert } from '../../lib/kontoSupabase';
 import { zahlWort } from '../../lib/sprache';
 /** M415: Lage und Größe eines Elements setzen — nur, was sich geändert hat (unveränderte Schreibvorgänge kosten im Tropfen-Look den ganzen Filter) */
@@ -181,7 +181,9 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   const gewaehlt = wahl ? blasen.find((b) => b.id === wahl) ?? null : null;
   // M513: Mitmachen per QR — nur diese Karte teilen (Teilnehmer-Seite mitmachen.html, Gastgeber: lib/mitmachenHost.ts)
   const mit = mitmachenVon(roh, id);   // M520: nur die Runde DIESER Karte (eine Kopie trägt das Feld ihres Originals)
-  const mitAn = !!mit?.an;
+  // M531: Ging die Runde hier zu Ende (Karte gelöscht, mit Strg+Z zurück), läuft sie nirgends mehr — die Karte zeigt sie
+  // nicht als laufend, „Mitmachen per QR" startet ohne Rückfrage neu
+  const mitAn = !!mit?.an && !hierBeendet(mit.token, id);
   const mitHier = mitAn && hierGastgeber(mit!.token, id);
   const mitStand = useMitmachenStand(mitAn ? mit!.token : undefined);
   const [qrOffen, setQrOffen] = useState(false);

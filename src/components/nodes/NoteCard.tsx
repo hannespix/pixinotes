@@ -192,12 +192,26 @@ function NoteAboFeeds({ id }: { id: string }) {
   );
 }
 
+/** M527: Bildschirmstellen von Anfang und Ende der Markierung in `el` — die ruhende Ansicht hat denselben Umbruch wie der Editor */
+type StartPunkt = { x: number; y: number; bis?: { x: number; y: number } };
+function auswahlPunkte(el: Element): StartPunkt | null {
+  const s = getSelection();
+  if (!s?.rangeCount || s.isCollapsed || !el.contains(s.anchorNode)) return null;
+  const [a, b] = [true, false].map((anfang) => { const c = s.getRangeAt(0).cloneRange(); c.collapse(anfang); const q = c.getClientRects()[0]; return q && { x: q.left, y: q.top + q.height / 2 }; });
+  return a && b ? { ...a, bis: b } : null;
+}
+/** M527: Stelle im Text unter (x, y) */
+function textStelle(x: number, y: number): Range | null {
+  const c = (document as Document & { caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null }).caretPositionFromPoint?.(x, y);
+  if (!c) return document.caretRangeFromPoint?.(x, y) ?? null;
+  const r = document.createRange(); r.setStart(c.offsetNode, c.offset); return r;
+}
 /**
  * Der lebende Editor einer Notiz (BlockNote, MPL-2.0) — entsteht erst bei Bedarf (M338).
  * `startPunkt`: Bildschirmstelle des Klicks, der ihn geweckt hat; dort landet der Cursor.
  */
 export function NotizEditor({ id, data, startPunkt, sitzung }: {
-  id: string; data: NoteNode['data']; startPunkt: MutableRefObject<{ x: number; y: number } | null>;
+  id: string; data: NoteNode['data']; startPunkt: MutableRefObject<StartPunkt | null>;
   /** M477: gemeinsam tippen — die Yjs-Sitzung dieser Notiz (sonst allein wie bisher); Hülle: ./NotizGemeinsam.tsx */
   sitzung?: NotizSitzung;
 }) {
@@ -474,11 +488,11 @@ export function NotizEditor({ id, data, startPunkt, sitzung }: {
     const setzen = () => {
       const el = editorRef.current?.querySelector('[contenteditable="true"]') as HTMLElement | null;
       if (!el) { if (n++ < 30) raf = requestAnimationFrame(setzen); return; }
-      const doc = document as Document & { caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null };
-      let r: Range | null = null;
-      if (typeof document.caretRangeFromPoint === 'function') r = document.caretRangeFromPoint(p.x, p.y);
-      else if (typeof doc.caretPositionFromPoint === 'function') { const c = doc.caretPositionFromPoint(p.x, p.y); if (c) { r = document.createRange(); r.setStart(c.offsetNode, c.offset); r.collapse(true); } }
+      const r = textStelle(p.x, p.y);
       el.focus({ preventScroll: true });
+      // M527: eine Markierung aus der ruhenden Ansicht reicht bis zur zweiten Stelle
+      const bis = p.bis ? textStelle(p.bis.x, p.bis.y) : null;
+      if (r && bis && el.contains(bis.startContainer)) r.setEnd(bis.startContainer, bis.startOffset);
       if (r && el.contains(r.startContainer)) { const sel = window.getSelection(); sel?.removeAllRanges(); sel?.addRange(r); }
     };
     setzen();
@@ -491,6 +505,8 @@ export function NotizEditor({ id, data, startPunkt, sitzung }: {
       <div
         className="nodrag nowheel note-editor"
         ref={editorRef}
+        // M527: Doppelklick auf eine eben geweckte Notiz markiert das Wort (lib/wortWaehlen.ts, nachgeladen)
+        onDoubleClick={(e) => { const { clientX: x, clientY: y } = e; if (window.getSelection()?.isCollapsed) void import('../../lib/wortWaehlen').then((m) => m.wortWaehlen(editorRef.current, x, y)); }}
         onKeyDownCapture={(e) => {
           // M390: Strg+Z / Strg+Y im Text — die Änderung, die gleich kommt, ist ein Rückgängig des Editors
           // M477: gemeinsam nicht — dort nimmt Yjs nur das Eigene zurück, das Board bekommt den Stand wie jede Änderung
@@ -515,7 +531,7 @@ export function NotizEditor({ id, data, startPunkt, sitzung }: {
           onSelectionChange={trackTable}
         >
           {/* M201: Standard-Leiste + A₋/A₊/A₊₊/Aa für den markierten Text */}
-          <NoteToolbar />
+          <NoteToolbar aufDemBoard />
           {/* M283: „/" bietet die rechnende Tabelle an; M302: Bilder und Dateien */}
           <NoteSlashMenu dateienAufsBoard={dateienNebenDieNotiz} />
         </BlockNoteView>
@@ -568,7 +584,7 @@ export function NotizEditor({ id, data, startPunkt, sitzung }: {
 
 /** M477: Im Live-Board übernimmt die Hülle für gemeinsames Tippen (nachgeladen, nur wenn ein Kanal steht) */
 const NotizGemeinsam = lazy(() => import('./NotizGemeinsam'));
-function NotizEditorWahl(p: { id: string; data: NoteNode['data']; startPunkt: MutableRefObject<{ x: number; y: number } | null> }) {
+function NotizEditorWahl(p: { id: string; data: NoteNode['data']; startPunkt: MutableRefObject<StartPunkt | null> }) {
   const boardId = useBoard((s) => s.activeId);
   useTakt(TEILNEHMER_EREIGNIS);
   // Einmal live, bleibt die Hülle (sie geht selbst zurück zu „allein", wenn der Kanal fehlt — nie unter dem Cursor)
@@ -629,7 +645,7 @@ export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
   const einfach = useMemo(() => notizEinfach(data.blocks), [data.blocks]);
   const imFokus = useBoard((s) => s.focusCard === id);
   const [aktiv, setAktiv] = useState(() => !einfach);
-  const startPunkt = useRef<{ x: number; y: number } | null>(null);
+  const startPunkt = useRef<StartPunkt | null>(null);
   useEffect(() => { if (!einfach || imFokus) setAktiv(true); }, [einfach, imFokus]);
   useEffect(() => {
     if (aktiv) return;
@@ -644,6 +660,7 @@ export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
   }, [aktiv, id]);
   const verweilen = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(verweilen.current), []);
+
   const hakenSetzen = useCallback((pfad: number[], an: boolean) => {
     const st = useBoard.getState();
     const n = st.boards.find((b) => b.id === st.activeId)?.nodes.find((k) => k.id === id);
@@ -699,10 +716,12 @@ export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
         <div
           className="nodrag nowheel note-editor"
           translate="no"
-          // Klick in den Text weckt den Editor; der Cursor landet an der Klickstelle
+          // Klick in den Text weckt den Editor; der Cursor landet an der Klickstelle.
+          // M527: … und eine Markierung (gezogen oder Doppelklick) zieht in den Editor mit — vorher war der erste Zug
+          // über den Text einer ruhenden Notiz verloren (keine Markierung, keine Formatier-Leiste).
           onClick={(e) => {
             if ((e.target as HTMLElement).closest('input')) return;
-            startPunkt.current = { x: e.clientX, y: e.clientY };
+            startPunkt.current = auswahlPunkte(e.currentTarget) ?? { x: e.clientX, y: e.clientY };
             setAktiv(true);
           }}
           // Maus ruht auf der Notiz: Editor vorwärmen — dann ist er da, bevor man klickt oder markiert

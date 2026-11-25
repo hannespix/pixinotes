@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Handle, NodeResizer, Position, useReactFlow, useUpdateNodeInternals } from '@xyflow/react';
 import { mutedHistory, runDerived, selectActiveBoard, useBoard } from '../../store';
+import { useKarteFestId } from '../../store/selektoren';   // M531 (direkt: store.ts behält seine Namen, m480)
 import { groesseGedreht, istDrehbar, winkelNorm, winkelRaste, winkelVon } from '../../lib/drehung';
 import { sizeOf } from '../../lib/arrange';
 import { IDrehen } from '../Icons';
@@ -65,6 +66,8 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
   const winkelRoh = useBoard((s) => winkelVon(selectActiveBoard(s)?.nodes.find((x) => x.id === id)));
   const drehbar = useBoard((s) => istDrehbar(selectActiveBoard(s)?.nodes.find((x) => x.id === id)));
   const nurLesen = useBoard((s) => selectActiveBoard(s)?.geteiltRolle === 'lesen');
+  // M531: Darf ich die Karte nicht ändern (Board nur lesen, Gast ohne Recht), blendet das Stylesheet ihre Bearbeiten-Leisten aus
+  const fest = useKarteFestId(id);
   const winkel = imFokus ? 0 : winkelRoh;
   const winkelRef = useRef(winkel);
   winkelRef.current = winkel;
@@ -325,7 +328,10 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
        * scrollHeight sinkt nie unter clientHeight, deshalb wird der Inhalt
        * selbst vermessen: Unterkante des letzten Kindes, bereinigt um den Zoom.
        */
-      if (autoFitRef.current && schrumpftRef.current && bearbeitetRef.current && !imFokusRef.current && !body.contains(document.activeElement)) {
+      // M527: Die Formatier-Leiste und ihre Menüs (Aa, Farbe) liegen in einer eigenen Ebene außerhalb der Karte — wer
+      // dort klickt, schreibt noch in dieser Karte (sonst schrumpfte sie unter dem offenen Menü, und es ging wieder zu).
+      if (autoFitRef.current && schrumpftRef.current && bearbeitetRef.current && !imFokusRef.current && !body.contains(document.activeElement)
+        && !document.activeElement?.closest?.('.pn-format-schicht')) {
         const shell = body.parentElement as HTMLElement | null;
         let inhalt: number;
         if (winkelRef.current) {
@@ -465,7 +471,7 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
   // Wichtig: Lösch-Knopf & Handles liegen AUSSERHALB des card-body,
   // damit dessen overflow:hidden sie nicht abschneidet.
   return (
-    <div className="card-shell" data-ruhig={ruhig && !alsKachel ? '' : undefined} data-ohne-hoehe={ohneHoehe ? '' : undefined} data-winkel={winkel ? winkel : undefined}
+    <div className="card-shell" data-fest={fest ? '' : undefined} data-ruhig={ruhig && !alsKachel ? '' : undefined} data-ohne-hoehe={ohneHoehe ? '' : undefined} data-winkel={winkel ? winkel : undefined}
       style={rollt || winkel ? ({ ...(rollt ? { '--notiz-max': `${NOTIZ_MAX}px`, ...(typeof festeHoehe === 'number' ? { '--karte-h': `${festeHoehe}px` } : {}) } : {}), ...(winkel ? { '--winkel': `${winkel}deg` } : {}) } as CSSProperties) : undefined}>
       {/* Resize-Griffe: weiße Quadrate mit neutralem Rand (klassischer
           Auswahlrahmen) — bewusst ANDERS als die runden Akzent-Verbindungs-

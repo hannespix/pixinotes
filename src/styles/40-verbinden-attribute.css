@@ -29,7 +29,9 @@
 }
 /* Während des Verbindens: Ganzkarten-Ziel aktiv, alle Anschlüsse sichtbar,
    Karte unter dem Zeiger leuchtet als Ziel auf */
-.react-flow:has(.react-flow__connectionline) .pn-handle-body { pointer-events: all !important; }
+/* M527: … und liegt dabei ÜBER dem Karteninhalt. Vorher lag der Kartenkörper darüber: Losgelassen wurde nur, was nah
+   genug an einem der vier Anschlusspunkte lag — mitten auf der Zielkarte entstand je nach Zoomstufe kein Pfeil. */
+.react-flow:has(.react-flow__connectionline) .pn-handle-body { pointer-events: all !important; z-index: 3; }
 /* M464: React Flow setzt an Anschlüssen das System-Fadenkreuz — unter Windows kaum sichtbar */
 .react-flow__handle.connectionindicator { cursor: var(--zeiger-fadenkreuz); }
 .react-flow:has(.react-flow__connectionline) .pn-handle { opacity: 1; }

@@ -5,7 +5,7 @@
  */
 import { useEffect, useState } from 'react';
 import type { BoardDoc, BoardState } from './typen';
-import { GRUPPE_EREIGNIS, karteFest } from './schutz';
+import { GRUPPE_EREIGNIS, gruppeVon, karteFest } from './schutz';
 import { useBoard } from '../store';
 
 export const selectActiveBoard = (s: BoardState): BoardDoc =>
@@ -24,4 +24,16 @@ export function useKarteFest(von: string | undefined): boolean {
     return () => window.removeEventListener(GRUPPE_EREIGNIS, auf);
   }, []);
   return nurLesen || karteFest(boardId, von);
+}
+/**
+ * M531: wie useKarteFest, aber für eine Hülle, die nur die Kennung kennt (CardShell, Form, Diagramm-Leiste). Den
+ * Ersteller sucht sie nur, wenn Gäste hier überhaupt eingeschränkt sein können — sonst kostet die Frage nichts.
+ */
+export function useKarteFestId(id: string): boolean {
+  const von = useBoard((s) => {
+    const b = selectActiveBoard(s);
+    if (!b || b.geteiltRolle === 'lesen' || !gruppeVon(s.activeId)?.gast) return undefined;
+    return (b.nodes.find((n) => n.id === id)?.data as { von?: string } | undefined)?.von;
+  });
+  return useKarteFest(von);
 }

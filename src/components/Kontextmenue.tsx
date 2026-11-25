@@ -35,6 +35,8 @@ export function useKontextSperre(): void {
       if (t.closest('input, textarea, select, [contenteditable="true"]')) return;
       e.preventDefault();
       if (gezogen) return;
+      // M528: Bereiche mit eigenem Menü (Rechen-Tabelle: Zeilen und Spalten einfügen/löschen) öffnen es selbst
+      if (t.closest('[data-eigenes-menue]')) return;
       // Langer Finger-Druck (Android): nur das Browser-Menü verhindern — eigene Gesten haben dort Vorrang
       if ((e as PointerEvent).pointerType === 'touch') return;
       const st = useBoard.getState();

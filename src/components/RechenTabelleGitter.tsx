@@ -32,6 +32,7 @@
 import { useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { indexZuAdresse, rechneBlatt, zeigeWert } from '../lib/formel';
+import '../lib/formelPlus';   // M528: Datum, ganze Spalten und Zeilen auch in der Tabelle in der Notiz
 import { resolveLink } from '../lib/links';
 import { useBoard } from '../store';
 import { IPlus, ISigma, IX, ILink } from './Icons';
