@@ -67,12 +67,30 @@ await P.mouse.down();
 await P.mouse.move(greif.x + 10, greif.y + 4, { steps: 3 }); await P.waitForTimeout(80);
 // Schnell nach rechts (Neigung) — Richtung Delta (erste Kachel im zweiten Projekt)
 const ziel = { x: d0.x + 30, y: d0.y + 30 };
-const neigungen = [];
-for (let i = 1; i <= 14; i += 1) {
-  await P.mouse.move(greif.x + ((ziel.x - greif.x) * i) / 14, greif.y + ((ziel.y - greif.y) * i) / 14);
-  await P.waitForTimeout(16);
-  if (i > 3 && i < 12) neigungen.push(await P.evaluate(() => { const t = document.querySelector('.ov-canvas .react-flow__node-ovBoard.dragging .ovc-tile'); if (!t) return null; const m = new DOMMatrix(getComputedStyle(t).transform); return { winkel: Math.atan2(m.b, m.a) * 180 / Math.PI, skala: Math.hypot(m.a, m.b) }; }));
+// M518: Die Neigung hängt am TEMPO der Hand (Punkte je Millisekunde). Vorher bestand der Zug aus 14 Schritten mit je
+// einer Abfrage dazwischen – unter Last dauerte jeder Schritt ein Vielfaches, der „schnelle" Zug war dann langsam,
+// die Kachel neigte sich zu Recht nur um 1,18° und B1 (> 1,2°) war rot. Jetzt folgt der Ort der Uhr: Die Strecke
+// wird in festen 300 ms zurückgelegt, egal wie viele Schritte die Maschine in dieser Zeit schafft; Neigung und
+// Größe schreibt die Seite selbst je Bild mit (keine Abfrage mitten im Zug).
+await P.evaluate(() => {
+  window.__neig = []; window.__neigAn = true;
+  const bild = () => {
+    if (!window.__neigAn) return;
+    const t = document.querySelector('.ov-canvas .react-flow__node-ovBoard.dragging .ovc-tile');
+    if (t) { const m = new DOMMatrix(getComputedStyle(t).transform); window.__neig.push({ winkel: Math.atan2(m.b, m.a) * 180 / Math.PI, skala: Math.hypot(m.a, m.b) }); }
+    requestAnimationFrame(bild);
+  };
+  requestAnimationFrame(bild);
+});
+const ZUG_MS = 300; const zugAb = Date.now();
+for (;;) {
+  const a = Math.min(1, (Date.now() - zugAb) / ZUG_MS);
+  await P.mouse.move(greif.x + (ziel.x - greif.x) * a, greif.y + (ziel.y - greif.y) * a);
+  if (a >= 1) break;
+  await P.waitForTimeout(12);
 }
+await P.waitForFunction(() => window.__neig.length >= 4, null, { timeout: 8000 }).catch(() => {});
+const neigungen = await P.evaluate(() => { window.__neigAn = false; return window.__neig; });
 const unten = await P.evaluate(() => { const n = document.querySelector('.ov-canvas .react-flow__node-ovBoard.dragging'); if (!n) return null; const r = n.getBoundingClientRect(); return { cx: r.left + r.width / 2, top: r.top }; });
 const skala = Math.max(...neigungen.filter(Boolean).map((n) => n.skala));
 pruefe('A1 die gegriffene Kachel hebt sich (größer) und trägt Schatten', skala > 1.03 && await P.evaluate(() => getComputedStyle(document.querySelector('.react-flow__node-ovBoard.dragging .ovc-tile')).boxShadow !== 'none'), { skala });
@@ -82,7 +100,7 @@ pruefe('A2 sie haftet an der Maus (der Griffpunkt bleibt, wo er war)', !!unten &
 
 console.log('B  Neigung');
 const maxWinkel = Math.max(...neigungen.filter(Boolean).map((n) => n.winkel));
-pruefe('B1 beim schnellen Zug nach rechts neigt sie sich in Zugrichtung', maxWinkel > 1.2 && maxWinkel < 8.5, neigungen);
+pruefe('B1 beim schnellen Zug nach rechts neigt sie sich in Zugrichtung', maxWinkel > 1.2 && maxWinkel < 8.5, { maxWinkel, bilder: neigungen.length, zugMs: ZUG_MS });
 
 console.log('C  Verdrängung');
 await P.waitForTimeout(650);

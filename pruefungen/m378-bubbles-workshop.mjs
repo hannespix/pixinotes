@@ -707,6 +707,33 @@ const bZiehen = async (P, text, zx, zy) => {
   await P.mouse.move(zx, zy, { steps: 8 }); await P.waitForTimeout(220);
   await P.mouse.up(); await P.waitForTimeout(350);
 };
+/**
+ * M518: Eine Blase AUF eine andere ziehen – und erst loslassen, wenn die Karte diese als Ziel zeigt (Klasse „ziel",
+ * der Ring, den auch ein Mensch abwartet) und der Zeiger wirklich in ihr steht. Vorher zielte der Zug auf die Lage,
+ * die die Ziel-Blase VOR dem Zug hatte: Unter Last meldete `ruhen` Ruhe, während die Bühne nur gerade kein Bild
+ * gezeichnet hatte – die Blase trieb noch, der Zeiger stand beim Loslassen neben ihr, und die Nachfrage
+ * „Gruppe aus beiden / dieselbe Idee" kam nie (B5 rot, danach 30 s Warten auf den Knopf).
+ */
+const bZiehenAuf = async (P, text, zielText) => {
+  const b = await von(P, text); let z = await von(P, zielText);
+  const stand = () => P.evaluate(([w, t]) => {
+    const el = [...document.querySelectorAll(`${w} [data-taste="bub-blase"]`)].find((e) => e.querySelector('.bub-text').textContent === t);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { sx: r.left + r.width / 2, sy: r.top + r.height / 2, r: r.width / 2, zeigt: el.classList.contains('ziel') };
+  }, [W, zielText]);
+  await P.mouse.move(b.sx, b.sy); await P.mouse.down();
+  await P.mouse.move(b.sx + (z.sx - b.sx) * 0.3, b.sy + (z.sy - b.sy) * 0.3, { steps: 4 }); await P.waitForTimeout(60);
+  let zeiger = [z.sx, z.sy];
+  await P.mouse.move(zeiger[0], zeiger[1], { steps: 8 });
+  for (let i = 0; i < 15; i++) {
+    await P.waitForTimeout(160);                                   // stillhalten: kein Wurf (der Zeiger ruht > 90 ms)
+    z = await stand();
+    if (z && z.zeigt && Math.hypot(zeiger[0] - z.sx, zeiger[1] - z.sy) < z.r * 0.6) break;
+    if (z) { zeiger = [z.sx, z.sy]; await P.mouse.move(zeiger[0], zeiger[1], { steps: 2 }); }
+  }
+  await P.mouse.up(); await P.waitForTimeout(350);
+};
 const ueberlappt = (liste) => liste.some((a, i) => liste.some((b, j) => j > i && Math.hypot(a.x - b.x, a.y - b.y) < a.r + b.r - 1.5));
 const bLeer = async (P) => { const b = (await blasen(P))[0]; await P.mouse.click(b.l + 5, b.t + b.h - 5); await P.waitForTimeout(200); };
 
@@ -743,18 +770,18 @@ await bZiehen(S1.P, 'Ruheraum', rg[0].sx, rg[0].sy);
 pruefe('B3 eine Blase auf die Gruppe gezogen: Sie gehört dazu', (await gruppeVonIdee(S1.P, 'Ruheraum')) === 'Räume');
 await ruhen(S1.P);
 let ziel = await von(S1.P, 'Ruheraum');
-await bZiehen(S1.P, 'Mehr Fenster', ziel.sx, ziel.sy);
+await bZiehenAuf(S1.P, 'Mehr Fenster', 'Ruheraum');
 pruefe('B4 auf eine Blase gezogen, die in einer Gruppe steckt: in dieselbe Gruppe, ohne Nachfrage', (await gruppeVonIdee(S1.P, 'Mehr Fenster')) === 'Räume' && (await S1.P.locator(`${W} [data-taste="bub-fallen"]`).count()) === 0);
 await ruhen(S1.P);
 ziel = await von(S1.P, 'Kaffeemaschine');
-await bZiehen(S1.P, 'Stehtische', ziel.sx, ziel.sy);
+await bZiehenAuf(S1.P, 'Stehtische', 'Kaffeemaschine');
 pruefe('B5 auf eine freie Blase gezogen: die Karte fragt, was gemeint ist', (await S1.P.locator(`${W} [data-taste="bub-fallen"]`).count()) === 1 && /Stehtische.*Kaffeemaschine/.test(await S1.P.locator(`${W} [data-taste="bub-fallen"]`).textContent()));
 await S1.P.locator(`${W} [data-taste="bub-fallen-gruppe"]`).click(); await S1.P.waitForTimeout(350);
 await S1.P.locator(`${W} [data-taste="bub-gruppe-name"]`).fill('Möbel'); await S1.P.keyboard.press('Enter'); await S1.P.waitForTimeout(300);
 pruefe('B6 „Gruppe aus beiden": Beide stecken in der neuen Gruppe', (await gruppeVonIdee(S1.P, 'Stehtische')) === 'Möbel' && (await gruppeVonIdee(S1.P, 'Kaffeemaschine')) === 'Möbel', `${await gruppeVonIdee(S1.P, 'Stehtische')} / ${await gruppeVonIdee(S1.P, 'Kaffeemaschine')}`);
 await ruhen(S1.P);
 ziel = await von(S1.P, 'Obstkorb');
-await bZiehen(S1.P, 'Obst', ziel.sx, ziel.sy);
+await bZiehenAuf(S1.P, 'Obst', 'Obstkorb');
 await S1.P.locator(`${W} [data-taste="bub-fallen-eins"]`).click(); await S1.P.waitForTimeout(400);
 await ruhen(S1.P);
 let bl = await blasen(S1.P);
@@ -792,8 +819,18 @@ pruefe('C7 alles kommt zur Ruhe (kein Dauerlauf)', await ruhen(S1.P));
   await ruhen(Wu.P);
   const wurf = await von(Wu.P, 'Solo');
   await Wu.P.mouse.move(wurf.sx, wurf.sy); await Wu.P.mouse.down();
-  for (let i = 1; i <= 6; i++) { await Wu.P.mouse.move(wurf.sx - i * 14, wurf.sy); await Wu.P.waitForTimeout(16); }
-  await Wu.P.mouse.up();
+  // M518: Ein Wurf ist eine Frage des Tempos (die App wertet ihn nur, wenn der Zeiger in den letzten 90 ms noch
+  // lief). Vorher: sechs Schritte mit je 16 ms Pause und danach das Loslassen als eigener Aufruf – unter Last
+  // dauerte beides so lange, dass aus dem Wurf ein Ablegen wurde (C8 rot: 4 statt > 8 Punkte Flug). Jetzt folgt
+  // der Ort der Uhr (84 Punkte in 130 ms, egal wie viele Schritte die Maschine schafft), und der letzte Schritt
+  // geht zusammen mit dem Loslassen hinaus.
+  const WURF_MS = 130; const wurfAb = Date.now();
+  for (;;) {
+    const a = (Date.now() - wurfAb) / WURF_MS;
+    if (a >= 1) break;
+    await Wu.P.mouse.move(wurf.sx - a * 84, wurf.sy);
+  }
+  await Promise.all([Wu.P.mouse.move(wurf.sx - 84, wurf.sy), Wu.P.mouse.up()]);
   const losX = wurf.x - 6 * 14;
   // am weitesten Punkt messen (der Anker holt sie gleich zurück; wie schnell gerechnet wird, hängt vom Rechner ab)
   let weit = losX;
