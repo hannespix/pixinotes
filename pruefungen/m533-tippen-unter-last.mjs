@@ -21,7 +21,7 @@ import http from 'node:http';
 import { extname, join } from 'node:path';
 
 const DIST = process.env.PN_DIST ?? path.join(__repo, 'dist');
-const PORT = 5533;
+const PORT = Number(process.env.M533_PORT ?? 5533);
 const app = http.createServer((q, r) => {
   let f = join(DIST, q.url.split('?')[0] === '/' ? 'index.html' : q.url.split('?')[0].slice(1));
   if (!existsSync(f)) f = join(DIST, 'index.html');
@@ -756,9 +756,12 @@ async function durchgang(id, schreiber, punkter, vorab, schluss, { verzug = 1800
   await schreiber.P.keyboard.type(schluss, { delay: 15 });
   await heraus(schreiber.P);
   const gespeichert = await warteBis(schreiber.P, () => serverText(id).includes(schluss.trim()), 12000);
-  await warteBis(punkter.P, async () => (await gesperrt(punkter.P, id)) === 0, 12000);
+  // sobald die Karte dort frei ist, sofort punkten (die Maus steht schon über ihr)
+  const m = await kMitte(punkter.P, id);
+  await punkter.P.mouse.move(m.x, m.y);
+  await punkter.P.waitForFunction((k) => !document.querySelector(`[data-taste="live-sperre"][data-karte="${k}"]`), id, { timeout: 12000, polling: 20 }).catch(() => {});
+  await punkter.P.mouse.click(m.x, m.y);
   const vorPunkt = await sicht(punkter.P, id);
-  await tipp(punkter.P, id);
   steuerung.verwerfen.clear();
   await punkter.P.waitForTimeout(verzug + 800);
   steuerung.verzug.delete(punkter.name);
