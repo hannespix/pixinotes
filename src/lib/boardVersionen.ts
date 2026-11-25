@@ -28,9 +28,10 @@
  * Sonderweg, der Ordner oder Konto übergeht.
  */
 import { idbDel, idbGet, idbKeys, idbSet } from './syncFolder';
-import { persistHaken, useBoard, vorUmbauHaken, type BoardDoc, type CommentThread, type Stroke } from '../store';
+import { inDerived, persistHaken, useBoard, vorUmbauHaken, type BoardDoc, type CommentThread, type Stroke } from '../store';
 import type { AppNode } from '../types';
 import { inhaltGeaendert } from './kartenZeit';
+import { nachZug, zugLaeuft } from './zugAnzeige';
 import type { Edge } from '@xyflow/react';
 
 export type VersionGrund = 'verlassen' | 'automatisch' | 'sitzung' | 'manuell' | 'abgleich' | 'import' | 'ki' | 'wiederherstellen' | 'team';
@@ -423,11 +424,26 @@ export function initBoardVersionen(): void {
     }
   };
 
+  // M536: Die erste Änderung einer Sitzung ist oft der erste Schritt eines Zugs. Die Sicherung davor baut das ganze Board
+  // als JSON — mitten im Zug ein Ruckler (m525 S1 maß ihn als vollen Stand). Der Stand davor (`a`) ändert sich nie
+  // (Store-Objekte werden ersetzt, nicht verändert), also wird nach dem Zug im Leerlauf gesichert; vor dem Verdecken
+  // der Seite sofort.
+  const offen = new Map<string, BoardDoc>();
+  const leerlauf = (f: () => void) => (window.requestIdleCallback ? window.requestIdleCallback(f, { timeout: 5000 }) : setTimeout(f, 200));
+  const nachholen = () => { for (const [id, b] of offen) { offen.delete(id); void versionSichern(b, 'sitzung'); } };
+  // (nach dem Ablegen noch 1,5 s Ruhe: wer gleich weiterzieht, bekommt den Ruckler auch nicht im nächsten Zug)
+  const nachDemZug = () => nachZug(() => { setTimeout(los, 1500); });
+  const los = (): void => { if (zugLaeuft()) nachDemZug(); else leerlauf(() => (zugLaeuft() ? nachDemZug() : nachholen())); };
+  const spaeter = (a: BoardDoc) => { const neu = !offen.size; offen.set(a.id, a); if (neu) setTimeout(los, 1500); };
   // Was beim Start von selbst nachgetragen wird (Fristen, Seitenbreiten, Abgleich hat seinen eigenen Haken), ist keine
-  // Änderung des Nutzers — sonst entstünde bei jedem Start eine Version
+  // Änderung des Nutzers — sonst entstünde bei jedem Start eine Version.
+  // M536: Die Version „Sitzung" (Stand vor der ersten EIGENEN Änderung) löst auch später nichts aus, was von selbst
+  // entsteht (runDerived: Eingesammeltes, gemessene Höhen, erkannter Text) — gemessen: ein Kanban sammelte 4,4 s nach
+  // dem Start ein, und jeder Start legte eine Version „Sitzung" an.
   const bereitAb = Date.now() + 2500;
   useBoard.subscribe((s, prev) => {
     if (s.boards !== prev.boards && Date.now() >= bereitAb) {
+      const vonSelbst = inDerived();
       const alt = new Map(prev.boards.map((b) => [b.id, b]));
       for (const b of s.boards) {
         const a = alt.get(b.id);
@@ -435,7 +451,7 @@ export function initBoardVersionen(): void {
         if (a.nodes === b.nodes && a.edges === b.edges && a.drawings === b.drawings && a.comments === b.comments) continue;
         geaendert.add(b.id);
         // Der Stand vor der ersten Änderung dieser Sitzung — der wichtigste, wenn etwas schiefgeht
-        if (!basis.has(b.id)) { basis.add(b.id); void versionSichern(a, 'sitzung'); }
+        if (!vonSelbst && !basis.has(b.id)) { basis.add(b.id); spaeter(a); }
       }
     }
     const verlassen = prev.activeId !== s.activeId || (prev.view === 'board' && s.view !== 'board');
@@ -462,5 +478,5 @@ export function initBoardVersionen(): void {
     }
   })();
   window.setInterval(() => faelligeSichern('automatisch', false), 60_000);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') faelligeSichern('verlassen', true); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { nachholen(); faelligeSichern('verlassen', true); } });
 }
