@@ -42,11 +42,28 @@ type Gespeichert = { state: Record<string, unknown>; version?: number };
    ohne Gedächtnis — sollte je ein Objekt an Ort und Stelle verändert worden sein, steht spätestens dann das Richtige
    im Speicher. */
 let textVon = new WeakMap<object, string>();
+/* M536: Hat die Ablage (M532) Neues gesichert oder sich angemeldet, ändert sich der Text NUR dort, wo eine große
+   data-URL steht. Statt das ganze Gedächtnis zu verwerfen (dann schrieb der nächste Speichervorgang den ganzen Stand
+   neu — gemessen beim Ziehen direkt nach dem Start: ein voller Stand JSON, m525 S1), zählt eine Generation hoch, und
+   nur Texte mit `"data:` aus einer älteren Generation entstehen neu. */
+let ablageGen = 0;
+let mitDatenAus = new WeakMap<object, number>();
+const gemerkt = (v: object): string | undefined => {
+  const t = textVon.get(v);
+  if (t === undefined) return undefined;
+  const g = mitDatenAus.get(v);
+  return g !== undefined && g < ablageGen ? undefined : t;
+};
+const merken = (v: object, t: string): void => {
+  textVon.set(v, t);
+  if (t.includes('"data:')) mitDatenAus.set(v, ablageGen); else mitDatenAus.delete(v);
+};
+const gedaechtnisLeeren = (): void => { textVon = new WeakMap(); mitDatenAus = new WeakMap(); };
 const istObjekt = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
 const einzeln = (v: unknown): string => {
   if (v === null || typeof v !== 'object') return JSON.stringify(v, ersetzer) ?? 'null';
-  let t = textVon.get(v);
-  if (t === undefined) { t = JSON.stringify(v, ersetzer) ?? 'null'; textVon.set(v, t); }
+  let t = gemerkt(v);
+  if (t === undefined) { t = JSON.stringify(v, ersetzer) ?? 'null'; merken(v, t); }
   return t;
 };
 /** Objekt wie JSON.stringify — `eigen` liefert für ausgewählte Felder einen eigenen Text (sonst undefined) */
@@ -69,10 +86,10 @@ const karteText = (n: unknown): string => (istObjekt(n) && istObjekt(n.data)
   : JSON.stringify(n, ersetzer) ?? 'null');
 const boardText = (b: unknown): string => {
   if (!istObjekt(b)) return JSON.stringify(b, ersetzer) ?? 'null';
-  let t = textVon.get(b);
+  let t = gemerkt(b);
   if (t === undefined) {
     t = objektText(b, (k, v) => (k === 'nodes' ? liste(v, karteText) : k === 'edges' || k === 'drawings' || k === 'comments' ? liste(v, einzeln) : undefined));
-    textVon.set(b, t);
+    merken(b, t);
   }
   return t;
 };
@@ -88,12 +105,12 @@ let ersetzer = (_k: string, v: unknown): unknown => {
 /** ablage.ts meldet sich an: ab jetzt lagert der Speicher aus (Gedächtnis verwerfen, einmal neu schreiben) */
 export function ablageAnmelden(f: (k: string, v: unknown) => unknown, nachSichern: { an: () => void }): void {
   ersetzer = f;
-  textVon = new WeakMap();
-  nachSichern.an = () => { textVon = new WeakMap(); if (writerRole === 'writer') reassertPersist(); };
+  ablageGen += 1;   // M536: nur Texte mit data-URL entstehen neu (s. o.)
+  nachSichern.an = () => { ablageGen += 1; if (writerRole === 'writer') reassertPersist(); };
   if (writerRole === 'writer') setTimeout(reassertPersist, 0);
 }
-/** Gemerkten Text verwerfen (die Ablage hat Neues als gesichert übernommen) */
-export const gedaechtnisVerwerfen = (): void => { textVon = new WeakMap(); };
+/** Die Ablage hat Neues als gesichert übernommen: gemerkte Texte mit data-URL gelten nicht mehr (M536: nur diese) */
+export const gedaechtnisVerwerfen = (): void => { ablageGen += 1; };
 /**
  * Einen Stand von außen (Konto, Ordner, WebDAV) VOR dem Übernehmen in die Ablage legen: Dann trägt schon das erste
  * Speichern nach dem Einarbeiten Verweise statt der Bilder — und scheitert nicht am vollen localStorage.
@@ -207,7 +224,7 @@ const ABWEICHUNG = 'M525: gemerkter Speichertext weicht vom Stand ab';
 let ungeprueft: { key: string; wert: Gespeichert } | null = null;
 function abweichung(): void {
   speicherZaehler.abweichungen += 1;
-  textVon = new WeakMap();   // dem Gedächtnis ist nicht mehr zu trauen
+  gedaechtnisLeeren();   // dem Gedächtnis ist nicht mehr zu trauen
   console.error('PixiNotes: Speichertext wich vom Stand ab (M525), neu geschrieben.');
   // Im Prüfbetrieb laut scheitern (die Prüfreihen sammeln Seitenfehler) — geschrieben ist der richtige Stand trotzdem
   if (pruefenAn()) setTimeout(() => { throw new Error(ABWEICHUNG); }, 0);
