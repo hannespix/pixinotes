@@ -18,6 +18,9 @@ export function kantenScheibe(_set: Setzen, get: Holen, patchActive: AufsOffene)
     },
 
     onConnect: (connection) => {
+      // M521: Auf der eigenen Karte losgelassen — eine Verbindung von einer Karte zu sich selbst wird nirgends
+      // gezeichnet, lag aber im Board (und als leerer Rückgängig-Schritt im Verlauf)
+      if (connection.source === connection.target) return;
       get().pushHistory();
       patchActive((b) => ({
         edges: addEdge({ ...connection, type: 'labeled', data: { label: '', kind: 'arrow' } }, b.edges),
