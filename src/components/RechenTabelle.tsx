@@ -5,12 +5,13 @@
  * ersten Tabelle, die gezeichnet wird, bzw. still im Leerlauf nach dem Start (App.tsx, `imLeerlaufVorladen`).
  * Bis es da ist, steht ein Platzhalter in Zeilen und Spalten der Tabelle — die Notiz springt nicht.
  */
-import { lazy, Suspense } from 'react';
+import { nachLazy } from '../lib/nachLazy';
+import { Suspense } from 'react';
 import { createReactBlockSpec } from '@blocknote/react';
 import { IPlus, ISigma, IX } from './Icons';
 
 export const rechenTabelleLaden = () => import('./RechenTabelleGitter');
-const GitterSpaet = lazy(() => rechenTabelleLaden().then((m) => ({ default: m.Gitter })));
+const GitterSpaet = nachLazy(() => rechenTabelleLaden().then((m) => ({ default: m.Gitter })));
 
 /**
  * Gleiche Gestalt wie das Raster — Zeilen × Spalten aus denselben Bausteinen und die Leiste mit denselben Knöpfen

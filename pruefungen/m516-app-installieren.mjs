@@ -248,7 +248,9 @@ const UA = {
 for (const [name, ua, muster, grund] of [
   ['edge', UA.edge, /Diese Website als App installieren/, /edge:\/\/policy/],
   ['iphone', UA.iphone, /Zum Home-Bildschirm/, null],
-  ['firefox', UA.firefox, /Firefox installiert Web-Apps am Computer nicht/, null],
+  // M534: Firefox unter Windows heftet Web-Apps an die Taskleiste (neuere Fassungen) — Linux/Mac weiter „installiert nicht"
+  ['firefox', UA.firefox, /Zur Taskleiste hinzufügen/, null],
+  ['firefox-linux', UA.firefox.replace('Windows NT 10.0; Win64; x64', 'X11; Linux x86_64'), /Firefox installiert Web-Apps am Computer nicht/, null],
 ]) {
   const { ctx, P } = await neueSeite({ userAgent: ua });
   await (await eintragImDock(P)).click();

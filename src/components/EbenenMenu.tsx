@@ -1,11 +1,12 @@
-import { lazy, Suspense, useEffect, useRef, useState, useLayoutEffect } from 'react';
+import { nachLazy } from '../lib/nachLazy';
+import { Suspense, useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useBoard, type BoardSortierung } from '../store';
 import { useEscSchliesst } from '../lib/useEscSchliesst';
 import { boardToShareUrl, downloadBoardFile, hatAblageInhalt, SHARE_URL_LIMIT } from '../lib/share';
 import { FreigabeDialogSpaet } from './FreigabeHost';
 // M459: „Per Link teilen" (mit Konto-Anfragen) kommt erst beim Öffnen
-const LinkDialog = lazy(() => import('./LinkDialog').then((m) => ({ default: m.LinkDialog })));
+const LinkDialog = nachLazy(() => import('./LinkDialog').then((m) => ({ default: m.LinkDialog })));
 import {
   IArchive, IArchiveRestore, ICopy, IDownload, IDuplicate, IMore, IMoveTo,
   IPen, IPerson, IPlay, IPlus, IShare, ITrash, IReihenfolge, ICheck, IUsers, IX, IUhr,

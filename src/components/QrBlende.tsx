@@ -4,6 +4,7 @@
 // weiterarbeitet (die Ecke lässt sich verschieben und bleibt auch über der Folien-Präsentation stehen). Der Code
 // trägt den Einladungslink des Boards; wer ihn scannt, landet im Board (mit „auch ohne Konto": sofort).
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { escDarueber } from '../lib/fensterEsc';
 import { useBoard } from '../store';
 import { EINLADUNG_EREIGNIS, TEILNEHMER_EREIGNIS, teilnehmerVon } from '../lib/liveStand';
 import { qrBild, qrWunschFuer, qrZeigen, type QrBild, type QrWunsch } from '../lib/qr';
@@ -50,7 +51,8 @@ export function QrBlende({ wunsch, onClose }: { wunsch: QrWunsch; onClose: () =>
   // beenden, nicht den Code.
   useEffect(() => {
     if (ecke) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    // M534: Liegt ein anderes Fenster darüber (Alt+H, Alt+E), gehört Esc ihm
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !escDarueber(kasten.current, e, '.qr-blende')) { e.stopPropagation(); onClose(); } };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [ecke, onClose]);

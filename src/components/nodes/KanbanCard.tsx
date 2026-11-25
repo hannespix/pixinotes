@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { nachLazy } from '../../lib/nachLazy';
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '@xyflow/react';
 import { konfettiWerfen } from '../../lib/konfetti';
@@ -26,9 +27,9 @@ import { liveVerbunden } from '../../lib/liveStand';
 import { ticketsSetzen, useKanbanLive } from '../../lib/kanbanLive';
 
 /** M487: Titel und Beschreibung eines Tickets gemeinsam tippen — nachgeladen, nur im Live-Board (./KanbanGemeinsam.tsx) */
-const KanbanFeld = lazy(() => import('./KanbanGemeinsam'));
+const KanbanFeld = nachLazy(() => import('./KanbanGemeinsam'));
 /** M498: hält im Live-Board die gemeinsame Sitzung der Karte (Felder, Checkliste, Reihenfolge) — ebenfalls nachgeladen */
-const KanbanHalter = lazy(() => import('./KanbanGemeinsam').then((m) => ({ default: m.KanbanHalter })));
+const KanbanHalter = nachLazy(() => import('./KanbanGemeinsam').then((m) => ({ default: m.KanbanHalter })));
 
 const TAG_RE = /#([\p{L}\d_-]{2,20})/gu;
 const TAG_MS = 86_400_000;

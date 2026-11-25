@@ -8,12 +8,13 @@
  * das erste Bild auf einem Board erschienen ist — dann stehen sie beim ersten Klick ohne Verzug, und der Service
  * Worker hat sie auch offline.
  */
-import { lazy, Suspense, type ComponentProps } from 'react';
+import { nachLazy } from '../../lib/nachLazy';
+import { Suspense, type ComponentProps } from 'react';
 
 const lupeLaden = () => import('./BildLupe');
 const chipsLaden = () => import('./BildTextChips');
-const Lupe = lazy(() => lupeLaden().then((m) => ({ default: m.BildLupe })));
-const Chips = lazy(() => chipsLaden().then((m) => ({ default: m.BildTextChips })));
+const Lupe = nachLazy(() => lupeLaden().then((m) => ({ default: m.BildLupe })));
+const Chips = nachLazy(() => chipsLaden().then((m) => ({ default: m.BildTextChips })));
 
 export const BildLupe = (p: ComponentProps<typeof Lupe>) => <Suspense fallback={null}><Lupe {...p} /></Suspense>;
 export const BildTextChips = (p: ComponentProps<typeof Chips>) => <Suspense fallback={null}><Chips {...p} /></Suspense>;
