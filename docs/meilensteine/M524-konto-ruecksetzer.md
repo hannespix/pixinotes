@@ -129,6 +129,13 @@ steuern den Dauerlauf, `M524_BOARD=<Export>` nimmt statt des eingebauten Boards 
   Ausgangsverkehr im Alltag; M524 ändert daran nur, dass ruhende Geräte keine zusätzlichen Runden mehr auslösen und
   die Tool-Dateien nicht mehr mitreisen.
 
+- **Schreiben, je Weg:** Beim PixiNotes-Konto reist je Änderung die geänderte Karte (`board_aendern`); die
+  Entprellung hat dort eine Obergrenze von 6 s. Google Drive und OneDrive kennen nur ganze Dateien — dort reist je
+  Änderung das ganze Board, und es bleibt bei „erst nach der Pause" (keine Obergrenze, sonst lüde ein großes Board
+  alle sechs Sekunden ganz hoch).
+- **Merkzeichen:** `merkeUngesichert` (syncFolder.ts) schreibt „hier liegt Ungesichertes" nur, wenn es noch nicht
+  steht — vorher sechs Speicher-Schreibvorgänge je Store-Änderung (Ordner, WebDAV, Konto zusammen).
+
 ## Grenzen / offen
 - **Entscheidung des Besitzers (Verkehr/Kosten):** Bei jeder fremden Änderung die ganze Board-Zeile zu lesen, kostet
   bei drei offenen Geräten und einem 0,65-MB-Board rund 1,3 MB Ausgangsverkehr je Änderung. Abhilfen wären ein
