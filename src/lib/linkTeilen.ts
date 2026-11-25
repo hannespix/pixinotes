@@ -19,6 +19,7 @@ const kontoDateiNachladen = (id: string): Promise<Blob | null> => kontoDateiHole
 import { supabaseKonfig } from './kontoSupabase';
 import { ohneAuswahl } from './syncMerge';
 import { cloneSharedBoard, parseBoardPayload } from './share';
+import { gestaltLaden } from './sicher';
 
 const BUCKET = 'pixinotes';
 /** Signierte Adressen gelten zehn Jahre — der Link endet, wenn der Besitzer ihn löscht (dann sind die Dateien weg) */
@@ -172,6 +173,7 @@ export async function linkOeffnen(token: string, neuerLaden: (name: string) => b
   const board = parseBoardPayload(roh);
   if (!board) throw new Error('Die geteilte Fassung ist beschädigt.');
   const ids = new Map<string, string>();
+  await gestaltLaden().catch(() => null);   // M522: die Gestalt-Prüfung für cloneSharedBoard
   const kopie = cloneSharedBoard(board, ids);
   st.importBoard(kopie);
   const neu = useBoard.getState().activeId;

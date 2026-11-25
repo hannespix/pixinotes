@@ -217,6 +217,11 @@ export function abgleichScheibe(set: Setzen, get: Holen) {
       // Boards des Projekts komplett durch das Paket ersetzen — Boards, die das
       // Team entfernt hat, verschwinden auch lokal; alle fremden Boards bleiben
       const incoming = new Set(boards.map((b) => b.id));
+      // M522: Ein Board aus dem Paket steht nur noch in DIESEM Projekt. Lag es hier inzwischen in einem anderen
+      // (verschoben), stand es danach in zwei Projekten zugleich — in Baum und Übersicht doppelt.
+      spaces = spaces.map((sp) => (sp.projects.some((p) => p.id !== proj.id && p.boardIds.some((id) => incoming.has(id)))
+        ? { ...sp, projects: sp.projects.map((p) => (p.id === proj.id ? p : { ...p, boardIds: p.boardIds.filter((id) => !incoming.has(id)) })) }
+        : sp));
       const kept = s.boards.filter((b) => !incoming.has(b.id) && !oldIds.includes(b.id));
       const nextBoards = [...kept, ...boards];
       markImported(nextBoards, spaces);

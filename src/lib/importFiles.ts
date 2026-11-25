@@ -15,6 +15,7 @@ import { canEmbed, makeCalendar, makeEmail, makeFile, makeHtmlApp, makeImage, ma
 // dem Deploy nicht auffindbar (dieselbe Falle wie beim Mermaid-Modul, M90).
 import { docxToBlocks } from './docx';
 import { boardDateienUebernehmen, cloneSharedBoard, parseBoardDatei } from './share';
+import { gestaltLaden } from './sicher';
 import { sicherungEinspielenOeffnen } from './sicherungTakt';
 import type { IcsEvent } from './ics';
 import { vcardLesen, vcardText, VCARD_MAX } from './vcard';
@@ -204,6 +205,7 @@ export async function importFilesToBoard(
         const shared = datei?.board;
         if (shared) {
           const idMap = new Map<string, string>();
+          await gestaltLaden().catch(() => null);   // M522: die Gestalt-Prüfung für cloneSharedBoard
           useBoard.getState().importBoard(cloneSharedBoard(shared, idMap));
           void boardDateienUebernehmen(datei?.dateien, idMap);   // M390: große Dateien und Tools aus der Datei
           showToast(`Geteiltes Board „${shared.name}" importiert`);

@@ -11,12 +11,12 @@
 //   Nextcloud liefert die standardmäßig NICHT — dann muss die IT die Origin
 //   freigeben, oder man nutzt den Sync-Ordner (Desktop-Client) bzw. Export.
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard } from '../store';
+import { standGeprueft } from './sicher';
 import {
   basisMerken, basisVergessen, buildSyncPayloadMitDateien, DATEI_BUDGET_MB, emitSyncStatus, fremdStandEinarbeiten,
   KONTO_DIRTY_KEY, notiereAenderung, SYNC_DIRTY_KEY, uebernimmDateien, WEBDAV_DIRTY_KEY, type SyncPayload, type SyncWeg,
 } from './syncFolder';
 import { nurAuswahlAnders } from './syncMerge';
-import { sprache } from './sprache';
 
 const LS_KEY = 'pixinotes-webdav';
 const STAMP_KEY = 'pixinotes:webdav-stamp';
@@ -97,77 +97,7 @@ async function friendly(e: unknown, cfg: WebdavConfig): Promise<Error> {
 
 const apple = (): boolean => /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Mac/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 
-/**
- * Fertiger Text für die IT — nennt die konkrete Herkunft dieser Installation
- * und exakt die Header, die der Server für PixiNotes liefern muss. Bewusst
- * OHNE Zugangsdaten: Benutzername und App-Passwort haben in so einer Mail
- * nichts verloren und stehen deshalb auch nicht drin.
- */
-export function corsRequestText(cfg: WebdavConfig | null): string {
-  // M381: Läuft die Oberfläche englisch, geht die Bitte an die IT englisch hinaus (eigene Fassung statt Zeile für Zeile)
-  if (sprache() === 'en') {
-    const h = cfg?.url ? cfg.url.replace(/^https?:\/\//, '').split('/')[0] : 'our Nextcloud';
-    return [
-      'Subject: CORS for WebDAV (browser access to ' + h + ')',
-      '',
-      'Hello,',
-      '',
-      `I use the web application PixiNotes and would like to store my notes via WebDAV in our Nextcloud (${h}).`,
-      'The browser aborts the connection because the server sends no CORS headers for /remote.php/dav.',
-      'The application runs entirely in the browser; no additional server is involved and no data is passed on to third parties.',
-      '',
-      `Origin that would need to be allowed: ${location.origin}`,
-      '',
-      'The following response headers are needed for /remote.php/dav:',
-      `  Access-Control-Allow-Origin: ${location.origin}`,
-      '  Access-Control-Allow-Methods: GET, PUT, OPTIONS',
-      '  Access-Control-Allow-Headers: Authorization, Content-Type, If-Match',
-    '  Access-Control-Expose-Headers: ETag',
-      '  Access-Control-Max-Age: 600',
-      'The OPTIONS request (preflight) must be answered with 200/204 without authentication —',
-      'otherwise it fails before the credentials are sent at all.',
-      '',
-      'In Nextcloud this can also be done without touching the server configuration, using the app',
-      '“WebAppPassword”: the origin above is entered there.',
-      '',
-      'PixiNotes only uses GET and PUT on a single JSON file in the given folder and signs in with an',
-      'app password (not the account password). No cookies are set.',
-      '',
-      'Thank you!',
-    ].join('\n');
-  }
-  const host = cfg?.url ? cfg.url.replace(/^https?:\/\//, '').split('/')[0] : 'unsere Nextcloud';
-  return [
-    'Betreff: CORS-Freigabe für WebDAV (Browser-Zugriff auf ' + host + ')',
-    '',
-    'Hallo zusammen,',
-    '',
-    'ich nutze die Web-Anwendung PixiNotes und möchte meine Notizen per WebDAV in',
-    `unserer Nextcloud (${host}) ablegen. Der Browser bricht die Verbindung ab, weil der`,
-    'Server keine CORS-Header für /remote.php/dav liefert. Die Anwendung läuft rein im',
-    'Browser, es ist kein zusätzlicher Server beteiligt und es werden keine Daten an',
-    'Dritte übertragen.',
-    '',
-    `Herkunft (Origin), die freigegeben werden müsste: ${location.origin}`,
-    '',
-    'Benötigt werden für /remote.php/dav folgende Antwort-Header:',
-    `  Access-Control-Allow-Origin: ${location.origin}`,
-    '  Access-Control-Allow-Methods: GET, PUT, OPTIONS',
-    '  Access-Control-Allow-Headers: Authorization, Content-Type',
-    '  Access-Control-Max-Age: 600',
-    'Die OPTIONS-Anfrage (Preflight) muss dabei ohne Anmeldung mit 200/204 beantwortet',
-    'werden, sonst schlägt sie fehl, bevor die Anmeldedaten überhaupt gesendet werden.',
-    '',
-    'In Nextcloud lässt sich das auch ohne Eingriff in die Server-Konfiguration über die',
-    'App „WebAppPassword" erledigen: dort wird die oben genannte Herkunft eingetragen.',
-    '',
-    'PixiNotes verwendet nur GET und PUT auf eine einzelne JSON-Datei im angegebenen',
-    'Ordner und meldet sich mit einem App-Passwort an (nicht mit dem Kennwort des',
-    'Kontos). Es werden keine Cookies gesetzt.',
-    '',
-    'Vielen Dank!',
-  ].join('\n');
-}
+// corsRequestText (die fertige Bitte an die IT) liegt in lib/webdavCorsText.ts — nur die Einstellungen brauchen sie (M522)
 
 /**
  * M390: Schreiben mit Vorbedingung.
@@ -207,7 +137,7 @@ export async function webdavRead(cfg: WebdavConfig): Promise<SyncPayload | null>
   if (!res.ok) throw new Error(`WebDAV: HTTP ${res.status}`);
   const p = (await res.json()) as SyncPayload;
   if (p?.app !== 'pixinotes' || !Array.isArray(p.boards) || p.boards.length === 0 || !Array.isArray(p.spaces)) return null;
-  return p;
+  return standGeprueft(p);   // M522: Gestalt prüfen — null, wenn kein gültiges Board darin ist
 }
 
 /** Aktuellen Stand hochladen (Allow-List-Payload — ohne Einstellungen/Schlüssel). */
