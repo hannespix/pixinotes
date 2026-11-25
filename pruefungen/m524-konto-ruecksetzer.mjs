@@ -769,10 +769,12 @@ if (will('D')) {
     const ist = await lagenVon(g.P);
     pruefe(`D3 Gerät ${g.name} zeigt denselben Stand`, abw(ist).length === 0, zeige(ist));
   }
-  // Wer hat welche Karte geschrieben? Ein Gerät schreibt nur, was es selbst geändert hat — höchstens Zeit- und
-  // Merkfelder (lib/abgleichZeiten.ts) reicht es zu fremden Karten nach, nie Lage oder Inhalt
+  // Wer hat welche Karte geschrieben? Ein Gerät schreibt nur, was es selbst geändert hat. Zu fremden Karten reicht
+  // es höchstens nach, was auf jedem Gerät von selbst entsteht: Zeit- und Merkfelder (lib/abgleichZeiten.ts) und den
+  // Text, den es selbst in einem Bild erkannt hat — nie Lage oder Inhalt.
+  const VON_SELBST = ['data.ocrAm', 'data.ocrText', 'data.ocrFuer', 'geaendert'];
   const karten = (info) => [...info.matchAll(/([\w-]+)\[[^:\]]*: ?([^\]]*)\]/g)].map((t) => ({ id: t[1], felder: t[2].split(',').filter(Boolean) }));
-  const inhalt = (k) => k.felder.some((f) => f !== 'data.ocrAm' && f !== 'geaendert');
+  const inhalt = (k) => k.felder.some((f) => !VON_SELBST.includes(f));
   const vonC = seit(m0, (e) => e.geraet === 'C' && e.status === 200 && (e.art === 'stapel' || (e.art === 'patch' && karten(e.info).some(inhalt))));
   pruefe('D4 das ruhende Gerät hat weder Lage noch Inhalt geschrieben', vonC.length === 0, `\n${zeigeProtokoll(vonC, 8)}`);
   const vonB = seit(m0, (e) => e.geraet === 'B' && e.status === 200 && e.art === 'patch' && karten(e.info).some((k) => inhalt(k) && !B_IDS.includes(k.id)));

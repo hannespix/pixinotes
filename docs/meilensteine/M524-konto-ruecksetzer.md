@@ -148,8 +148,11 @@ steuern den Dauerlauf, `M524_BOARD=<Export>` nimmt statt des eingebauten Boards 
   wäre ein optionaler Parameter `p_wenn_umgebung bigint` (Fehler „vorbedingung", wenn die Umgebung des Besitzers
   inzwischen eine andere Version hat) oder ein Patch je Feld. Das ist eine Migration; hier ist nichts am Server
   geändert. Ohne sie bleibt ein Fenster von einer Anfrage-Laufzeit (vorher: Sekunden bis Minuten).
-- Zeit- und Merkfelder (`ocrAm`, Ticket-Zeiten): Der spätere Wert gilt (M472); ein ruhendes Gerät reicht ihn weiter
-  nach — als Patch der ganzen Karte, unmittelbar nach einem frischen Lesen. Lage und Inhalt schreibt es nicht.
+- Was auf jedem Gerät von selbst entsteht, reicht auch ein ruhendes Gerät weiter nach: Zeit- und Merkfelder
+  (`ocrAm`, Ticket-Zeiten — der spätere Wert gilt, M472) und den Text, den es selbst in einem Bild erkannt hat. Das
+  geschieht nicht mehr von allein, sondern erst, wenn es ohnehin einen fremden Stand eingearbeitet hat — als Patch der
+  ganzen Karte, unmittelbar nach dem frischen Lesen und dem Mini-Abruf. Lage und Inhalt schreibt es nicht. Ganz
+  abstellen hieße: Erkannter Text reist nur noch mit einer echten Änderung (Entscheidung, berührt M452/M472).
 - Der gemerkte Ring der letzten Server-Stände (`konto:basen`, sechs ganze Stände) wird bei jedem Lesen und Schreiben
   ganz gelesen und geschrieben; bei Boards mit großen eingebetteten Bildern sind das mehrere Megabyte je Abgleich.
   Nicht angefasst (Leistung → M525).
