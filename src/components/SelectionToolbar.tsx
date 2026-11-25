@@ -23,7 +23,7 @@ import { wurzelZoom } from '../lib/anzeige';
 // von Hand gepflegte Kopie der Schriftliste.
 import { FONT_STACKS, GROESSEN_KARTE, SCHRIFTEN } from '../lib/typo';
 import { ALIGN_LABEL, ALIGN_MIN, computeAlign, type AlignOp } from '../lib/align';
-import { sizeOf } from '../lib/arrange';
+import { frameMembers, sizeOf } from '../lib/arrange';
 import { istDrehbar, winkelVon } from '../lib/drehung';
 import {
   IKanteLinks, IKanteMitteX, IKanteRechts, IKanteOben, IKanteMitteY, IKanteUnten, IVerteilenX, IVerteilenY, IAlsZeile, IAlsSpalte,
@@ -34,7 +34,7 @@ import { bildBearbeitbar, bildBearbeiten } from './BildEditorHost';
 import { BildTextMenue } from './BildTextMenue';
 import { mutedHistory } from '../store';
 import { vorWann, zeitLang, zeitVon } from '../lib/kartenZeit';
-import { arrangeFrameInside, FRAME_COLORS } from '../lib/frameOps';
+import { arrangeFrameInside, FRAME_COLORS, rahmenAnpassen, rahmenAuto, rahmenAutoSetzen } from '../lib/frameOps';
 import type { ArrangeMode } from '../lib/arrange';
 import { KARTEN_EREIGNIS, kartenWunschNehmen } from '../lib/kontextmenue';
 import { zahlWort } from '../lib/sprache';
@@ -292,9 +292,24 @@ export function SelectionToolbar() {
     mutedHistory(() => { for (const n of selected) fn(n); });
   };
   const selFrames = board.nodes.filter((n) => n.selected && n.type === 'frame');
+  /**
+   * M542: Rahmen ordnen sich an wie Karten — samt Inhalt. Was in einem gewählten Rahmen liegt (auch ein kleinerer
+   * gewählter Rahmen), geht mit ihm und zählt nicht für sich; sonst bewegte es sich doppelt.
+   */
+  const einheitenAus = (nodes: AppNode[]) => {
+    const rahmen = nodes.filter((n) => n.selected && n.type === 'frame');
+    const drin = new Set(rahmen.flatMap((f) => frameMembers(f, nodes, true, true).map((m) => m.id)));
+    const aussen = rahmen.filter((f) => !drin.has(f.id));
+    const inhalt = new Map<string, string>();   // Mitglied → Rahmen, der es mitnimmt
+    for (const f of aussen) for (const m of frameMembers(f, nodes, true, true)) if (!inhalt.has(m.id)) inhalt.set(m.id, f.id);
+    return { einheiten: [...aussen, ...nodes.filter((n) => n.selected && n.type !== 'frame' && !drin.has(n.id))], inhalt };
+  };
+  const einheitenZahl = selFrames.length ? einheitenAus(board.nodes).einheiten.length : selected.length;
   /** M399: Ein Anordnungs-Befehl auf die Auswahl – ein Rückgängig-Schritt, gleich wie viele Karten sich bewegen */
   const anordnen = (op: AlignOp, offenLassen = false) => {
-    const { moves, resizes } = computeAlign(selected, op);
+    const nodes = selectActiveBoard(useBoard.getState()).nodes;
+    const { einheiten, inhalt } = einheitenAus(nodes);
+    const { moves, resizes } = computeAlign(einheiten, op);
     if (moves.length === 0 && resizes.length === 0) {
       if (!offenLassen) { setMenu(null); showToast('Die Karten stehen schon so.'); }
       return;
@@ -302,11 +317,18 @@ export function SelectionToolbar() {
     const st = useBoard.getState();
     st.pushHistory();
     mutedHistory(() => {
-      // Eine von Hand gesetzte Höhe soll bleiben: wie beim Ziehen am Griff endet die Auto-Größe
-      const hoehe = resizes.filter(([rid, , h]) => Math.abs(h - sizeOf(selected.find((n) => n.id === rid)!).h) > 0.01).map(([rid]) => rid);
+      // Eine von Hand gesetzte Höhe soll bleiben: wie beim Ziehen am Griff endet die Auto-Größe (Rahmen haben keine)
+      const hoehe = resizes.filter(([rid, , h]) => { const n = einheiten.find((k) => k.id === rid)!; return n.type !== 'frame' && Math.abs(h - sizeOf(n).h) > 0.01; }).map(([rid]) => rid);
       if (hoehe.length) st.setAutoFit(hoehe, false);
       for (const [rid, w, h] of resizes) st.resizeNode(rid, w, h);
-      if (moves.length) st.setNodePositions(moves);
+      // M542: Ein Rahmen nimmt seinen Inhalt mit — außer bei Größer/Kleiner: dort dehnt er sich nur um seine Mitte
+      const mit = op === 'bigger' || op === 'smaller' ? [] : moves.flatMap(([rid, x, y]) => {
+        const f = einheiten.find((k) => k.id === rid);
+        if (f?.type !== 'frame') return [];
+        const dx = x - f.position.x; const dy = y - f.position.y;
+        return nodes.filter((n) => inhalt.get(n.id) === rid).map((n) => [n.id, n.position.x + dx, n.position.y + dy] as [string, number, number]);
+      });
+      if (moves.length) st.setNodePositions([...moves, ...mit]);
     });
     if (offenLassen) return;
     setMenu(null);
@@ -332,7 +354,7 @@ export function SelectionToolbar() {
       data-anordnen={op}
       title={ALIGN_LABEL[op]}
       aria-label={ALIGN_LABEL[op]}
-      disabled={selected.length < (ALIGN_MIN[op] ?? 2)}
+      disabled={einheitenZahl < (ALIGN_MIN[op] ?? 2)}
       onClick={() => anordnen(op, offenLassen)}
     ><Bild size={17} /></button>
   );
@@ -577,8 +599,33 @@ export function SelectionToolbar() {
                 <>
                   <button data-taste="rahmen-duplizieren" onClick={() => { setMenu(null); duplicate(); }}><IDuplicate size={14} /> Duplizieren{taste('duplizieren') && <kbd className="kontext-taste">{taste('duplizieren')}</kbd>}</button>
                   {boards.length > 1 && <button data-taste="rahmen-verschieben" onClick={() => setMenu('move')}><IMoveTo size={14} /> In Board verschieben …</button>}
+                  {/* M542: mehrere Rahmen ausrichten, verteilen, gleich groß — dasselbe Menü wie bei Karten */}
+                  {einheitenZahl >= 2 && (
+                    <button data-taste="rahmen-anordnen" onClick={() => setMenu('align')} title="Rahmen ausrichten, verteilen, gleiche Größe, Raster – samt Inhalt"><IArrange size={14} /> Anordnen …</button>
+                  )}
                 </>
               )}
+              {/* M542: Größe nach dem Inhalt — einmal anpassen oder dauerhaft mitwachsen (wie die Auto-Größe der Karten) */}
+              <div className="sel-attr-title">Größe</div>
+              <button data-taste="rahmen-anpassen" onClick={() => { setMenu(null); rahmenAnpassen(selFrames.map((f) => f.id)); }} title="Der Rahmen umschließt genau seine Karten – mit Innenabstand">
+                <IMaximize size={14} /> An Inhalt anpassen
+              </button>
+              {(() => {
+                const alleAuto = selFrames.every(rahmenAuto);
+                return (
+                  <button
+                    data-taste="rahmen-auto"
+                    className={alleAuto ? 'on' : ''}
+                    aria-pressed={alleAuto}
+                    onClick={() => { setMenu(null); rahmenAutoSetzen(selFrames.map((f) => f.id), !alleAuto); }}
+                    title={alleAuto
+                      ? 'Auto-Größe ist AN: Der Rahmen wächst mit seinem Inhalt (schrumpft nie von selbst)'
+                      : 'Auto-Größe: Der Rahmen wächst mit, wenn Karten hineinkommen oder größer werden'}
+                  >
+                    <IFit size={14} /> Auto-Größe {alleAuto ? 'AUS' : 'AN'}
+                  </button>
+                );
+              })()}
               <div className="sel-attr-title">Inhalt anordnen</div>
               <button onClick={() => frameArrange('flow')}><IFlowH size={14} /> Fluss horizontal</button>
               <button onClick={() => frameArrange('flowV')}><IFlowV size={14} /> Fluss vertikal</button>
@@ -608,10 +655,11 @@ export function SelectionToolbar() {
           <button
             className={menu === 'frame' ? 'ai-on' : ''}
             data-smbtn
+            data-taste="rahmen-menue"
             onClick={toggleMenu('frame')}
             aria-haspopup="true"
             aria-expanded={menu === 'frame'}
-            title="Rahmen: Inhalt anordnen · Tönung · Umbenennen"
+            title="Rahmen: Größe · Inhalt anordnen · Tönung · Umbenennen"
           ><IGridLayout size={15} /><span className="sel-label"> Rahmen</span></button>
         </span>
       )}
@@ -703,7 +751,7 @@ export function SelectionToolbar() {
           ))}
         </span>
       )}
-      {selected.length >= 2 && (
+      {einheitenZahl >= 2 && (
         <span className="sel-ai-wrap">
           {menu === 'align' && menuPortal('anordnen-menu', (
             <>
@@ -953,7 +1001,7 @@ export function SelectionToolbar() {
                     <IWand size={14} /> KI-Aktionen …
                   </button>
                 )}
-                {selected.length >= 2 && (
+                {einheitenZahl >= 2 && (
                   <button onClick={() => setMenu('align')} title="Ausrichten, verteilen, gleiche Größe, Raster" aria-label="Anordnen" data-taste="anordnen-auf">
                     <IArrange size={14} /> Anordnen …
                   </button>
