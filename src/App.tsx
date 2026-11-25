@@ -1,5 +1,6 @@
-import { QR_EREIGNIS, type QrWunsch } from './lib/qr';
-import { lazy, Suspense, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { QR_EREIGNIS } from './lib/qr';
+import { lazy, Suspense, useEffect, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react';
+import { nachLazy } from './lib/nachLazy';
 import { ReactFlowProvider } from '@xyflow/react';
 import { auswahlLeisteLaden, Board, kartenVorladen, kommentareLaden } from './components/Board';
 import { Dock } from './components/Dock';
@@ -69,12 +70,9 @@ const ladeHilfe = async () => {
   if (en) m.hilfeEnglischSetzen(en);
   return { default: m.HelpOverlay };
 };
-const HelpOverlayLazy = lazy(ladeHilfe);
+const HelpOverlayLazy = nachLazy(ladeHilfe);
 function Hilfe() {
-  const offen = useBoard((s) => s.helpOpen);
-  const [geladen, setGeladen] = useState(false);
-  useEffect(() => { if (offen) setGeladen(true); }, [offen]);
-  return offen || geladen ? <Suspense fallback={null}><HelpOverlayLazy /></Suspense> : null;
+  return <BeiBedarf offen={useBoard((s) => s.helpOpen)}><HelpOverlayLazy /></BeiBedarf>;
 }
 
 /**
@@ -82,12 +80,27 @@ function Hilfe() {
  * Danach bleibt es eingehängt: Reiter und Eingaben überleben das Schließen wie zuvor.
  */
 const ladeEinstellungen = () => import('./components/Settings').then((m) => ({ default: m.Settings }));
-const SettingsLazy = lazy(ladeEinstellungen);
+const SettingsLazy = nachLazy(ladeEinstellungen);
 function Einstellungen() {
-  const offen = useBoard((s) => s.settingsOpen);
-  const [geladen, setGeladen] = useState(false);
-  useEffect(() => { if (offen) setGeladen(true); }, [offen]);
-  return offen || geladen ? <Suspense fallback={null}><SettingsLazy /></Suspense> : null;
+  return <BeiBedarf offen={useBoard((s) => s.settingsOpen)}><SettingsLazy /></BeiBedarf>;
+}
+
+/**
+ * M534: Dialoge, die auf ein Ereignis aufgehen (Vorlagen, Versionen, Sicherung, App installieren, Outlook, Eingang,
+ * QR). Vorher hatte jeder seinen eigenen Zuhörer samt Zustand — dieselben zwölf Zeilen siebenmal im Start-Paket.
+ * `wie` macht aus dem Ereignis die Angaben für den Dialog (null = zu), `n` zählt die Aufrufe, `k` setzt ihn neu auf.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Wie = (d: any, n: number) => ({ k?: string; n?: number } & Record<string, unknown>) | null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function AufRuf({ e, T, wie = () => ({}) }: { e: string; T: ComponentType<any>; wie?: Wie }) {
+  const [p, setP] = useState<ReturnType<Wie>>(null);
+  useEffect(() => {
+    const auf = (ev: Event) => setP((alt) => wie((ev as CustomEvent).detail, (alt?.n ?? 0) + 1));
+    window.addEventListener(e, auf);
+    return () => window.removeEventListener(e, auf);
+  }, [e, wie]);
+  return p ? <Suspense fallback={null}><T key={p.k} {...p} onClose={() => setP(null)} /></Suspense> : null;
 }
 
 /**
@@ -95,42 +108,18 @@ function Einstellungen() {
  * oder der Knopf auf dem leeren Board) — die Vorlagen selbst reisen mit ihm, nicht mit dem Start.
  */
 const ladeVorlagen = () => import('./components/VorlagenDialog').then((m) => ({ default: m.VorlagenDialog }));
-const VorlagenDialogLazy = lazy(ladeVorlagen);
-function Vorlagen() {
-  const [wunsch, setWunsch] = useState<{ projectId?: string; inBoard?: string } | null>(null);
-  useEffect(() => {
-    const auf = (e: Event) => setWunsch((e as CustomEvent<{ projectId?: string; inBoard?: string }>).detail ?? {});
-    window.addEventListener('pixinotes:vorlagen', auf);
-    return () => window.removeEventListener('pixinotes:vorlagen', auf);
-  }, []);
-  return wunsch ? <Suspense fallback={null}><VorlagenDialogLazy wunsch={wunsch} onClose={() => setWunsch(null)} /></Suspense> : null;
-}
+const VorlagenDialogLazy = nachLazy(ladeVorlagen);
+const vorlagenWie: Wie = (d) => ({ wunsch: d ?? {} });
 
 /** M449: Der Versionen-Dialog wird erst geladen, wenn ihn jemand aufruft (Mehr-Menü, Board-⋯, Strg+K) */
 const ladeVersionen = () => import('./components/VersionenDialog').then((m) => ({ default: m.VersionenDialog }));
-const VersionenDialogLazy = lazy(ladeVersionen);
-function Versionen() {
-  const [boardId, setBoardId] = useState<string | null>(null);
-  useEffect(() => {
-    const auf = (e: Event) => setBoardId((e as CustomEvent<{ boardId?: string }>).detail?.boardId ?? useBoard.getState().activeId);
-    window.addEventListener(VERSIONEN_EREIGNIS, auf);
-    return () => window.removeEventListener(VERSIONEN_EREIGNIS, auf);
-  }, []);
-  return boardId ? <Suspense fallback={null}><VersionenDialogLazy boardId={boardId} onClose={() => setBoardId(null)} /></Suspense> : null;
-}
+const VersionenDialogLazy = nachLazy(ladeVersionen);
+const versionenWie: Wie = (d) => ({ boardId: d?.boardId ?? useBoard.getState().activeId });
 
 /** M476: Sicherung einspielen — der Dialog (samt ZIP-Leser) kommt erst, wenn jemand eine Sicherung einspielt */
 const ladeSicherung = () => import('./components/SicherungDialog').then((m) => ({ default: m.SicherungDialog }));
-const SicherungDialogLazy = lazy(ladeSicherung);
-function SicherungEinspielen() {
-  const [offen, setOffen] = useState<{ datei?: File } | null>(null);
-  useEffect(() => {
-    const auf = (e: Event) => setOffen({ datei: (e as CustomEvent<{ datei?: File }>).detail?.datei });
-    window.addEventListener(SICHERUNG_EREIGNIS, auf);
-    return () => window.removeEventListener(SICHERUNG_EREIGNIS, auf);
-  }, []);
-  return offen ? <Suspense fallback={null}><SicherungDialogLazy key={offen.datei?.name ?? '-'} datei={offen.datei} onClose={() => setOffen(null)} /></Suspense> : null;
-}
+const SicherungDialogLazy = nachLazy(ladeSicherung);
+const sicherungWie: Wie = (d) => ({ datei: d?.datei, k: d?.datei?.name ?? '-' });
 
 /**
  * M523: Der Sprach-Hinweis (M368) bringt seinen Text in 13 Sprachen mit — gut 3 KB im Start-Paket, die nur braucht,
@@ -149,54 +138,23 @@ const sprachHinweisNoetig = ((): boolean => {
 
 /** M516: Die Diagnose „Als App installieren" kommt erst, wenn der Browser kein Angebot gemacht hat und jemand fragt */
 const ladeAppInstallieren = () => import('./components/AppInstallierenFenster').then((m) => ({ default: m.AppInstallierenFenster }));
-const AppInstallierenLazy = lazy(ladeAppInstallieren);
-function AppInstallieren() {
-  const [offen, setOffen] = useState(false);
-  useEffect(() => {
-    const auf = () => setOffen(true);
-    window.addEventListener(APP_INSTALLIEREN_EREIGNIS, auf);
-    return () => window.removeEventListener(APP_INSTALLIEREN_EREIGNIS, auf);
-  }, []);
-  return offen ? <Suspense fallback={null}><AppInstallierenLazy onClose={() => setOffen(false)} /></Suspense> : null;
-}
+const AppInstallierenLazy = nachLazy(ladeAppInstallieren);
 
 /** M466: Das Outlook-Fenster (Microsoft Graph) kommt erst mit dem ersten Aufruf — Strg+K „Outlook" oder ＋ → Outlook */
-const OutlookLazy = lazy(() => import('./components/OutlookFenster').then((m) => ({ default: m.OutlookFenster })));
-function Outlook() {
-  const [offen, setOffen] = useState(false);
-  useEffect(() => {
-    const auf = () => setOffen(true);
-    window.addEventListener('pixinotes:outlook', auf);
-    return () => window.removeEventListener('pixinotes:outlook', auf);
-  }, []);
-  return offen ? <Suspense fallback={null}><OutlookLazy onClose={() => setOffen(false)} /></Suspense> : null;
-}
+const OutlookLazy = nachLazy(() => import('./components/OutlookFenster').then((m) => ({ default: m.OutlookFenster })));
 
 /** M478: Die Eingangs-Liste wird erst geladen, wenn jemand sie öffnet (Zähler in der Spalte, Strg+K, Sprung) */
 const ladeEingang = () => import('./components/EingangFenster').then((m) => ({ default: m.EingangFenster }));
-const EingangLazy = lazy(ladeEingang);
+const EingangLazy = nachLazy(ladeEingang);
+const eingangWie: Wie = (d, n) => ({ gruppe: d?.gruppe, wunsch: n, n });
 function Eingang() {
-  const [offen, setOffen] = useState<{ gruppe?: string; n: number } | null>(null);
-  useEffect(() => {
-    const auf = (e: Event) => setOffen((o) => ({ gruppe: (e as CustomEvent<{ gruppe?: string }>).detail?.gruppe, n: (o?.n ?? 0) + 1 }));
-    window.addEventListener(EINGANG_OEFFNEN, auf);
-    const aus = eingangWaechter();
-    return () => { window.removeEventListener(EINGANG_OEFFNEN, auf); aus(); };
-  }, []);
-  return offen ? <Suspense fallback={null}><EingangLazy gruppe={offen.gruppe} wunsch={offen.n} onClose={() => setOffen(null)} /></Suspense> : null;
+  useEffect(eingangWaechter, []);
+  return <AufRuf e={EINGANG_OEFFNEN} T={EingangLazy} wie={eingangWie} />;
 }
 
 /** M385: Die QR-Einblendung (samt Rechenbibliothek) wird erst geladen, wenn jemand sie aufruft */
-const QrBlendeLazy = lazy(() => import('./components/QrBlende').then((m) => ({ default: m.QrBlende })));
-function Qr() {
-  const [wunsch, setWunsch] = useState<QrWunsch | null>(null);
-  useEffect(() => {
-    const auf = (e: Event) => setWunsch((e as CustomEvent<QrWunsch>).detail ?? null);
-    window.addEventListener(QR_EREIGNIS, auf);
-    return () => window.removeEventListener(QR_EREIGNIS, auf);
-  }, []);
-  return wunsch ? <Suspense fallback={null}><QrBlendeLazy wunsch={wunsch} onClose={() => setWunsch(null)} /></Suspense> : null;
-}
+const QrBlendeLazy = nachLazy(() => import('./components/QrBlende').then((m) => ({ default: m.QrBlende })));
+const qrWie: Wie = (d) => (d ? { wunsch: d } : null);
 
 /**
  * M446: Übersicht, Aufgaben-Zentrale, Präsentation, Suche und Recherche gehören nicht in den Start — sie kommen
@@ -216,19 +174,21 @@ const LADER = {
   // M502: Nachschlagen (Wikipedia & Co.) — öffnet erst auf Wunsch
   nachschlagen: () => import('./components/LookupPanel'),
 };
-const OverviewLazy = lazy(() => LADER.overview().then((m) => ({ default: m.Overview })));
-const TaskHubLazy = lazy(() => LADER.taskhub().then((m) => ({ default: m.TaskHub })));
-const PresenterLazy = lazy(() => LADER.presenter().then((m) => ({ default: m.Presenter })));
-const SearchOverlayLazy = lazy(() => LADER.suche().then((m) => ({ default: m.SearchOverlay })));
-const RechercheLazy = lazy(() => LADER.recherche().then((m) => ({ default: m.RechercheDialog })));
-const ShareCardsLazy = lazy(() => LADER.teilen().then((m) => ({ default: m.ShareCardsModal })));
-const BildExportLazy = lazy(() => LADER.bildExport().then((m) => ({ default: m.BildExport })));
-const LookupLazy = lazy(() => LADER.nachschlagen().then((m) => ({ default: m.LookupPanel })));
+const OverviewLazy = nachLazy(() => LADER.overview().then((m) => ({ default: m.Overview })));
+const TaskHubLazy = nachLazy(() => LADER.taskhub().then((m) => ({ default: m.TaskHub })));
+const PresenterLazy = nachLazy(() => LADER.presenter().then((m) => ({ default: m.Presenter })));
+const SearchOverlayLazy = nachLazy(() => LADER.suche().then((m) => ({ default: m.SearchOverlay })));
+const RechercheLazy = nachLazy(() => LADER.recherche().then((m) => ({ default: m.RechercheDialog })));
+const ShareCardsLazy = nachLazy(() => LADER.teilen().then((m) => ({ default: m.ShareCardsModal })));
+const BildExportLazy = nachLazy(() => LADER.bildExport().then((m) => ({ default: m.BildExport })));
+const LookupLazy = nachLazy(() => LADER.nachschlagen().then((m) => ({ default: m.LookupPanel })));
 
+/** M534: Die Zurück-Taste führt durch die App (lib/verlauf.ts) — kommt im Leerlauf oder mit dem ersten Fenster */
+const verlaufLaden = () => void import('./lib/verlauf').then((m) => m.verlaufStarten(), () => {});
 /** Einmal geöffnet, bleibt der Teil eingehängt (er schließt sich selbst über seinen Store-Schalter) */
 function BeiBedarf({ offen, children }: { offen: boolean; children: ReactNode }) {
   const [geladen, setGeladen] = useState(false);
-  useEffect(() => { if (offen) setGeladen(true); }, [offen]);
+  useEffect(() => { if (offen) { setGeladen(true); verlaufLaden(); } }, [offen]);
   return offen || geladen ? <Suspense fallback={null}>{children}</Suspense> : null;
 }
 /** Die Präsentation öffnet sich auch, wenn ich jemandem folge, der vorführt (M371/M387) — das entscheidet der
@@ -263,7 +223,7 @@ function Recherche() {
 function Suche() {
   const offen = useBoard((s) => s.searchOpen);
   const [geladen, setGeladen] = useState(false);
-  useEffect(() => { if (offen) setGeladen(true); }, [offen]);
+  useEffect(() => { if (offen) { setGeladen(true); verlaufLaden(); } }, [offen]);
   useEffect(() => {
     if (geladen) return;   // ab jetzt fängt SearchOverlay die Taste selbst
     const onKey = (e: KeyboardEvent) => {
@@ -338,7 +298,7 @@ export default function App() {
   // Auto-Sync in den verbundenen Sync-Ordner (Nextcloud & Co.) — no-op ohne Verbindung
   useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initSyncStart(); initBrain(); initGrabsteine(); initBoardVersionen(); seitenBreitenReparieren();
     // M476: Auto-Sicherung bzw. die Erinnerung nach 14 Tagen — der Code dafür lädt nur nach, wenn etwas fällig ist
-    window.setTimeout(() => { if (sicherungStartFaellig()) void import('./lib/sicherung').then((m) => m.sicherungStart()); }, 6000); imLeerlaufVorladen();
+    window.setTimeout(() => { if (sicherungStartFaellig()) void import('./lib/sicherung').then((m) => m.sicherungStart()); }, 6000); imLeerlaufVorladen(); window.setTimeout(verlaufLaden, VORLADEN_NACH_MS);
     // M513: Läuft auf diesem Gerät eine Mitmach-Runde (QR an einer Ideabubbles-Karte)? Dann den Gastgeber nachladen.
     try { if (localStorage.getItem('pixinotes-mitmachen')) void import('./lib/mitmachen').then((m) => m.gastgeberLaden()); } catch { /* privat */ } window.setTimeout(() => useBoard.getState().fristAnkerNachtragen(), 1200); }, []);
 
@@ -675,12 +635,12 @@ export default function App() {
         <Onboarding />
         <Suche />
       <Hilfe />
-      <Vorlagen />
-      <Qr />
-      <Versionen />
-      <SicherungEinspielen />
-      <AppInstallieren />
-      <Outlook />
+      <AufRuf e="pixinotes:vorlagen" T={VorlagenDialogLazy} wie={vorlagenWie} />
+      <AufRuf e={QR_EREIGNIS} T={QrBlendeLazy} wie={qrWie} />
+      <AufRuf e={VERSIONEN_EREIGNIS} T={VersionenDialogLazy} wie={versionenWie} />
+      <AufRuf e={SICHERUNG_EREIGNIS} T={SicherungDialogLazy} wie={sicherungWie} />
+      <AufRuf e={APP_INSTALLIEREN_EREIGNIS} T={AppInstallierenLazy} />
+      <AufRuf e="pixinotes:outlook" T={OutlookLazy} />
       <Eingang />
       <BildExportFenster />
       {/* M290: Aus einer anderen App geteilt (Android) — fragt nach dem Ziel */}

@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useRef, useState, type RefObject } from 'react';
+import { nachLazy } from '../../lib/nachLazy';
+import { Suspense, useEffect, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
@@ -70,7 +71,7 @@ function useVorfuehrTakt(): void {
 }
 
 /** M414: Das Abbild eines Tools beim Zuschauer (lädt erst, wenn jemand vorführt) */
-const SpiegelRahmen = lazy(() => import('../SpiegelRahmen'));
+const SpiegelRahmen = nachLazy(() => import('../SpiegelRahmen'));
 /**
  * M414: Ich führe vor und mein Tool läuft: Es meldet laufend sein Abbild, das an die Zuschauer geht (lib/spiegel.ts).
  * Eingeschaltet wird die Brücke im Tool erst hier — und nach jedem Neuladen des Tools wieder.

@@ -1,4 +1,5 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { nachLazy } from '../lib/nachLazy';
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import type { PartialBlock } from '@blocknote/core';
@@ -26,9 +27,9 @@ import { ansichtGemerkt, ansichtMerken, FOLIEN_ANSICHTEN, useFolienZoom, type Fo
 import { useZiehRollen } from '../lib/ziehRollen';
 
 // M395: Was nur WÄHREND einer Präsentation gebraucht wird, kommt erst dann — der Kern der App bleibt schlank
-const DokumentFolie = lazy(() => import('./DokumentFolie').then((m) => ({ default: m.DokumentFolie })));
-const FolienStift = lazy(() => import('./FolienStift').then((m) => ({ default: m.FolienStift })));
-const FolienKommentare = lazy(() => import('./FolienKommentare').then((m) => ({ default: m.FolienKommentare })));
+const DokumentFolie = nachLazy(() => import('./DokumentFolie').then((m) => ({ default: m.DokumentFolie })));
+const FolienStift = nachLazy(() => import('./FolienStift').then((m) => ({ default: m.FolienStift })));
+const FolienKommentare = nachLazy(() => import('./FolienKommentare').then((m) => ({ default: m.FolienKommentare })));
 import { ICheck, IComment, IEraser, IFit, IHighlighter, IMaximize, IPen, IUndo, IMegafon } from './Icons';
 import { BubblesBody } from './nodes/BubblesCard';
 import { FluessigBuehne } from './nodes/FluessigCard';

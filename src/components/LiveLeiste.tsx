@@ -5,7 +5,8 @@
 //                      nachgeladen aus LiveLeisteVoll.tsx, sobald das Board live ist (M477)
 //   · LiveSperren    – farbiger Rahmen mit Namensschild um jede Karte, die gerade ein anderer bearbeitet
 //   · GastNameDialog – „Wie heißt du?" beim Einwählen ohne Konto
-import { lazy, Suspense, useEffect, useState, type CSSProperties } from 'react';
+import { nachLazy } from '../lib/nachLazy';
+import { Suspense, useEffect, useState, type CSSProperties } from 'react';
 import { useInternalNode } from '@xyflow/react';
 import { useBoard } from '../store';
 import { liveAuf, nameGeaendert, SPERREN_EREIGNIS, sperrenVon, TEILNEHMER_EREIGNIS } from '../lib/liveStand';
@@ -38,7 +39,7 @@ export const farbe = (f: string): CSSProperties => ({ '--farbe': f } as CSSPrope
  * M477: Die Leiste selbst (Kürzel, Liste, Werkzeuge der Gruppe) lädt erst, wenn das Board live ist — sie zeigt ohne
  * Kanal ohnehin nichts. So bleibt im Start-Paket Platz für das gemeinsame Tippen (Grenze in m446/m459/m467).
  */
-const LiveLeisteVoll = lazy(() => import('./LiveLeisteVoll'));
+const LiveLeisteVoll = nachLazy(() => import('./LiveLeisteVoll'));
 export function LiveLeiste() {
   const boardId = useBoard((s) => s.activeId);
   useTakt(TEILNEHMER_EREIGNIS);
@@ -58,10 +59,10 @@ function useLiveTeam(): boolean {
   if (liveAuf(boardId)) liveTeamDa = true;
   return liveTeamDa;
 }
-const LiveZeigerVoll = lazy(() => import('./Mauszeiger').then((m) => ({ default: m.LiveZeiger })));
-const VorfuehrenVoll = lazy(() => import('./Vorfuehren').then((m) => ({ default: m.Vorfuehren })));
-const GruppenraumVoll = lazy(() => import('./Gruppenraum').then((m) => ({ default: m.GruppenraumSchicht })));
-const GruppenTimerVoll = lazy(() => import('./Gruppenraum').then((m) => ({ default: m.GruppenTimer })));
+const LiveZeigerVoll = nachLazy(() => import('./Mauszeiger').then((m) => ({ default: m.LiveZeiger })));
+const VorfuehrenVoll = nachLazy(() => import('./Vorfuehren').then((m) => ({ default: m.Vorfuehren })));
+const GruppenraumVoll = nachLazy(() => import('./Gruppenraum').then((m) => ({ default: m.GruppenraumSchicht })));
+const GruppenTimerVoll = nachLazy(() => import('./Gruppenraum').then((m) => ({ default: m.GruppenTimer })));
 /** Gehört in ein <ViewportPortal> des Boards (M375) */
 export function LiveZeigerSpaet() {
   return useLiveTeam() ? <Suspense fallback={null}><LiveZeigerVoll /></Suspense> : null;

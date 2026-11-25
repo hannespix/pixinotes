@@ -5,7 +5,8 @@
 //   · Bild aus der Geräte-Ablage (Karte „file"): Das neue Bild wird unter einer NEUEN Kennung abgelegt und die
 //     Karte dorthin umgezogen — der Inhalt hängt an der Kennung, und nur so reist er beim Abgleich als neue Datei
 //     mit (Konto, Team, Gäste). Das alte Bild bleibt bis zum nächsten Start liegen: Rückgängig findet es.
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { nachLazy } from '../lib/nachLazy';
+import { Suspense, useEffect, useState } from 'react';
 import { karteFest, selectActiveBoard, selectNurLesen, useBoard } from '../store';
 import { loadFile, saveFile, vorschauArt } from '../lib/fileStore';
 import { canEmbed } from '../lib/nodes';
@@ -32,7 +33,7 @@ export function bildBearbeitbar(n: AppNode | undefined): boolean {
   return istBildKarte(n) && !selectNurLesen(st) && !karteFest(st.activeId, (n!.data as { von?: string }).von);
 }
 
-const BildEditorLazy = lazy(() => import('./BildEditor').then((m) => ({ default: m.BildEditor })));
+const BildEditorLazy = nachLazy(() => import('./BildEditor').then((m) => ({ default: m.BildEditor })));
 
 interface Offen { id: string; quelle: string; name: string; mime: string; frei?: () => void }
 

@@ -1,5 +1,6 @@
 // M476: Sicherung einspielen — erst zeigen, was drin ist, dann fragen, wie (lib/sicherung.ts).
 import { useEffect, useRef, useState } from 'react';
+import { escDarueber } from '../lib/fensterEsc';
 import { eingespieltMelden, OHNE, sicherungEinspielen, sicherungLesen, ueberblick, type Modus, type Sicherung } from '../lib/sicherung';
 import { t, zahlWort } from '../lib/sprache';
 import { useBoard } from '../store';
@@ -28,7 +29,8 @@ export function SicherungDialog({ datei, onClose }: { datei?: File; onClose: () 
 
   useEffect(() => {
     zu.current?.focus();
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    // M534: Liegt ein anderes Fenster darüber (Alt+H, Alt+E, Strg+K), gehört Esc ihm
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !escDarueber(zu.current, e)) { e.stopPropagation(); onClose(); } };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [onClose]);

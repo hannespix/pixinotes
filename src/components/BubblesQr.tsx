@@ -4,6 +4,7 @@
 // einreichen, Punkte vergeben, Ergebnis sehen. Gedacht für große Runden, etwa im Teams-Meeting: Man scrollt per
 // Bildschirmfreigabe über das Board, das Publikum scannt den Code und stimmt ab, ohne Gast im ganzen Board zu sein.
 import { useEffect, useState } from 'react';
+import { escDarueber } from '../lib/fensterEsc';
 import { createPortal } from 'react-dom';
 import { useBoard } from '../store';
 import { qrBild, type QrBild } from '../lib/qr';
@@ -63,7 +64,8 @@ export function BubblesQr({ karte, titel, m, onClose, buehneSetzen, beenden }: {
   const { dabei, verbunden } = useMitmachenStand(m.token);
   const hier = hierGastgeber(m.token, karte);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    // M534: Liegt ein anderes Fenster darüber (Alt+H, Alt+E), gehört Esc ihm
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !escDarueber(document.querySelector('[data-taste="mit-qr"]'), e, '.qr-blende')) { e.stopPropagation(); onClose(); } };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [onClose]);

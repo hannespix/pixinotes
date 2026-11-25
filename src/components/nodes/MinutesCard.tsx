@@ -1,4 +1,5 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { nachLazy } from '../../lib/nachLazy';
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useReactFlow, type NodeProps } from '@xyflow/react';
 import { SuggestionMenuController, useBlockNoteEditor, useCreateBlockNote, useExtension, type DefaultReactSuggestionItem, type SuggestionMenuProps } from '@blocknote/react';
 import { SuggestionMenu } from '@blocknote/core/extensions';
@@ -910,7 +911,7 @@ export function MinutesBody({ id, data: daten }: { id: string; data: MinutesData
 }
 
 /** M487: Im Live-Board übernimmt die Hülle für gemeinsames Tippen (nachgeladen, nur wenn ein Kanal steht) */
-const ProtokollGemeinsam = lazy(() => import('./ProtokollGemeinsam'));
+const ProtokollGemeinsam = nachLazy(() => import('./ProtokollGemeinsam'));
 export interface EntryEditorProps {
   nodeId: string; entryId: string; blocks?: unknown[];
   editorRef?: { current: unknown };

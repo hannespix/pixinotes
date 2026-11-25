@@ -141,6 +141,21 @@ html[data-keyboard='on']:has(.app.focus-mode) { --focus-nav-h: 0px; }
   background: var(--surface-2); word-break: break-word; font-size: 10.5px;
 }
 @media (pointer: coarse) { .err-acts button { min-height: 44px; } }
+/* M534: Ein nachgeladener Teil kam nicht (Netz weg, alte Datei nach einem Update). Fenster und Ansichten zeigen den
+   Hinweis schwebend unten in der Mitte, in einer Karte steht er an ihrer Stelle. */
+.nachlade-fehler {
+  position: fixed; left: 50%; bottom: 72px; transform: translateX(-50%); z-index: 120;
+  max-width: min(520px, calc(100vw - 24px)); padding: 12px 14px; border-radius: var(--r-lg);
+  border: 1px solid var(--border); background: var(--surface); color: var(--ink); box-shadow: var(--pop-shadow);
+  font-size: 13px; line-height: 1.45; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+}
+.react-flow__node .nachlade-fehler { position: static; transform: none; box-shadow: none; margin: 8px; max-width: none; }
+.nachlade-fehler button {
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--ink);
+  border-radius: var(--r); padding: 6px 12px; min-height: 36px; font: inherit; cursor: pointer;
+}
+.nachlade-fehler button:hover { border-color: var(--accent); color: var(--accent-strong); }
+@media (pointer: coarse) { .nachlade-fehler button { min-height: 44px; } }
 
 /* ================= M215: Ticket-Ziehen an Maus und Finger ================= */
 /* Kein HTML5-Drag mehr: Der Browser darf beim Ziehen weder Text markieren noch

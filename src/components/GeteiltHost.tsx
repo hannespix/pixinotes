@@ -1,7 +1,8 @@
 // M483: Was aus einer anderen App (Android, M290) oder der Browser-Erweiterung (M458) ankommt. Hier steht nur, was der
 // Start braucht: nachsehen, ob etwas wartet, und auf die Erweiterung hören. Der Dialog (GeteiltDialog.tsx samt Notiz-
 // und Board-Übernahme) lädt erst, wenn wirklich etwas angekommen ist.
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { nachLazy } from '../lib/nachLazy';
+import { Suspense, useEffect, useState } from 'react';
 import { useBoard } from '../store';
 import { geteiltMarkeAbholen, leseGeteiltes, loescheGeteiltes, type Geteiltes } from '../lib/geteilt';
 import { erweiterungEingang } from '../lib/erweiterung';
@@ -9,7 +10,7 @@ import { eingangSammeln, geteiltesInEingang } from '../lib/eingang';
 import { zahlWort } from '../lib/sprache';
 
 const geteiltDialogLaden = () => import('./GeteiltDialog');
-const GeteiltDialogSpaet = lazy(() => geteiltDialogLaden().then((m) => ({ default: m.GeteiltDialog })));
+const GeteiltDialogSpaet = nachLazy(() => geteiltDialogLaden().then((m) => ({ default: m.GeteiltDialog })));
 
 interface Wunsch { gabe: Geteiltes; ziel?: string; n: number }
 

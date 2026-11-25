@@ -1,5 +1,6 @@
+import { nachLazy } from '../../lib/nachLazy';
 import { warEbenAngelegt } from '../../lib/nodes';
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject } from 'react';
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject } from 'react';
 import { useReactFlow, type NodeProps } from '@xyflow/react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
@@ -579,7 +580,7 @@ export function NotizEditor({ id, data, startPunkt, sitzung }: {
 }
 
 /** M477: Im Live-Board übernimmt die Hülle für gemeinsames Tippen (nachgeladen, nur wenn ein Kanal steht) */
-const NotizGemeinsam = lazy(() => import('./NotizGemeinsam'));
+const NotizGemeinsam = nachLazy(() => import('./NotizGemeinsam'));
 function NotizEditorWahl(p: { id: string; data: NoteNode['data']; startPunkt: MutableRefObject<StartPunkt | null> }) {
   const boardId = useBoard((s) => s.activeId);
   useTakt(TEILNEHMER_EREIGNIS);
