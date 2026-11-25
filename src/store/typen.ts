@@ -469,6 +469,8 @@ export interface BoardState {
   updateEdgeKind: (id: string, kind: string) => void;
   /** M146/M147: feingliedrige Verbindungsoptionen — Spitzen (Ende/Anfang),
    *  Spitzenform, Linienstärke, eigene Farbe */
+  /** M530: Reihenfolge der Ausgänge eines Rahmens für die Rahmen-Reise (Kanten-Kennungen in der neuen Folge) */
+  ausgaengeOrdnen: (ids: string[]) => void;
   updateEdgeStyle: (id: string, patch: {
     head?: boolean; headStart?: boolean; shape?: string; width?: number; color?: string | null;
   }) => void;

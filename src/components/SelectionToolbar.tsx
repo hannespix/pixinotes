@@ -16,7 +16,7 @@ void import('../store/stricheLoesen').catch(() => null);
 import { kiBeispiel, kiBlaettern } from '../lib/kiVerlauf';
 import { KACHEL_TYPEN, STICKY_COLORS, type AppNode } from '../types';
 import { FARB_NAMEN } from '../lib/notiz';
-import { IArchive, IArchiveRestore, IArrange, IBookmark, IDownload, IComment, ICompact, ICrop, IDuplicate, IFit, IFrame, IFlowH, IFlowV, IGlobe, IGridLayout, IImage, IMore, IMoveTo, IPalette, IPen, IPerson, IPlay, IShare, ITag, ITrash, IType, IUndo, IWand, IX, IMaximize } from './Icons';
+import { IArchive, IArchiveRestore, IArrange, IArrowUp, IBookmark, IDownload, IComment, ICompact, ICrop, IDuplicate, IFit, IFrame, IFlowH, IFlowV, IGlobe, IGridLayout, IImage, IMore, IMoveTo, IPalette, IPen, IPerson, IPlay, IShare, ITag, ITrash, IType, IUndo, IWand, IX, IMaximize } from './Icons';
 import { wurzelZoom } from '../lib/anzeige';
 // M267: Schrift-Stapel, Stufen und Beschriftungen kommen aus lib/typo.ts —
 // dieselbe Quelle wie für den markierten Text. Vorher lag hier eine zweite,
@@ -437,8 +437,9 @@ export function SelectionToolbar() {
   };
 
   const duplicate = () => {
-    const n = useBoard.getState().dupliziere(selected.map((x) => x.id));
-    if (n) showToast(`${n} Karte${n > 1 ? 'n' : ''} dupliziert`);
+    // M530: gewählte Rahmen samt Inhalt (vorher nur die Karten)
+    const n = useBoard.getState().dupliziere([...selected, ...selFrames].map((x) => x.id));
+    if (n) showToast(`${zahlWort(n, 'Karte', 'Karten')} dupliziert`);
   };
 
   const remove = () => removeNodes([...selected, ...selFrames].map((n) => n.id));
@@ -530,6 +531,42 @@ export function SelectionToolbar() {
                       </>
                     );
                   })()}
+                  {(() => {
+                    // M530: Reihenfolge an einer Verzweigung — welcher Ausgang zuerst in der Rahmen-Reise drankommt
+                    const rahmenIds = new Set(board.nodes.filter((n) => n.type === 'frame' && !n.archived).map((n) => n.id));
+                    const folge = (e: typeof board.edges[number]) => { const f = (e.data as { folge?: unknown } | undefined)?.folge; return typeof f === 'number' ? f : 1e9; };
+                    const aus = board.edges.map((e, i) => ({ e, i, r: richtung(e) }))
+                      .filter(({ r }) => r?.von === singleFrame.id && r.nach !== singleFrame.id && rahmenIds.has(r.nach))
+                      .sort((a, b) => folge(a.e) - folge(b.e) || a.i - b.i);
+                    if (aus.length < 2) return null;
+                    const nachVorn = (j: number) => {
+                      const ids = aus.map((x) => x.e.id);
+                      [ids[j - 1], ids[j]] = [ids[j], ids[j - 1]];
+                      useBoard.getState().ausgaengeOrdnen(ids);
+                    };
+                    return (
+                      <>
+                        <div className="sel-attr-title">Reihenfolge der Ausgänge</div>
+                        {aus.map(({ e, r }, j) => {
+                          const ziel = board.nodes.find((n) => n.id === r!.nach);
+                          return (
+                            <button key={e.id} data-taste="ausgang-vor" disabled={j === 0}
+                              title={j === 0 ? 'Kommt in der Rahmen-Reise zuerst dran' : 'Einen Platz nach vorn – kommt in der Rahmen-Reise früher dran'}
+                              onClick={() => nachVorn(j)}>
+                              <IArrowUp size={14} /> <span>{j + 1}.</span> <span translate="no">{(ziel?.data as { name?: string } | undefined)?.name || 'Rahmen'}</span>
+                            </button>
+                          );
+                        })}
+                      </>
+                    );
+                  })()}
+                </>
+              )}
+              {/* M530: Rahmen allein — Duplizieren und Verschieben samt Inhalt (sonst nur mit einer Karte in der Auswahl) */}
+              {framesOnly && (
+                <>
+                  <button data-taste="rahmen-duplizieren" onClick={() => { setMenu(null); duplicate(); }}><IDuplicate size={14} /> Duplizieren{taste('duplizieren') && <kbd className="kontext-taste">{taste('duplizieren')}</kbd>}</button>
+                  {boards.length > 1 && <button data-taste="rahmen-verschieben" onClick={() => setMenu('move')}><IMoveTo size={14} /> In Board verschieben …</button>}
                 </>
               )}
               <div className="sel-attr-title">Inhalt anordnen</div>

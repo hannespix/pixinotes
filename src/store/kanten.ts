@@ -102,6 +102,13 @@ export function kantenScheibe(_set: Setzen, get: Holen, patchActive: AufsOffene)
       }));
     },
 
+    // M530: Reihenfolge der Ausgänge eines Rahmens (Rahmen-Reise an einer Verzweigung) — `ids` in der neuen Folge
+    ausgaengeOrdnen: (ids) => {
+      get().pushHistory();
+      const platz = new Map(ids.map((id, i) => [id, i]));
+      patchActive((b) => ({ edges: b.edges.map((e) => (platz.has(e.id) && e.data?.folge !== platz.get(e.id) ? { ...e, data: { ...e.data, folge: platz.get(e.id) } } : e)) }));
+    },
+
     removeEdge: (id) => {
       get().pushHistory();
       patchActive((b) => ({ edges: b.edges.filter((e) => e.id !== id) }));

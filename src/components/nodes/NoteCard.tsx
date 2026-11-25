@@ -297,6 +297,26 @@ export function NotizEditor({ id, data, startPunkt, sitzung }: {
     return () => window.removeEventListener(NOTIZ_EXTERN, auf);
   }, [id, editor, sitzung]);
 
+  // M530: Strg+V im Karten-Fokus ohne Cursor im Text (lib/fokusEinfuegen.ts) — ans Ende der Notiz, über den Editor
+  // selbst: derselbe Weg wie ein Einfügen im Text (Markdown, Bilder, gemeinsam über Yjs)
+  useEffect(() => {
+    const auf = (e: Event) => {
+      const d = (e as CustomEvent<{ id?: string; daten?: DataTransfer }>).detail;
+      if (d?.id !== id || !d.daten) return;
+      // in einen eigenen Absatz unter dem bisherigen Text (ein leerer letzter Absatz wird genommen)
+      const letzter = editor.document[editor.document.length - 1];
+      const leer = letzter?.type === 'paragraph' && Array.isArray(letzter.content) && letzter.content.length === 0;
+      try {
+        const ziel = !letzter || leer ? letzter : editor.insertBlocks([{ type: 'paragraph' }], letzter, 'after')[0];
+        if (ziel) editor.setTextCursorPosition(ziel, 'end');
+      } catch { /* Editor gerade im Umbau: dann an der Stelle, wo der Cursor steht */ }
+      editor.focus();
+      editor.domElement?.dispatchEvent(new ClipboardEvent('paste', { clipboardData: d.daten, bubbles: true, cancelable: true }));
+    };
+    window.addEventListener('pixinotes:notiz-einfuegen', auf);
+    return () => window.removeEventListener('pixinotes:notiz-einfuegen', auf);
+  }, [id, editor]);
+
   // Frische, leere Notiz: sofort den Cursor reinsetzen — lostippen ohne Extra-Klick
   // M365: … aber nur in der selbst angelegten. Eine leere Notiz, die jemand anderes gerade angelegt hat und die
   // per Abgleich hier ankommt, nähme sonst jedem den Cursor weg.

@@ -24,6 +24,8 @@ let ebenenUndo: {
   /** dabei von selbst angelegt, weil sonst nichts Sichtbares geblieben wäre */
   neuesBoard?: string; neuesProjekt?: string;
 } | null = null;
+/** M530: Stand vor dem Löschen eines Boards — „Rückgängig" in der Meldung (vorher Browser-Rückfrage ohne Weg zurück) */
+let boardUndo: { board: BoardDoc; index: number; projektId?: string; stelle: number; activeId: string } | null = null;
 
 /** M480: Teil des Board-Speichers – Struktur */
 export function strukturScheibe(set: Setzen, get: Holen) {
@@ -135,6 +137,7 @@ export function strukturScheibe(set: Setzen, get: Holen) {
       }
     }
     ebenenUndo = { art, bereich, bereichIndex, projekt, projektIndex, boards: weg, activeId: s0.activeId, neuesBoard, neuesProjekt };
+    boardUndo = null;
     mutedHistory(() => set({ boards, spaces, activeId }));
     get().showToast(meldung, 'ebene', 12000);
   };
@@ -211,6 +214,28 @@ export function strukturScheibe(set: Setzen, get: Holen) {
     removeProject: (id, mit) => ebeneLoeschen('projekt', id, mit),
 
     ebeneZurueck: () => {
+      // M530: ein gelöschtes Board — es kommt an seine Stelle im Projekt zurück, mit Inhalt und Kennung. Auf anderen
+      // Geräten kommt es mit dem nächsten Abgleich wieder: Seine Grabsteine reisen nur, solange es fehlt (lib/grabsteine.ts)
+      const bu = boardUndo;
+      if (bu) {
+        boardUndo = null;
+        const s1 = get();
+        if (s1.boards.some((b) => b.id === bu.board.id)) return false;
+        const boards = [...s1.boards];
+        boards.splice(Math.min(bu.index, boards.length), 0, bu.board);
+        let drin = false;
+        let spaces = s1.spaces.map((sp) => ({ ...sp, projects: sp.projects.map((p) => {
+          if (p.id !== bu.projektId) return p;
+          drin = true;
+          const ids = [...p.boardIds]; ids.splice(Math.min(bu.stelle, ids.length), 0, bu.board.id);
+          return { ...p, boardIds: ids };
+        }) }));
+        // Das Projekt gibt es nicht mehr: ins erste
+        if (!drin && bu.projektId !== undefined) spaces = spaces.map((sp, i) => (i === 0 && sp.projects[0] ? { ...sp, projects: sp.projects.map((p, j) => (j === 0 ? { ...p, boardIds: [...p.boardIds, bu.board.id] } : p)) } : sp));
+        mutedHistory(() => set({ boards, spaces: sortiereProjekte(spaces, boards), activeId: bu.activeId === bu.board.id ? bu.board.id : s1.activeId }));
+        get().showToast(t(`„${bu.board.name}" ist wieder da.`));
+        return true;
+      }
       const u = ebenenUndo;
       if (!u) return false;
       ebenenUndo = null;
@@ -387,11 +412,18 @@ export function strukturScheibe(set: Setzen, get: Holen) {
         activeId = projekt?.boardIds.find((x) => x !== id && rest.some((b) => b.id === x && !b.archived))
           ?? rest.find((b) => !b.archived)?.id ?? rest[0].id;
       }
+      // M530: mit „Rückgängig" in der Meldung (wie Bereich und Projekt) — der Stand davor bleibt für die Sitzung liegen
+      if (weg) {
+        const projekt = get().spaces.flatMap((sp) => sp.projects).find((p) => p.boardIds.includes(id));
+        boardUndo = { board: weg, index: boards.indexOf(weg), projektId: projekt?.id, stelle: projekt ? projekt.boardIds.indexOf(id) : 0, activeId: get().activeId };
+        ebenenUndo = null;
+      }
       set({
         boards: rest,
         spaces: stripBoardFromHierarchy(get().spaces, id),
         activeId,
       });
+      if (weg) get().showToast(t(`Board „${weg.name}" gelöscht.`), 'ebene', 12000);
     },
 
     moveBoard: (boardId, targetProjectId, beforeBoardId) => {

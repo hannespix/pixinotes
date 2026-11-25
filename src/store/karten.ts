@@ -227,8 +227,12 @@ export function kartenScheibe(set: Setzen, get: Holen, patchActive: AufsOffene) 
       // Verbindungen ZWISCHEN den Kopierten kommen mit, große Dateien und Tool-Quelltexte ebenfalls, und die
       // Kopien landen nie deckungsgleich auf einer früheren Kopie.
       const b = selectActiveBoard(get());
-      const wahl = b.nodes.filter((n) => ids.includes(n.id));
+      // M530: Ein Rahmen kommt samt Inhalt (auch archiviertem, wie beim Ziehen) — vorher entstanden nur Kopien der Karten
+      const set0 = new Set(ids);
+      for (const f of b.nodes) if (set0.has(f.id) && f.type === 'frame') for (const m of frameMembers(f, b.nodes, true, true)) set0.add(m.id);
+      const wahl = b.nodes.filter((n) => set0.has(n.id));
       if (!wahl.length) return 0;
+      const istRahmen = new Set(wahl.filter((n) => n.type === 'frame').map((n) => n.id));
       let k = 1;
       const belegt = (kk: number) => wahl.some((n) => b.nodes.some((x) => x.type === n.type && Math.abs(x.position.x - (n.position.x + 30 * kk)) < 2 && Math.abs(x.position.y - (n.position.y + 30 * kk)) < 2));
       while (k < 40 && belegt(k)) k += 1;
@@ -238,7 +242,8 @@ export function kartenScheibe(set: Setzen, get: Holen, patchActive: AufsOffene) 
         position: { x: n.position.x + 30 * k, y: n.position.y + 30 * k },
         data: JSON.parse(JSON.stringify(n.data)),
       }) as AppNode);
-      const kanten = b.edges.filter((e) => karte.has(e.source) && karte.has(e.target))
+      // M530: Rahmenpfeile (Rahmen → Rahmen) nicht: Die Kopie legte sonst eine zweite Rahmen-Reise neben die erste
+      const kanten = b.edges.filter((e) => karte.has(e.source) && karte.has(e.target) && !(istRahmen.has(e.source) && istRahmen.has(e.target)))
         .map((e) => ({ ...e, id: uid(), source: karte.get(e.source) as string, target: karte.get(e.target) as string, selected: false }));
       get().pushHistory();
       patchActive((bb) => ({

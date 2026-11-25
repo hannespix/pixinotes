@@ -230,6 +230,8 @@ const AuswahlLeiste = memo(function AuswahlLeiste() {
  * jedem Schwenk eine Speicher-Runde auslösen.
  */
 const gemerkteAnsicht = new Map<string, { x: number; y: number; zoom: number }>();
+/** M530: Die Rahmen-Reise endet, während das Board nicht zu sehen ist — beim Wiederkommen gilt die Ansicht von vor ihr */
+export const ansichtVormerken = (boardId: string, v: { x: number; y: number; zoom: number }): void => { gemerkteAnsicht.set(boardId, v); };
 
 export function Board() {
   const activeId = useBoard((s) => s.activeId);
@@ -1724,6 +1726,16 @@ export function Board() {
 
       const dt = e.clipboardData;
       if (!dt) return;
+      // M530: Im Karten-Fokus legte Strg+V eine Notiz bzw. ein Bild HINTER der offenen Karte an (unsichtbar). Jetzt geht
+      // es in die offene Karte, wenn sie das kann (Notiz) — sonst ein Hinweis, und nichts passiert (lib/fokusEinfuegen.ts)
+      if (st.focusCard && !e.defaultPrevented) {
+        e.preventDefault();
+        const kopie = new DataTransfer();
+        for (const art of ['text/plain', 'text/html']) { const v = dt.getData(art); if (v) kopie.setData(art, v); }
+        for (const f of Array.from(dt.files ?? [])) kopie.items.add(f);
+        void import('../lib/fokusEinfuegen').then((m) => m.fokusEinfuegen(st.focusCard as string, kopie));
+        return;
+      }
       // Manche Quellen (Snipping Tool, Explorer-Kopie) liefern nur `files`,
       // andere (Browser-„Bild kopieren") nur `items` — beide abklappern
       let files = Array.from(dt.files ?? []).filter((f) => f.type.startsWith('image/'));
