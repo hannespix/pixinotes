@@ -5,8 +5,8 @@
  */
 import { uid } from '../types';
 import type { BoardDoc, Space } from './typen';
-import { mutedHistory } from './verlauf';
 import { useBoard } from '../store';
+import { ablageModul } from './speicher';
 
 /** „Board 2", „Board 3" … statt fünfmal „Neues Board" */
 export function nextName(base: string, existing: string[]): string {
@@ -65,31 +65,17 @@ export function ohneStartboard<T extends { boards: BoardDoc[]; spaces: Space[] }
 }
 
 /**
- * M397: PixiNotes vergibt keine Emojis mehr. Namen, die die App früher selbst vergeben hat („🏠 Mein Board",
- * „🏢 Arbeit", die Beispiel-Boards, „✨ Board 2" …), verlieren ihren Vorsatz – einmal je Gerät. Eigene Namen
- * bleiben unangetastet: Es zählt nur, was nach dem Vorsatz genau einem alten Standardnamen entspricht.
+ * M397: Namen, die die App früher selbst mit Emoji vergeben hat, verlieren ihren Vorsatz – einmal je Gerät.
+ * M532: Die Liste der alten Namen und das Umbenennen laden nach (store/ohneEmoji.ts) — und nur, wenn überhaupt ein
+ * Name einen Vorsatz trägt; sonst wird nur die Marke gesetzt. Das hält das Start-Paket klein.
  */
-const ALTE_STANDARDNAMEN = new Set(
-  'Arbeit|Work|Mein Board|My board|Mein Schreibtisch|My desk|Board|Projekt|Project|Arbeitsplatz|Wissen & Nachschlagen|Zusammenarbeit & Projekte|Privat|Schreibtisch|Aufgaben-Zentrale|Zeiterfassung & Abwesenheit|Dienstreise|Dienstwagen|Wissen|Software & Tipps|Datenschutz & IT-Sicherheit|Ansprechpartner|Jour fixe|Mitarbeitergespräche|Beispielprojekt: E-Akte|Onboarding neue Kolleg:innen|Prozesse & Mindmap|Eigene Apps & Dateien|Familienplan|Routinen & Ziele|Verträge & Fristen|Besprechung|Meeting|Rückblick|Retrospective|Projektplan|Project plan|Brainstorming|Aufgaben-Board|Task board|Wochenplanung|Weekly planning|Entscheidung|Decision|SWOT|Workshop'.split('|'),
-);
-export function alteNamenOhneEmoji(): void {
-  try {
-    if (localStorage.getItem('pixinotes-ohne-emoji')) return;
-    localStorage.setItem('pixinotes-ohne-emoji', '1');
-  } catch { return; }
-  const neu = (n: string): string => {
-    const kern = ohneVorsatz(n);
-    return kern !== n && ALTE_STANDARDNAMEN.has(kern.replace(/ \d+$/, '')) ? kern : n;
-  };
+export function alteNamenOhneEmoji(): Promise<void> | void {
+  try { if (localStorage.getItem('pixinotes-ohne-emoji')) return; } catch { return; }
   const s = useBoard.getState();
-  const boards = s.boards.map((b) => (neu(b.name) === b.name ? b : { ...b, name: neu(b.name) }));
-  const spaces = s.spaces.map((sp) => {
-    const projects = sp.projects.map((p) => (neu(p.name) === p.name ? p : { ...p, name: neu(p.name) }));
-    const gleich = projects.every((p, i) => p === sp.projects[i]) && neu(sp.name) === sp.name;
-    return gleich ? sp : { ...sp, name: neu(sp.name), projects };
-  });
-  if (boards.every((b, i) => b === s.boards[i]) && spaces.every((sp, i) => sp === s.spaces[i])) return;
-  mutedHistory(() => useBoard.setState({ boards, spaces }));
+  const namen = [...s.boards.map((b) => b.name), ...s.spaces.flatMap((sp) => [sp.name, ...sp.projects.map((p) => p.name)])];
+  // (über das ohnehin nachgeladene Modul der Speicherschicht — ein eigener Nachlade-Weg kostete Platz im Start-Paket)
+  if (namen.some((n) => ohneVorsatz(n) !== n)) return ablageModul().then((m) => m.namenOhneEmoji(), () => {});
+  try { localStorage.setItem('pixinotes-ohne-emoji', '1'); } catch { /* egal */ }
 }
 
 /**
