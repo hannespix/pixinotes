@@ -12,6 +12,7 @@
 // diese Fassung nicht kennt, bleiben ebenfalls (sie gehören vielleicht einer neueren).
 import { useBoard } from '../store';
 import { kontoObjekte, kontoObjekteLoeschen, kontoVerweise } from './kontoSync';
+import { versionsAnhaenge } from './boardVersionen';
 
 export const SCHONFRIST_MS = 24 * 3600_000;
 const BEKANNT = /^(datei|zustand)-(.+)$/;
@@ -35,7 +36,7 @@ export async function speicherPruefen(jetzt = Date.now()): Promise<Aufraeumen | 
   for (const b of st.boards) if (!b.geteiltVon && !b.gastLink) for (const n of b.nodes) karten.add(n.id);
   for (const v of st.templates ?? []) if (v?.node?.id) karten.add(v.node.id);
   // Versionen dieses Geräts (M449): ein Stand, der sich zurückholen lässt, bringt seine Anhänge mit
-  try { for (const id of await import('./boardVersionen').then((m) => m.versionsAnhaenge())) karten.add(id); } catch { return null; }
+  try { for (const id of await versionsAnhaenge()) karten.add(id); } catch { return null; }
   const aus: Aufraeumen = { leichen: [], groesse: 0, geschont: 0, gesamt: objekte.size };
   for (const [name, o] of objekte) {
     const m = BEKANNT.exec(name);

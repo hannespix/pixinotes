@@ -5,6 +5,7 @@
 // auf diesem Gerät", das kopierte Tool hatte keinen Quelltext. Betraf „Board duplizieren", „Projekt duplizieren"
 // und „Eigene Kopie anlegen" bei einem geteilten Board.
 import { idbGet, idbSet } from './syncFolder';
+import { kontoIstEigenes } from './kontoSitzung';
 
 const VORSILBEN = ['file:', 'happ:', 'happ-state:', 'happ-state-at:'];
 
@@ -24,9 +25,11 @@ export async function anhaengeKopieren(paare: Array<[string, string]>): Promise<
     }
     // M529: Liegt der Inhalt nur im Konto (große Datei, noch nie geöffnet), ihn von dort holen. Sonst bekam die Kopie
     // eine neue Kennung ohne Inhalt — auf keinem Gerät und nicht im Konto (HTTP 400 bei jedem Aufbau der Karte).
-    if (!inhaltDa) {
+    // Nur, wenn das Konto die Datei nennt (ein Live-Tool hat keinen Inhalt — sonst fragte jede Kopie vergeblich).
+    if (!inhaltDa && kontoIstEigenes()) {
       try {
-        const blob = await import('./syncStart').then((m) => m.kontoDateiHolen(alt));
+        const k = await import('./kontoSync');
+        const blob = (await k.kontoDateiBekannt(alt)) ? await k.kontoDateiNachladen(alt) : null;
         if (blob) { await idbSet(`file:${neu}`, blob); kopiert += 1; }
       } catch { /* nicht im Konto — die Karte sagt es */ }
     }

@@ -2,28 +2,40 @@
 //
 // War der gespeicherte Stand (`pixinotes-board` in localStorage) kein lesbares JSON — möglich nur durch einen Eingriff
 // von außen oder einen abgebrochenen Schreibvorgang —, startete PixiNotes leer und überschrieb ihn mit dem nächsten
-// Speichern. Der Rohtext war weg. Jetzt wird er vorher in IndexedDB aufgehoben (die letzten drei), es gibt einen
-// Hinweis, und unter Einstellungen → Daten lässt er sich herunterladen oder verwerfen. store/speicher.ts hält das
-// erste Speichern zurück, bis die Kopie liegt.
+// Speichern. Der Rohtext war weg. Jetzt legt store/speicher.ts ihn sofort (synchron, vor jedem Überschreiben) in
+// sessionStorage (`pixinotes-rettung`, eigenes Kontingent — localStorage ist in diesem Fall oft voll). Dieser Teil
+// lädt im Leerlauf mit den Einstellungen (App.tsx → ladeEinstellungen), legt den Text in die IndexedDB (die letzten
+// drei), gibt einen Hinweis und bietet ihn unter Einstellungen → Daten zum Herunterladen oder Verwerfen an. So steht im
+// Start-Paket nur eine Zeile.
 import { idbGet, idbSet, idbDel } from './syncFolder';
+import { useBoard } from '../store';
 
 const KEY = 'pixinotes:rettung';
+/** Hier legt store/speicher.ts die Kopie zuerst ab */
+const SITZUNG = 'pixinotes-rettung';
 export const RETTUNG_EREIGNIS = 'pixinotes:rettung';
 export interface Rettung { am: string; text: string }
 
-export async function rettungSichern(roh: string): Promise<void> {
+const ausSitzung = (): string | null => { try { return sessionStorage.getItem(SITZUNG); } catch { return null; } };
+
+/** Die Kopie aus sessionStorage in die Geräte-Ablage übernehmen (einmal, beim Laden dieses Teils) */
+async function aufnehmen(): Promise<void> {
+  const roh = ausSitzung();
+  if (!roh) return;
   const alt = (await idbGet<Rettung[]>(KEY).catch(() => undefined)) ?? [];
-  await idbSet(KEY, [...alt, { am: new Date().toISOString(), text: roh }].slice(-3));
+  if (!alt.some((r) => r.text === roh)) await idbSet(KEY, [...alt, { am: new Date().toISOString(), text: roh }].slice(-3));
+  try { sessionStorage.removeItem(SITZUNG); } catch { /* bleibt liegen */ }
   window.dispatchEvent(new CustomEvent(RETTUNG_EREIGNIS));
-  // Der Hinweis kommt, wenn die Oberfläche steht
-  setTimeout(() => {
-    void import('../store/hinweise').then(({ hinweisMitKnopf }) => hinweisMitKnopf(
-      'Der gespeicherte Stand war nicht lesbar – PixiNotes startet leer. Eine Rettungskopie liegt unter Einstellungen → Daten.',
-      'Herunterladen', () => { void rettungHerunterladen(); }, 20000,
-    ));
-  }, 1500);
+  useBoard.getState().showToast('Der gespeicherte Stand war nicht lesbar – PixiNotes startet leer. Eine Rettungskopie liegt unter Einstellungen → Daten.', false, 20000);
 }
-export const rettungen = async (): Promise<Rettung[]> => (await idbGet<Rettung[]>(KEY).catch(() => undefined)) ?? [];
+if (typeof window !== 'undefined') void aufnehmen().catch(() => {});
+
+/** Alle Rettungskopien — auch eine, die noch in sessionStorage liegt */
+export async function rettungen(): Promise<Rettung[]> {
+  const liste = (await idbGet<Rettung[]>(KEY).catch(() => undefined)) ?? [];
+  const roh = ausSitzung();
+  return roh && !liste.some((r) => r.text === roh) ? [...liste, { am: new Date().toISOString(), text: roh }] : liste;
+}
 /** Die jüngste Rettungskopie als Datei — so, wie sie im Speicher stand */
 export async function rettungHerunterladen(): Promise<boolean> {
   const r = (await rettungen()).at(-1);
@@ -37,5 +49,6 @@ export async function rettungHerunterladen(): Promise<boolean> {
 }
 export async function rettungVerwerfen(): Promise<void> {
   await idbDel(KEY);
+  try { sessionStorage.removeItem(SITZUNG); } catch { /* egal */ }
   window.dispatchEvent(new CustomEvent(RETTUNG_EREIGNIS));
 }

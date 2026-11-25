@@ -58,7 +58,8 @@ drei sind geschlossen. Liegen die Inhalte noch auf einem seiner Geräte, lädt e
   aus der Zeit vor M329, dann je Verdacht `object/info`. Gefundenes wird wie ein hier ersetztes Tool verbucht
   (`Kenn.ersetzt`, M524) — nicht geholt, beim nächsten Schreiben hochgeladen. Läuft 20 s nach dem Start, alle 6 h im
   Takt und (nur Teil i, ohne Netz) 3 s nach `pixinotes:dateien-da`.
-- `lib/anhangKopie.ts`: fehlt der Inhalt hier, `kontoDateiHolen(alt)` → `file:<neu>`. Live-Tools reisen nicht mit.
+- `lib/anhangKopie.ts`: fehlt der Inhalt hier und nennt das Konto die Datei (`kontoDateiBekannt`), wird sie von dort
+  geholt (`kontoDateiNachladen(alt)` → `file:<neu>`) — ein Live-Tool oder ein nie hochgeladener Inhalt fragt nicht.
 - `lib/kontoZustand.ts` (nachgeladen): `zustandMelden(id, data)` aus dem Speicher-Kanal der Karte → nach ≥ 1,5 s,
   höchstens alle 10 s, nur bei geänderter Prüfsumme → `<Nutzer>/zustand-<id>`. `zustandHolen(id, hierAm)` beim Start
   des Tools (`freshestState`): nur wenn das Verzeichnis ein solches Objekt nennt (keine 400 für Tools ohne Stand), nur
@@ -71,8 +72,14 @@ drei sind geschlossen. Liegen die Inhalte noch auf einem seiner Geräte, lädt e
   „eingearbeitet", Board-Schlüssel und Fingerabdrücke; je Board-Fassung ein Eintrag `konto:bb:<Board>:<n>`. Gleiches
   Objekt (WeakMap) oder gleicher Fingerabdruck → derselbe Schlüssel, nichts geschrieben. Nicht mehr genannte Fassungen
   werden gelöscht. Das alte Format wird beim ersten Lesen einmal aufgeteilt. `window.pixinotesKontoBasen` zählt.
-- `store/speicher.ts → getItem`: unlesbarer Text → `lib/rettung.ts` (IndexedDB `pixinotes:rettung`, die letzten drei),
-  `flushPersist` wartet, bis die Kopie liegt. `components/RettungsKopie.tsx` unter Einstellungen → Daten.
+- `store/speicher.ts → getItem`: unlesbarer Text → synchron, vor jedem Überschreiben, nach sessionStorage
+  (`pixinotes-rettung`, eigenes Kontingent — localStorage ist in diesem Fall oft voll). Nur diese eine Zeile steht im
+  Start-Paket (nach M527/M532 waren dort rund 115 B Luft). `lib/rettung.ts` lädt im Leerlauf mit den Einstellungen,
+  legt den Text in die IndexedDB (`pixinotes:rettung`, die letzten drei) und meldet es; `components/RettungsKopie.tsx`
+  unter Einstellungen → Daten. Wird der Tab in den ersten Sekunden geschlossen, ist die Kopie weg (sessionStorage).
+- Start-Paket: Nachgeladene Teile importieren Module des Start-Pakets **statisch** (`versionsAnhaenge`, `useBoard`).
+  Ein `import()` eines Moduls, das im Start-Paket liegt, legt dort ein Namensraum-Objekt aller seiner Exporte an
+  (hier über 500 B) — gemessen beim Einmischen von M527/M532.
 - `lib/sicherung.ts → sicherungEinspielen('ersetzen')`, Gesamt-Sicherung: `leeresStartboard` fällt weg samt leerem
   Start-Bereich; ist es offen, wird ein Board der Sicherung geöffnet.
 

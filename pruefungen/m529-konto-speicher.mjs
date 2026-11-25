@@ -36,6 +36,8 @@ const NUR = process.argv.slice(2).filter((a) => !a.startsWith('--')).map((a) => 
 const will = (abschnitt) => NUR.length === 0 || NUR.includes(abschnitt);
 const LAUT = process.argv.includes('--laut');
 const SAAT = 529;
+/** Bildschirmfotos für den Bericht (nur von Hand): M529_BILDER=<Ordner> */
+const BILDER = process.env.M529_BILDER ?? '';
 
 // Labor für O1 (Speicher + Sicherung im Browser, wie m522)
 const tmp = mkdtempSync(path.join(tmpdir(), 'm529-'));
@@ -601,6 +603,7 @@ if (will('F') || will('Z')) {
   pruefe(`F1 B fragt die fehlende Datei nicht bei jedem Abgleich wieder (${lesen} Lesevorgänge seit dem ersten Mal)`, lesen >= 2 && anfragen.length <= 2, `${anfragen.length} Anfragen\n${zeigeProtokoll(anfragen, 6)}`);
   const hinweis = await B.P.locator('.react-flow__node[data-id="h1"]').innerText().catch(() => '');
   pruefe('F2 die Karte sagt, dass der Inhalt auch im Konto fehlt', /fehlt auf diesem Gerät und im Konto/.test(hinweis), hinweis.slice(0, 200));
+  if (BILDER) await B.P.locator('.react-flow__node[data-id="h1"]').screenshot({ path: join(BILDER, 'm529-karte-fehlt.png') }).catch(() => {});
   // Anna öffnet PixiNotes neu: ihr Gerät hat die Datei und reicht sie nach
   const m2 = protokoll.length;
   await A.P.reload({ waitUntil: 'networkidle' });
@@ -657,6 +660,7 @@ if (will('A')) {
   await warteBis(A.P, async () => (await A.P.locator('[data-taste="konto-aufraeumen-stand"]').count()) > 0, 15000);
   const stand = await A.P.locator('[data-taste="konto-aufraeumen-stand"]').innerText();
   pruefe('A1 gezeigt: zwei verwaiste Dateien, eine jüngere bleibt', /2 Dateien ohne Verweis/.test(stand) && /1 jüngere Datei bleibt/.test(stand), stand);
+  if (BILDER) await A.P.locator('[data-taste="konto-aufraeumen"]').screenshot({ path: join(BILDER, 'm529-speicher-aufraeumen.png') }).catch(() => {});
   pruefe('A2 vor der Bestätigung ist nichts gelöscht', [...sb.objekte.keys()].length === vorher);
   let gefragt = '';
   A.P.once('dialog', (d) => { gefragt = d.message(); });
@@ -717,7 +721,7 @@ if (will('O')) {
   const fehler = [];
   P.on('pageerror', (e) => fehler.push(e.message));
   await P.goto(`http://localhost:${PORT}/`, { waitUntil: 'networkidle' });
-  const gesichert = await warteBis(P, async () => (await ablage(P, 'pixinotes:rettung'))?.[0]?.text === ROH, 10000);
+  const gesichert = await warteBis(P, async () => (await ablage(P, 'pixinotes:rettung'))?.[0]?.text === ROH, 30000);
   pruefe('O2.1 der unlesbare Stand liegt als Rettungskopie in der Geräte-Ablage', gesichert);
   const ueberschrieben = await warteBis(P, () => P.evaluate(() => { try { JSON.parse(localStorage.getItem('pixinotes-board')); return true; } catch { return false; } }), 10000);
   pruefe('O2.2 erst danach wird neu gespeichert (die App läuft weiter)', ueberschrieben && fehler.length === 0, fehler.join(' | '));

@@ -566,6 +566,9 @@ export async function kontoDateiNachladen(id: string): Promise<Blob | null> {
   return blob;
 }
 
+/** M529: Nennt das Konto diese Datei (zuletzt gelesene Umgebung)? Fragt nichts beim Server */
+export const kontoDateiBekannt = async (id: string): Promise<boolean> => (await kennLesen()).dateien.includes(id);
+
 // ---------- M529: Dateien, die im Konto fehlen ----------
 // Befund beim Besitzer: Karten (eigene Tools) verwiesen auf `datei-<Kennung>`, die es im Dateispeicher nicht gab —
 // jedes Gerät fragte bei jedem Aufbau der Karte und bei jedem Abgleich erneut (HTTP 400 in der Konsole), und niemand

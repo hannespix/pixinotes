@@ -165,15 +165,8 @@ function setWriterRole(role: WriterRole): void {
  *  true = der aktuelle Stand liegt jetzt sicher in localStorage.
  *  Bei Quota-Fehler bleibt der Write gepuffert (Retry beim nächsten Flush).
  *  M525 `gruendlich` (Seite wird verlassen/verdeckt): Text ohne Gedächtnis, siehe speicherText. */
-/** M529: Wird gerade ein unlesbarer Stand als Rettungskopie aufgehoben, wartet das Schreiben darauf */
-let rettungLaeuft: Promise<void> | null = null;
 export function flushPersist(gruendlich?: boolean): boolean {
   if (!pendingWrite) return true;
-  if (rettungLaeuft) {
-    clearTimeout(writeTimer);
-    void rettungLaeuft.then(() => { writeTimer = setTimeout(flushPersist, 0); });
-    return false;
-  }
   try {
     const wert = pendingWrite.wert;
     let text = speicherText(wert, gruendlich === true);
@@ -243,14 +236,14 @@ export const speicherAblage = {
     // (Puffer: der Stand im Arbeitsspeicher — ohne Verweise, M532)
     const roh = pendingWrite?.key === k ? JSON.stringify(pendingWrite.wert) : localStorage.getItem(k);
     if (roh === null) return null;
-    let g: Gespeichert;
-    try { g = JSON.parse(roh) as Gespeichert; } catch {
-      // M529 (M522 O2): Unlesbar — vor dem ersten Überschreiben als Rettungskopie aufheben (lib/rettung.ts)
-      rettungLaeuft = import('../lib/rettung').then((m) => m.rettungSichern(roh)).catch(() => {}).finally(() => { rettungLaeuft = null; });
+    nachDemLaden(roh);   // (verträgt Unlesbares: das Nachgeladene fängt seinen Fehler selbst)
+    try { return JSON.parse(roh) as Gespeichert; } catch {
+      // M529 (M522 O2): Unlesbar — sofort (synchron, vor jedem Überschreiben) aufheben. sessionStorage hat ein eigenes
+      // Kontingent; lib/rettung.ts (lädt im Leerlauf mit den Einstellungen) legt es in die Geräte-Ablage. Hier steht
+      // so wenig wie möglich — das Start-Paket hat kaum Luft.
+      try { sessionStorage.setItem('pixinotes-rettung', roh); } catch { /* kein Platz: nichts zu retten */ }
       return null;
     }
-    nachDemLaden(roh);
-    return g;
   },
   setItem: (k: string, v: Gespeichert): void => {
     if (writerRole !== 'writer') return; // Mitlese-Fenster schreibt NIE
