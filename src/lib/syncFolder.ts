@@ -3,7 +3,7 @@
 // der Desktop-Client des Cloud-Dienstes auf alle Geräte spiegelt. Kein Server,
 // kein CORS, keine App-Passwörter — funktioniert überall, wo der Sync-Client läuft.
 // Das Ordner-Handle wird in IndexedDB gemerkt (übersteht Neustarts in Chrome/Edge).
-import { ablageVorab } from '../store/ablage';
+import { ablageVorab } from '../store/speicher';
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc, type Space } from '../store';
 import { berichtAlsSatz, dreiWegeMerge, nurAuswahlAnders, ohneAuswahl, tabellenMischen, type SyncStand } from './syncMerge';
 import { grabsteineFuer, grabsteineVereinigen } from './grabsteine';

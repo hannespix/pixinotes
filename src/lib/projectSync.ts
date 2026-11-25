@@ -7,7 +7,7 @@
 // WICHTIG: Das Paket enthält NIEMALS KI-Schlüssel, WebDAV-Zugangsdaten oder
 // OAuth-Tokens — die leben in eigenen localStorage-Schlüsseln außerhalb des
 // Board-Stores und werden hier gar nicht erst angefasst.
-import { ablageVorab } from '../store/ablage';
+import { ablageVorab } from '../store/speicher';
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc } from '../store';
 import { ensurePermission, idbDel, idbGet, idbSet, syncSupported, type SyncDirHandle } from './syncFolder';
 import { nurAuswahlAnders, ohneAuswahl } from './syncMerge';

@@ -20,12 +20,11 @@
  */
 
 /** Ab dieser Länge wird eine data-URL ausgelagert (kleine Symbole bleiben im Text — sie kosten dort nichts) */
-export const AUSLAGERN_AB = 10_000;
+export { AUSLAGERN_AB } from './speicher';
+import { ablageAnmelden, AUSLAGERN_AB, gedaechtnisVerwerfen } from './speicher';
 const PRAEFIX = 'pixinotes-ablage:';
 /** Ein Verweis, wie er im gespeicherten Text steht — und nur so (ganzer Wert, keine Teilzeichenkette) */
 export const VERWEIS_MUSTER = /^pixinotes-ablage:[0-9a-z]{1,12}-[0-9a-z]{1,12}-\d{1,10}$/;
-/** dasselbe zum Finden im rohen JSON-Text (mit Anführungszeichen) */
-export const VERWEIS_IM_TEXT = /"(pixinotes-ablage:[0-9a-z]{1,12}-[0-9a-z]{1,12}-\d{1,10})"/g;
 
 /** Prüfsumme (cyrb53) — zwei Durchläufe mit verschiedenem Startwert ergeben mit der Länge rund 106 Bit */
 function streu(s: string, seed: number): number {
@@ -59,17 +58,14 @@ export const A = {
   offen: new Map<string, string>(),
   lauf: null as Promise<void> | null,
   /** Meldet der Speicherschicht: Es liegt Neues sicher in der Ablage — den Stand jetzt mit Verweisen schreiben */
-  nachSichern: () => {},
-  /** Der Speicher verwirft sein Text-Gedächtnis (M525) — nötig, sobald `gesichert` wächst */
-  vergessen: () => {},
+  nachSichern: () => melden.an(),
   /** Zähler für Prüfreihen und Fehlersuche */
   zaehler: { gesichert: 0, fehler: 0, geladen: 0, fehlt: 0 },
 };
 let geplant = false;
-export const beimSichern = (fn: () => void, vergessen: () => void): void => { A.nachSichern = fn; A.vergessen = vergessen; };
 /** Aus der Ablage geladen: Der Inhalt liegt sicher, und sein Verweis ist bekannt (kein erneutes Durchrechnen) */
 export const alsGesichertMerken = (v: string, daten?: string): void => {
-  if (!A.gesichert.has(v)) { A.gesichert.add(v); A.vergessen(); }
+  if (!A.gesichert.has(v)) { A.gesichert.add(v); gedaechtnisVerwerfen(); }
   if (daten !== undefined && verweise.size < 2000) verweise.set(daten, v);
 };
 
@@ -91,8 +87,7 @@ export function planen(): void {
 }
 /** Alles Offene sichern, eins nach dem anderen (ablageIdb.ts) */
 export const abarbeiten = (): Promise<void> => (A.lauf ??= import('./ablageIdb').then((m) => m.abarbeiten(), () => { A.offen.clear(); A.lauf = null; }));
-/**
- * Einen Stand von außen (Konto, Ordner, WebDAV) VOR dem Übernehmen in die Ablage legen: Dann trägt schon das erste
- * Speichern nach dem Einarbeiten Verweise statt der Bilder — und scheitert nicht am vollen localStorage.
- */
-export const ablageVorab = (wert: unknown): Promise<void> => import('./ablageIdb').then((m) => m.vorab(wert), () => {});
+
+/** Hier meldet die Speicherschicht, was nach dem Sichern zu tun ist (ablageAnmelden) */
+const melden = { an: () => {} };
+ablageAnmelden(ablageErsetzer, melden);

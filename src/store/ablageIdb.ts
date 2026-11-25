@@ -5,7 +5,46 @@
  * bewusst ohne lib/syncFolder, damit die Speicherschicht nicht am ganzen Abgleich hängt. Datenbankname, Version und
  * Tabelle müssen mit lib/syncFolder.ts übereinstimmen.
  */
-import { A, AUSLAGERN_AB, VERWEIS_MUSTER, ablageErsetzer, abarbeiten as planeLauf, planen } from './ablage';
+import { A, AUSLAGERN_AB, VERWEIS_MUSTER, ablageErsetzer, abarbeiten as planeLauf, alsGesichertMerken, planen } from './ablage';
+import { runDerived, speicherAuswahl } from './speicher';
+import type { BoardDoc, BoardState } from './typen';
+import { useBoard } from '../store';
+
+/** Verweise im rohen JSON-Text (mit Anführungszeichen) */
+const VERWEIS_IM_TEXT = /"(pixinotes-ablage:[0-9a-z]{1,12}-[0-9a-z]{1,12}-\d{1,10})"/g;
+const verweiseIn = (roh: string): Set<string> => new Set([...roh.matchAll(VERWEIS_IM_TEXT)].map((m) => m[1]));
+/** Die gespeicherten Felder, die Inhalte tragen können (alles, was speicherAuswahl schreibt) */
+const inhaltsFelder = (s: BoardState): Record<string, unknown> => ({ ...speicherAuswahl(s), boards: s.boards });
+
+/**
+ * Nach dem Laden des Stands (speicher.ts → standBereit, main.tsx zeichnet erst danach): Verweise durch ihre Inhalte
+ * ersetzen — per runDerived (kein Hochladen, kein Rückgängig-Schritt), Unverändertes bleibt dasselbe Objekt. Ein
+ * alter Stand mit eingebetteten Bildern zieht im Leerlauf in die Ablage um (ohne den Start zu verzögern).
+ */
+export async function nachDemLaden(roh: string): Promise<void> {
+  const verweise = verweiseIn(roh);
+  if (verweise.size) {
+    const inhalte = await inhalteLaden(verweise);
+    for (const [v, x] of inhalte) alsGesichertMerken(v, x);
+    const s = useBoard.getState();
+    const teil: Record<string, unknown> = {};
+    for (const [k, alt] of Object.entries(inhaltsFelder(s))) {
+      const neu = verweiseEinsetzen(alt, inhalte);
+      if (neu !== alt) teil[k] = neu;
+    }
+    if (Object.keys(teil).length) runDerived(() => useBoard.setState(teil as Partial<BoardState>));
+  }
+  if (roh.length > AUSLAGERN_AB && roh.includes('"data:')) {
+    const umziehen = () => vormerken(inhaltsFelder(useBoard.getState()));
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(umziehen, { timeout: 4000 }); else setTimeout(umziehen, 1500);
+  }
+}
+/** Mitlese-Fenster (adoptPersistedState): Boards eines rohen Stands mit eingesetzten Inhalten */
+export async function mitInhalten(roh: string, boards: BoardDoc[]): Promise<BoardDoc[]> {
+  const inhalte = await inhalteLaden(verweiseIn(roh));
+  for (const [v, x] of inhalte) alsGesichertMerken(v, x);
+  return verweiseEinsetzen(boards, inhalte);
+}
 
 let offen: Promise<IDBDatabase> | null = null;
 function db(): Promise<IDBDatabase> {

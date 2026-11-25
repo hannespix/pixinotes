@@ -37,30 +37,33 @@ liegt — wenn das Konto es schon hat — wieder im Konto und kommt mit dem näc
 dem Neuladen eines Fensters mit ungespeicherter Arbeit: Einstellungen → Daten → „Alles sichern".
 
 ## Wie (Architektur)
-- **`src/store/ablage.ts`** (Start-Paket, klein): `ablageErsetzer` ist der `JSON.stringify`-Ersetzer des Speichers.
-  Eine `data:`-URL ab `AUSLAGERN_AB` (10 000) Zeichen wird zum Verweis `pixinotes-ablage:<prüfsumme>-<prüfsumme>-<länge>`
-  (`verweisVon`, cyrb53 mit zwei Startwerten, rund 106 Bit plus Länge) — **aber nur, wenn ihr Inhalt nachweislich in
-  der IndexedDB liegt** (`gesichert`). Sonst bleibt sie im Text und wird vorgemerkt (`offen`); `abarbeiten` sichert
-  im Leerlauf eins nach dem anderen (`requestIdleCallback`) und meldet danach `nachSichern` → der Speicher verwirft
-  sein Text-Gedächtnis (M525) und schreibt einmal neu (`reassertPersist`). So entsteht nie ein Verweis ohne Inhalt.
-  `navigator.storage.persist()` wird einmal angefragt, sobald etwas in der Ablage liegt.
-- **`src/store/ablageIdb.ts`** (nachgeladen): `inhaltSichern` (Schreibtransaktion mit `durability: 'strict'`),
-  `inhalteLaden`, `verweiseEinsetzen` (ersetzt nur Verweise, Unverändertes bleibt dasselbe Objekt). Dieselbe Datenbank
-  wie `lib/syncFolder.ts` (`pixinotes-sync`, Tabelle `kv`), Schlüssel = der Verweis.
-- **`src/store/speicher.ts`**: Alle Texte (`einzeln`, `objektText`, `speicherText`, Prüfbetrieb `vollText`) laufen
-  durch `ablageErsetzer`; das M525-Gedächtnis bleibt gültig, weil sich der Text eines Objekts nur ändert, wenn ein
-  Inhalt neu gesichert wurde (dann wird das Gedächtnis verworfen). `speicherAblage.getItem` ruft `nachDemLaden(roh)`:
-  Verweise im rohen Text (`VERWEIS_IM_TEXT`) → Inhalte laden → per `runDerived` in den Store setzen (kein Hochladen,
-  kein Rückgängig-Schritt); große data-URLs im Text (alter Stand) → im Leerlauf `vormerken`. `standBereit()` ist das
-  Versprechen dazu; **`main.tsx` zeichnet erst danach** (und erst danach `alteNamenOhneEmoji`) — keine Karte ohne Bild,
-  kein Abgleich/Export, der einen Verweis sieht. `adoptPersistedState` (Mitlese-Fenster) setzt Verweise ebenso ein,
-  bevor es übernimmt. **Der Store hält nie einen Verweis** — deshalb ändern sich Export, Teilen und Abgleich nicht.
-- **`ablageVorab(wert)`**: Ein Stand von außen wird vor dem Übernehmen in die Ablage gelegt, sonst scheiterte schon
-  das erste Speichern nach dem Einarbeiten. Aufgerufen in `fremdStandEinarbeiten` (Konto, Ordner, WebDAV),
-  `projectSync` (Team-Ordner: Beitreten, Prüfen) und den Lade-Knöpfen in `Settings.tsx`.
-- **Meldung:** `flushPersist` merkt den Grund (`QuotaExceededError` → `voll`, sonst `anderer`);
-  `speicherFehlerText()` liefert den Satz für `kontoSync.ts` (drei Stellen). Der allgemeine Hinweis bei vollem Speicher
-  (`pixinotes:quota` in `App.tsx`) nennt „Alles sichern".
+- **`src/store/speicher.ts`** (Start-Paket): Alle Texte (`einzeln`, `objektText`, `speicherText`, Prüfbetrieb
+  `vollText`) laufen durch `ersetzer`. Bis die Ablage geladen ist, ist das ein winziger Wächter: Trifft er eine
+  `data:`-URL ab `AUSLAGERN_AB` (10 000) Zeichen, lädt er `ablageIdb.ts` (und damit `ablage.ts`) nach; die meldet sich
+  mit `ablageAnmelden` an, setzt ihren Ersetzer ein, verwirft das Text-Gedächtnis (M525) und schreibt einmal neu. So
+  kostet M532 das Start-Paket rund 1 KB (Grenze m502: 2 065 000 B).
+  `speicherAblage.getItem` ruft `nachDemLaden(roh)`: Stehen Verweise im Text (oder alte große data-URLs), lädt die
+  Ablage nach; `standBereit()` ist das Versprechen dazu, und **`main.tsx` zeichnet erst danach** (und erst danach
+  `alteNamenOhneEmoji`) — keine Karte ohne Bild, kein Abgleich/Export, der einen Verweis sieht. `adoptPersistedState`
+  (Mitlese-Fenster) setzt Verweise ebenso ein (`mitInhalten`), bevor es übernimmt. **Der Store hält nie einen
+  Verweis** — deshalb ändern sich Export, Teilen und Abgleich nicht.
+- **`src/store/ablage.ts`** (nachgeladen): `ablageErsetzer` macht aus einer großen `data:`-URL den Verweis
+  `pixinotes-ablage:<prüfsumme>-<prüfsumme>-<länge>` (`verweisVon`, cyrb53 mit zwei Startwerten, rund 106 Bit plus
+  Länge) — **aber nur, wenn ihr Inhalt nachweislich in der IndexedDB liegt** (`A.gesichert`). Sonst bleibt sie im Text
+  und wird vorgemerkt (`A.offen`), `planen` sichert im Leerlauf (`requestIdleCallback`).
+- **`src/store/ablageIdb.ts`** (nachgeladen): `abarbeiten` sichert eins nach dem anderen (`inhaltSichern`,
+  Schreibtransaktion mit `durability: 'strict'`) und führt das Gesicherte **erst am Ende, gemeinsam mit dem
+  Neuschreiben** als gesichert (sonst passte ein dazwischen geprüfter, gemerkter Text nicht mehr zum Stand — m525 S9
+  fing genau das). `nachDemLaden` (Verweise einsetzen per `runDerived`: kein Hochladen, kein Rückgängig-Schritt;
+  alter Stand: im Leerlauf `vormerken`), `mitInhalten`, `inhalteLaden`, `verweiseEinsetzen` (Unverändertes bleibt
+  dasselbe Objekt), `vorab`. Dieselbe Datenbank wie `lib/syncFolder.ts` (`pixinotes-sync`, Tabelle `kv`), Schlüssel =
+  der Verweis. `navigator.storage.persist()` wird einmal angefragt, sobald etwas in der Ablage liegt.
+- **`ablageVorab(wert)`** (speicher.ts): Ein Stand von außen wird vor dem Übernehmen in die Ablage gelegt, sonst
+  scheiterte schon das erste Speichern nach dem Einarbeiten. Aufgerufen in `fremdStandEinarbeiten` (Konto, Ordner,
+  WebDAV), `projectSync` (Team-Ordner: Beitreten, Prüfen) und den Lade-Knöpfen in `Settings.tsx`.
+- **Meldung:** `flushPersist` merkt den Grund (`QuotaExceededError` → `voll`, sonst `anderer`, `speicherFehlerArt`);
+  `speicherFehlerText()` in `kontoSync.ts` baut daraus den Satz (drei Stellen). Der allgemeine Hinweis bei vollem
+  Speicher (`pixinotes:quota` in `App.tsx`) nennt „Alles sichern".
 
 ## Grenzen / offen
 - **Aufräumen** verwaister Einträge `pixinotes-ablage:*` gibt es noch nicht (ein gelöschtes Bild bleibt in der
