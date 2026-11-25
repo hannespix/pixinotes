@@ -41,6 +41,12 @@ const ZAEH: Record<FluessigZaeh, Partial<PhysikWerte>> = {
   zaeh: { viscosity: 0.85, attraction: 0.95 },
 };
 const MAX_AKTIV = 3;
+/**
+ * M535: Steht die Maus so lange still über der Karte, hält die Flüssigkeit an (kein Rechnen, kein Zeichnen) — der
+ * Magnet und „lebendig" ließen sie sonst dauernd rechnen, obwohl niemand etwas tut (M518, Befund 2). Die nächste
+ * Bewegung weckt sie sofort. Einschwingen, Platzen und ein fallender Tropfen laufen erst zu Ende.
+ */
+const ANHALTEN_MS = 2000;
 const SCHRIFT_REF = 100;
 
 /** Für Prüfreihen und Fehlersuche: wie oft der Takt lief und wie viele Karten gerade rechnen */
@@ -188,6 +194,8 @@ export class Flaeche {
   private hand: { x: number; y: number } | null = null;
   private restCalm = 0;
   private ruht = false;
+  /** M535: Liegt der Mauszeiger gerade über der Karte (nicht Finger/Stift)? */
+  private mausDrueber = false;
   private zusammensetzen = true;
   private sichtbar = false;
   /** Liegt die Karte bereit zum Anfassen (markiert/Fokus/Folie)? Sonst zieht ein Druck die Karte. */
@@ -234,7 +242,7 @@ export class Flaeche {
     an('pointerup', (ev) => this.los(ev));
     an('pointercancel', (ev) => { if (ev.pointerId === this.pointer.id) this.langerDruck(); this.los(ev); });
     an('lostpointercapture', (ev) => this.los(ev));
-    an('pointerleave', () => { this.magnetAn = false; if (!this.pointer.down) this.pointer.last = 0; });
+    an('pointerleave', () => { this.magnetAn = false; this.mausDrueber = false; if (!this.pointer.down) this.pointer.last = 0; });
     an('contextmenu', (ev) => { if (this.pointer.id !== -1 && this.pointer.typ !== 'mouse') { ev.preventDefault(); this.langerDruck(); } });
   }
 
@@ -333,6 +341,9 @@ export class Flaeche {
       this.restCalm = 1;
       if (!this.pointer.down) this.ruht = true;
       this.zeichnen();
+      // M535: „Lebendig" schläft nie von selbst — nach dem Neu-Abtasten (Größe geändert, Schrift nachgeladen) blieb sie
+      // sonst stehen, bis jemand sie berührte (M525, Grenzen)
+      if (this.e.lebendig) this.aufwecken();
     }
   }
 
@@ -405,7 +416,14 @@ export class Flaeche {
   wirdBeruehrt(): boolean { return this.pointer.down || this.magnetAn; }
 
   willLaufen(): boolean {
-    return this.sichtbar && !this.ruht && !!this.fluid && this.fluid.n > 0 && !this.still;
+    return this.sichtbar && !this.ruht && !!this.fluid && this.fluid.n > 0 && !this.still && !this.angehalten(performance.now());
+  }
+
+  /** M535: Maus steht seit ANHALTEN_MS still über der Karte, und nichts ist gerade im Gang, das zu Ende laufen muss */
+  angehalten(t: number): boolean {
+    const p = this.pointer;
+    return this.mausDrueber && !p.down && p.id === -1 && p.last > 0 && t - p.last > ANHALTEN_MS
+      && t > this.settle.until && !this.burstUntil && !this.tropfen;
   }
 
   /** Ein Bild: Effekte, Physik in festen Schritten von 1/120 s, Ruhe erkennen, zeichnen */
@@ -483,6 +501,7 @@ export class Flaeche {
     this.magnetAn = !fremd && !p.down && ev.pointerType === 'mouse' && !!b && x > b.l && x < b.r && y > b.o && y < b.u;
     this.magnet.x = x; this.magnet.y = y;
     p.x = x; p.y = y; p.last = jetzt;
+    this.mausDrueber = ev.pointerType === 'mouse';
     if (!fremd) { this.idleSince = jetzt; this.aufwecken(); }
   }
 
@@ -538,8 +557,8 @@ export class Flaeche {
   }
 
   /** Nur für Prüfreihen: wie die Flüssigkeit gerade steht */
-  zustand(): { teilchen: number; ruht: boolean; sichtbar: boolean; umriss: Umriss | null } {
-    return { teilchen: this.fluid?.n ?? 0, ruht: this.ruht, sichtbar: this.sichtbar, umriss: this.umriss };
+  zustand(): { teilchen: number; ruht: boolean; sichtbar: boolean; umriss: Umriss | null; angehalten: boolean } {
+    return { teilchen: this.fluid?.n ?? 0, ruht: this.ruht, sichtbar: this.sichtbar, umriss: this.umriss, angehalten: this.angehalten(performance.now()) };
   }
 }
 
