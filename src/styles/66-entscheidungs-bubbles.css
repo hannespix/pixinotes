@@ -253,7 +253,7 @@
 }
 /* ---------- M543: KI gruppiert — die Blasen kreisen (Physik), die alten Gruppen treten zurück, neue erscheinen sanft ---------- */
 .bub-ki-hinweis {
-  position: absolute; left: 50%; top: 8px; z-index: 6; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 6px;
+  position: absolute; left: 8px; top: 8px; z-index: 6; display: inline-flex; align-items: center; gap: 6px;   /* wo sonst „＋ Gruppe" steht */
   height: 26px; padding: 0 12px; box-sizing: border-box; border: 1px solid var(--border-soft); border-radius: 13px;
   background: var(--surface-card); color: var(--ink); font-size: 12px; font-weight: 600; white-space: nowrap; pointer-events: none;
 }

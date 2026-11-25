@@ -673,12 +673,14 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
     const wb = wirbelAb.current;
     const anlauf = wb == null ? 0 : Math.min(1, (performance.now() - wb) / WIRBEL_ANLAUF_MS);
     const omega = ((2 * Math.PI) / WIRBEL_RUNDE_MS) * SCHRITT_MS * anlauf;
-    const kreis = Math.max(20, Math.min(Math.min(w, h) * 0.3, Math.min(w, h) / 2 - rMax - 14));
+    // etwas unter der Mitte: oben links steht der Hinweis „KI gruppiert …"
+    const unter = Math.min(18, h * 0.05);
+    const kreis = Math.max(20, Math.min(Math.min(w, h) * 0.3, Math.min(w, h) / 2 - rMax - 14 - unter));
     for (const [bid, k] of ks) {
       k.r += (k.ziel - k.r) * 0.18;
       if (bid === gezogen) { k.vx = 0; k.vy = 0; continue; }
       if (wb != null) {
-        const dx = k.x - w / 2; const dy = k.y - h / 2; const dist = Math.hypot(dx, dy) || 1;
+        const dx = k.x - w / 2; const dy = k.y - (h / 2 + unter); const dist = Math.hypot(dx, dy) || 1;
         const schub = omega * Math.max(dist, kreis * 0.5) * ((1 - daempfung) / daempfung);
         const hin = (kreis - dist) * 0.003 * anlauf;
         k.vx += (-dy / dist) * schub + (dx / dist) * hin;
@@ -709,7 +711,9 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
           if (dist < 0.01) { dx = 1; dy = 0; dist = 1; }
           // M429: sanfter als zuvor (0,11) — die Gruppen schoben sich gegenseitig an, statt nur Abstand zu halten
           const ff = sch[i].f * sch[j].f;
-          const sx = (dx / dist) * tiefe * 0.08 * ff; const sy = (dy / dist) * tiefe * 0.08 * ff;
+          // M543: höchstens 50 Punkte Tiefe — ein riesiger Kreis um eben verstreute Ideen schleuderte sie sonst davon
+          const tf = Math.min(tiefe, 50);
+          const sx = (dx / dist) * tf * 0.08 * ff; const sy = (dy / dist) * tf * 0.08 * ff;
           for (const [bid, k] of ks) {
             if (bid === gezogen) continue;
             if (k.g === sch[i].g) { k.vx -= sx; k.vy -= sy; } else if (k.g === sch[j].g) { k.vx += sx; k.vy += sy; }
@@ -722,7 +726,8 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
         const oben = tropfenRef.current ? 3 + TROPFEN_KUPPE : 3;
         const rx = c.x - c.r < 3 ? 3 - (c.x - c.r) : c.x + c.r > w - 3 ? (w - 3) - (c.x + c.r) : 0;
         const ry = c.y - c.r < oben ? oben - (c.y - c.r) : c.y + c.r > h - 3 ? (h - 3) - (c.y + c.r) : 0;
-        for (const [bid, k] of ks) if (k.g === g && bid !== gezogen) { k.vx += (c.x - k.x) * 0.012 + rx * 0.05 * f; k.vy += (c.y - k.y) * 0.012 + ry * 0.05 * f; }
+        const rxf = Math.max(-50, Math.min(50, rx)) * 0.05 * f; const ryf = Math.max(-50, Math.min(50, ry)) * 0.05 * f;   // M543: ebenso begrenzt
+        for (const [bid, k] of ks) if (k.g === g && bid !== gezogen) { k.vx += (c.x - k.x) * 0.012 + rxf; k.vy += (c.y - k.y) * 0.012 + ryf; }
       }
       for (const [bid, k] of ks) {
         if (k.g || bid === gezogen) continue;
@@ -732,7 +737,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
         for (const { s: c, f } of sch) {
           const dx = k.x - c.x; const dy = k.y - c.y; const dist = Math.hypot(dx, dy) || 1;
           const tiefe = (c.r + k.r + (tropfenRef.current ? 22 : 4) - dist) * f;
-          if (tiefe > 0) { k.vx += (dx / dist) * tiefe * 0.05 + (ax / an) * Math.min(tiefe, 40) * 0.05; k.vy += (dy / dist) * tiefe * 0.05 + (ay / an) * Math.min(tiefe, 40) * 0.05; }
+          if (tiefe > 0) { const tf = Math.min(tiefe, 60); k.vx += (dx / dist) * tf * 0.05 + (ax / an) * Math.min(tiefe, 40) * 0.05; k.vy += (dy / dist) * tf * 0.05 + (ay / an) * Math.min(tiefe, 40) * 0.05; }   // M543: begrenzt wie oben
         }
       }
     }

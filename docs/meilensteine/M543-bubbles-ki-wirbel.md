@@ -46,6 +46,16 @@ dass etwas läuft; die Karte stand still, und mit der Antwort waren die Gruppen 
 - **Tropfen-Rand** je Körper `Koerper.rand` (0…1, Zeitkonstante `RAND_TAU`) statt an/aus; Kern und Kuppe einer Gruppe
   wachsen mit dem Mittel ihrer Ränder (`daVon`). `randRest` hält die Rechnung wach, bis alle Ränder stehen (wie
   `namenRest`). Die gezogene Idee löst sich weiter sofort.
+- **Gruppen-Kräfte wachsen mit der Gruppe** (`fest(g)` in `schritt()`, Mittel von `k.rand`): Abstoßen der Gruppen, „als
+  Ganzes in die Bühne" und „freie Ideen aus den Gruppenfeldern" zählen anteilig. Gemessen (m543 B6): Bekamen über die Bühne
+  verstreute Ideen eine neue Gruppe, war der Kreis um sie riesig, und diese Kräfte schleuderten die Blasen im ersten
+  Augenblick bis zu 40 Punkte je Bild (vMax ist ein Radius je Schritt) — das gab es auch vor M543 nach jedem KI-Ergebnis.
+  Ebenso der Wandabstand für Rand und Namenskuppe (vorher ein Satz von 40 Punkten, sobald eine freie Idee in eine Gruppe
+  kam). In Ruhe sind alle Ränder 1 — dort ändert sich nichts. Zusätzlich sind diese drei Kräfte auf eine Tiefe von 50
+  (Gruppen, Bühnenrand) bzw. 60 Punkten (freie Ideen) begrenzt: Selbst halb gewachsene Gruppen um verstreute Ideen
+  schleuderten sonst noch 28 Punkte je Bild. In Ruhe überlappen Gruppen nie so tief — dort greift die Grenze nicht.
+- **Hinweis-Platz und Kreis:** Der Hinweis steht oben links (wo sonst „＋ Gruppe" steht, das während der KI ausgeblendet
+  ist); der Kreis liegt etwas unter der Mitte (`unter`), sein Radius höchstens 30 % der kurzen Seite.
 - **CSS** (`66-entscheidungs-bubbles.css`, Abschnitt M543): Hinweis aus Tokens (`--surface-card`, `--ink`, `--border-soft`),
   Namen/Ringe im Wirbel ausgeblendet, weicher Farbwechsel; alles Übergänge aus bei `prefers-reduced-motion`.
 

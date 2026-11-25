@@ -301,7 +301,7 @@ if (will('D')) {
   const S = await auf({ reduziert: true });
   await kiNachbauen(S, { ms: 2500 });
   await S.starten();
-  await S.P.waitForTimeout(800);
+  await stillBis(S.P);   // erst, wenn die Bühne nach dem Laden steht
   const vor = Object.fromEntries(Object.entries((await spur(S.P)).blasen).map(([k, p]) => [k, p.length]));
   await kiStarten(S.P);
   const h = await S.P.waitForSelector('[data-taste="bub-ki-hinweis"]', { timeout: 3000 }).then(() => hinweis(S.P)).catch(() => null);
