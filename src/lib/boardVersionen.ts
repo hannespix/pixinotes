@@ -145,6 +145,8 @@ export function ausduennen(liste: VersionInfo[], jetzt = Date.now()): VersionInf
 
 /** Alle Schreibvorgänge nacheinander — sonst überschrieben sich zwei Sicherungen gegenseitig die Liste */
 let kette: Promise<unknown> = Promise.resolve();
+/** M536: holt eine wartende Version „Sitzung" nach (initBoardVersionen setzt sie) */
+let sitzungZuerst = (): void => {};
 function nacheinander<T>(fn: () => Promise<T>): Promise<T> {
   const p = kette.then(fn, fn);
   kette = p.catch(() => {});
@@ -155,6 +157,9 @@ const letzteSig = new Map<string, string>();
 const letzteZeit = new Map<string, number>();
 
 export async function versionenVon(boardId: string): Promise<VersionInfo[]> {
+  // M536: eine wartende Version „Sitzung" gehört in die Liste — erst sichern, dann lesen
+  sitzungZuerst();
+  await kette;
   try {
     const l = (await idbGet<VersionInfo[]>(IX(boardId))) ?? [];
     return [...l].sort((a, b) => b.at - a.at);
@@ -201,11 +206,13 @@ const ANHANG_TYPEN = new Set(['file', 'htmlapp', 'sheet']);
  * `abstandMs`: nicht sichern, wenn der letzte Stand jünger ist (Abgleich im Hintergrund).
  * Rückgabe: der neue Stand, `'gleich'` (schon gesichert) oder null (leer, zu früh, Fehler).
  */
-export function versionSichern(b: BoardDoc | undefined, grund: VersionGrund, abstandMs = 0): Promise<VersionInfo | 'gleich' | null> {
+export function versionSichern(b: BoardDoc | undefined, grund: VersionGrund, abstandMs = 0, zeit?: number): Promise<VersionInfo | 'gleich' | null> {
+  // M536: eine noch wartende Version „Sitzung" (älterer Stand) kommt zuerst in die Reihe
+  if (grund !== 'sitzung') sitzungZuerst();
   if (!b) return Promise.resolve(null);
   const stand = standVon(b);
   const name = b.name;
-  const jetzt = Date.now();
+  const jetzt = zeit ?? Date.now();
   return nacheinander(async () => {
     try {
       const json = JSON.stringify(stand);
@@ -428,13 +435,16 @@ export function initBoardVersionen(): void {
   // als JSON — mitten im Zug ein Ruckler (m525 S1 maß ihn als vollen Stand). Der Stand davor (`a`) ändert sich nie
   // (Store-Objekte werden ersetzt, nicht verändert), also wird nach dem Zug im Leerlauf gesichert; vor dem Verdecken
   // der Seite sofort.
-  const offen = new Map<string, BoardDoc>();
+  // Zeitpunkt = der Moment der Änderung; jede andere Sicherung holt sie vorher nach (sitzungZuerst), damit die Reihenfolge
+  // der Versionen stimmt
+  const offen = new Map<string, { b: BoardDoc; at: number }>();
   const leerlauf = (f: () => void) => (window.requestIdleCallback ? window.requestIdleCallback(f, { timeout: 5000 }) : setTimeout(f, 200));
-  const nachholen = () => { for (const [id, b] of offen) { offen.delete(id); void versionSichern(b, 'sitzung'); } };
+  const nachholen = () => { for (const [id, { b, at }] of offen) { offen.delete(id); void versionSichern(b, 'sitzung', 0, at); } };
+  sitzungZuerst = nachholen;
   // (nach dem Ablegen noch 1,5 s Ruhe: wer gleich weiterzieht, bekommt den Ruckler auch nicht im nächsten Zug)
   const nachDemZug = () => nachZug(() => { setTimeout(los, 1500); });
   const los = (): void => { if (zugLaeuft()) nachDemZug(); else leerlauf(() => (zugLaeuft() ? nachDemZug() : nachholen())); };
-  const spaeter = (a: BoardDoc) => { const neu = !offen.size; offen.set(a.id, a); if (neu) setTimeout(los, 1500); };
+  const spaeter = (a: BoardDoc) => { const neu = !offen.size; offen.set(a.id, { b: a, at: Date.now() }); if (neu) setTimeout(los, 1500); };
   // Was beim Start von selbst nachgetragen wird (Fristen, Seitenbreiten, Abgleich hat seinen eigenen Haken), ist keine
   // Änderung des Nutzers — sonst entstünde bei jedem Start eine Version.
   // M536: Die Version „Sitzung" (Stand vor der ersten EIGENEN Änderung) löst auch später nichts aus, was von selbst
