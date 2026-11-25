@@ -57,7 +57,10 @@ dem Zug, war S1 rot. Gemessen mit Stapel im Build: Auslöser `updateNodeDataOnBo
 true, t = 4 400 ms.
 - **Version „Sitzung" nach dem Zug:** `spaeter(a)` merkt den Stand vor der Änderung (unveränderliches Store-Objekt) und
   sichert ihn 1,5 s später im Leerlauf (`requestIdleCallback`, höchstens 5 s); läuft gerade ein Zug (`zugLaeuft`), erst
-  1,5 s nach dem Ablegen (`nachZug`). Wird die Seite verdeckt, sofort (`nachholen` im `visibilitychange`).
+  1,5 s nach dem Ablegen (`nachZug`). Wird die Seite verdeckt, sofort (`nachholen` im `visibilitychange`). Die Version
+  trägt den Zeitpunkt der Änderung (`versionSichern(…, zeit)`), und jede andere Sicherung sowie `versionenVon` holen eine
+  wartende Version „Sitzung" vorher nach (`sitzungZuerst`) — sonst stand sie in der Liste nach „Board verlassen"
+  (m449 A6 fing das).
 - **Was von selbst entsteht, löst die Version „Sitzung" nicht aus** (`inDerived()`), wie es der Kommentar zu `bereitAb`
   schon für die ersten 2,5 s wollte („sonst entstünde bei jedem Start eine Version"). Die Markierung `geaendert` für die
   automatischen Versionen bleibt wie bisher.
