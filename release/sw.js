@@ -6,6 +6,30 @@
 //  - Assets (JS/CSS/Fonts/Icons): stale-while-revalidate — sofort aus dem
 //    Cache, im Hintergrund aktualisieren.
 const CACHE = 'pixinotes-v1';
+/**
+ * M534: Die Dateien unter assets/ DIESER Veröffentlichung — der Build setzt sie ein (vite.config.ts, swDateiliste).
+ * Damit ändert sich sw.js mit jeder Fassung (der Browser installiert den neuen Service Worker), und beim Übernehmen
+ * fliegt aus dem Cache, was zu keiner der letzten beiden Fassungen gehört. Leer (Entwicklung): nichts wird gelöscht.
+ */
+const DATEIEN = [] /*__PIXINOTES_DATEIEN__*/;
+/** Merkzettel im Cache: die Liste der Fassung davor (ihre Dateien bleiben noch eine Runde, für offene alte Tabs) */
+const LISTE = './__pixinotes-dateien__';
+
+async function aufraeumen() {
+  if (!DATEIEN.length) return;
+  try {
+    const c = await caches.open(CACHE);
+    const vorher = await c.match(LISTE).then((r) => (r ? r.json() : [])).catch(() => []);
+    const behalten = new Set([...DATEIEN, ...(Array.isArray(vorher) ? vorher : [])]);
+    // Gleiche Fassung noch einmal (Neuinstallation ohne Änderung): die Liste davor nicht überschreiben
+    const neu = JSON.stringify(DATEIEN) !== JSON.stringify(vorher);
+    for (const req of await c.keys()) {
+      const m = new URL(req.url).pathname.match(/\/assets\/([^/]+)$/);
+      if (m && !behalten.has(decodeURIComponent(m[1]))) await c.delete(req);
+    }
+    if (neu) await c.put(LISTE, new Response(JSON.stringify(DATEIEN), { headers: { 'Content-Type': 'application/json' } }));
+  } catch (e) { /* Aufräumen ist Pflege — scheitert es, läuft alles weiter wie bisher */ }
+}
 
 /**
  * M523: Die Einstiegsdateien der App-Seite gleich mit in den Cache legen.
@@ -36,6 +60,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
       .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then(aufraeumen)
       .then(() => self.clients.claim()),
   );
 });
