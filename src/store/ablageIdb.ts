@@ -156,6 +156,45 @@ export function verweiseEinsetzen<T>(wert: T, inhalte: Map<string, string>): T {
   return tausch(wert) as T;
 }
 
+/**
+ * M538: Ein Stand von außen (Konto, Ordner, WebDAV, Gast-Link) trägt Verweise statt Bilder — das schreibt nur eine
+ * ältere App-Fassung, die den gespeicherten Stand mit Verweisen gelesen hat (ein lange offener Tab von vor M532). Ohne
+ * Reparatur entschärfte lib/sicher.ts den Verweis als „fremde Quelle" (Bild leer), und das leere Bild ginge an alle.
+ * Verweise werden aus der Ablage dieses Geräts eingesetzt (der Schlüssel ist die Prüfsumme des Inhalts — wer das Bild
+ * je gespeichert hat, hat es unter genau diesem Schlüssel). Fehlt der Inhalt auch hier, bleibt die hiesige Fassung der
+ * Karte stehen (der Abgleich sieht „drüben unverändert"); nur eine Karte, die es hier nicht gibt, kommt wie geliefert.
+ */
+export async function verweiseReparieren<T extends { boards: BoardDoc[] }>(p: T): Promise<T> {
+  const sammle = (v: unknown, in_: Set<string>): void => {
+    if (typeof v === 'string') { if (v.length < 64 && VERWEIS_MUSTER.test(v)) in_.add(v); return; }
+    if (Array.isArray(v)) { for (const x of v) sammle(x, in_); return; }
+    if (v && typeof v === 'object') for (const k of Object.keys(v)) sammle((v as Record<string, unknown>)[k], in_);
+  };
+  const gefunden = new Set<string>();
+  sammle(p.boards, gefunden);
+  if (!gefunden.size) return p;
+  const inhalte = await inhalteLaden(gefunden).catch(() => new Map<string, string>());
+  for (const [v, x] of inhalte) alsGesichertMerken(v, x);
+  let boards = verweiseEinsetzen(p.boards, inhalte);
+  if (inhalte.size < gefunden.size) {
+    const hier = useBoard.getState().boards;
+    boards = boards.map((b) => {
+      const lokal = hier.find((x) => x.id === b.id);
+      if (!lokal || !Array.isArray(b.nodes)) return b;
+      let nodes: typeof b.nodes | null = null;
+      b.nodes.forEach((n, i) => {
+        const hat = new Set<string>();
+        sammle(n, hat);
+        if (![...hat].some((v) => !inhalte.has(v))) return;
+        const k = lokal.nodes.find((x) => x.id === n.id);
+        if (k) { nodes ??= b.nodes.slice(); nodes[i] = k; }
+      });
+      return nodes ? { ...b, nodes } : b;
+    });
+  }
+  return boards === p.boards ? p : { ...p, boards };
+}
+
 let dauerhaftGefragt = false;
 /** Alles Offene sichern, eins nach dem anderen (ein großer Schub würde die IndexedDB für Sekunden belegen). Läuft als A.lauf. */
 export async function abarbeiten(): Promise<void> {

@@ -73,3 +73,51 @@ wie vorher (sie merkt es an der Antwort ohne Vorbedingung; ein „vorbedingung" 
 - `pruefungen/m538c-gast-vorbedingung.mjs` (Port 6538, Gerüst aus m533, Attrappe beider Wege): W mit Migration (Text und
   Punkt bleiben, erstes Schreiben scheitert an der Vorbedingung, zweites geht durch), O ohne Migration (derselbe Aufruf,
   kein Fehler, kein Wiederholen), R Karten, die niemand hielt, ohne Vorbedingung.
+
+## A — Verwaiste Einträge der Geräte-Ablage aufräumen (offen aus M532)
+**Vorher:** Jedes gelöschte, ersetzte oder geänderte große Bild blieb als `pixinotes-ablage:…` in der IndexedDB liegen
+— die Ablage wuchs mit jeder Änderung an einem Bild. **Jetzt:** Einmal am Tag, eine Minute nach dem Start im Leerlauf,
+löscht PixiNotes Einträge, die nichts mehr nennt — und das erst nach sieben Tagen (Schonfrist).
+- `store/ablageAufraeumen.ts` (nachgeladen aus `App.tsx → Vorladen`, nicht im Start-Paket). Genannt ist, was im
+  gespeicherten Stand (`pixinotes-board`), im Ersatzspeicher (M532), in den Rettungskopien (M529, auch sessionStorage),
+  im Stand dieses Fensters und in seinem **Rückgängig-Verlauf** (`past`/`future`, dort als data-URL → ihr Verweis)
+  steht, dazu was gerade gesichert wird (`A.offen`). Versionen (M449), Sicherungen und Abgleich speichern das ganze Bild,
+  nicht den Verweis.
+- Merkzettel `pixinotes-ablage-waisen` (IndexedDB, Verweis → seit wann verwaist). Gelöscht wird nur, was beim Lauf seit
+  mindestens `SCHONFRIST_MS` (7 Tage) verwaist ist — und erst nach einem zweiten, frischen Blick unmittelbar davor.
+  Wieder Genanntes fällt aus dem Merkzettel. Höchstens ein Lauf je 20 h (`pixinotes-ablage-aufgeraeumt`), nur ein
+  Fenster zugleich (Web Lock `pixinotes-ablage-aufraeumen`). `ablage.ts` lädt erst, wenn es Einträge gibt (ihr Laden
+  schaltet das Auslagern ein).
+- **Andere offene Fenster:** Ihren Rückgängig-Verlauf sieht der Lauf nicht. Darum geht eine Nachricht an alle Fenster
+  (BroadcastChannel `pixinotes-ablage`), welche Verweise gelöscht sind; `ablage.ts` nimmt sie aus `A.gesichert` und
+  verwirft das Text-Gedächtnis. Holt ein Fenster das Bild per Rückgängig zurück, legt es den Inhalt erst wieder ab und
+  schreibt dann den Verweis (nie ein Verweis ohne Inhalt) — Prüfreihe B.
+- `window.pixinotesAblageAufraeumen(jetzt?)` für Prüfreihen und Fehlersuche (liefert `{ eintraege, verwaist, geloescht }`).
+- Grenze: Holt ein anderes Fenster das Bild genau in dem Augenblick per Rückgängig zurück, in dem der Lauf löscht, kann
+  sein Schreiben der Nachricht zuvorkommen (sieben Tage verwaist und dann in derselben Sekunde zurückgeholt). Dann fehlt
+  das Bild nach dem Neuladen auf diesem Gerät; Abgleich und Konto tragen es weiter (der Store hält die data-URL).
+
+## F — Alte App-Fassung sieht Verweise (offen aus M532)
+**Befund:** Eine App-Fassung von vor M532 kennt die Verweise nicht. Realistisch ist nur ein **lange offener Tab** von
+vor dem Update auf demselben Gerät (die App-Seite kommt vom Netz zuerst, ein alter Offline-Stand hat nie Verweise
+gesehen — Verweise schreibt nur neuer Code, der online lief und damit auch den Offline-Speicher erneuert hat; eine alte
+portable Datei unter `file://` hat einen eigenen Speicher). So ein Tab übernimmt beim Mitlesen bzw. als Nachfolger des
+Schreibers den Stand mit Verweisen; wird er Schreiber, lädt er sie per Konto/Ordner/WebDAV hoch. Auf anderen Geräten
+entschärfte `lib/sicher.ts` den Verweis dann als fremde Quelle — **das Bild wurde leer**, und das leere Bild ging an alle
+(nachgestellt: Prüfreihe R gegen den Build davor).
+Eine Fassung von vor M538 lässt sich nachträglich nicht umstimmen (ihr Code steht fest). Darum zwei Teile:
+- **Reparatur beim Empfang** (wirkt gegen die heutigen alten Fassungen): `lib/sicher.ts → standGeprueft` (Konto, Ordner,
+  WebDAV, Dateien) und `lib/gastSync.ts → holen` (Gast-Link) setzen Verweise vor jeder Prüfung aus der Ablage dieses
+  Geräts ein (`store/ablageIdb.ts → verweiseReparieren`; der Schlüssel ist die Prüfsumme des Inhalts — wer das Bild je
+  gespeichert hat, hat es unter genau diesem Schlüssel). Fehlt der Inhalt auch hier, bleibt die hiesige Fassung der
+  Karte stehen (der Abgleich sieht „drüben unverändert"); nur eine hier unbekannte Karte kommt wie geliefert.
+  `hatAblageVerweis` (Start-Paket, ohne Text zu bauen) lädt den Teil nur, wenn ein Verweis da ist.
+- **Speicherformat** (wirkt ab jetzt für jede künftige Änderung des Aufbaus): `pixinotes-speicherformat` im localStorage
+  (`store/speicher.ts → SPEICHERFORMAT = 2`). Findet eine Fassung eine höhere Nummer als ihre eigene, schreibt sie nichts,
+  gleicht nicht ab, nimmt nie die Schreibrechte (kein Web Lock — das andere Fenster bleibt Schreiber) und zeigt ein Band
+  „Eine neuere Fassung von PixiNotes hat hier gespeichert … Neu laden". Auch wenn die Marke erst während des Laufs steigt
+  (anderes Fenster, `storage`-Ereignis). **Wer den Aufbau so ändert, dass eine ältere Fassung ihn nicht lesen kann, zählt
+  `SPEICHERFORMAT` hoch.**
+- Prüfreihen: F1–F4 (Marke, Band, keine Schreibvorgänge, Marke bleibt), R1–R5 (WebDAV-Nachbau: ein Stand mit Verweis —
+  Inhalt hier vorhanden bzw. nirgends — kommt an, beide Bilder bleiben, der nächste Upload trägt wieder die ganzen
+  Bilder). Gegen den Build davor: R3, R4, R5 rot (Bilder leer, leer hochgeladen), F2–F3 rot.

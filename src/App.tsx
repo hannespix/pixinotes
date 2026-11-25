@@ -8,7 +8,7 @@ import { Dock } from './components/Dock';
 import { Tabs } from './components/Tabs';
 import { TopActions } from './components/TopActions';
 import {
-  adoptPersistedState, claimWriter, getWriterRole, hinweisKnopfDruecken, hinweisMitKnopf, reassertPersist,
+  adoptPersistedState, claimWriter, getWriterRole, hinweisKnopfDruecken, hinweisMitKnopf, istZuAlt, reassertPersist,
   selectActiveBoard, selectNurLesen, singleWriterSupported, takeOverWriter, useBoard, type WriterRole,
 } from './store';
 import { initAutoSync } from './lib/syncFolder';
@@ -267,6 +267,7 @@ function imLeerlaufVorladen() {
     void import('./components/Gruppenraum').catch(() => null);
     void import('./lib/handschriftStruktur').catch(() => null);
     void import('./lib/brain').catch(() => null);
+    void import('./store/ablageAufraeumen').catch(() => null);   // M538: verwaiste Bilder der Geräte-Ablage (eine Minute später, im Leerlauf)
     // M523: Einstellungen, Hilfe und die Dialoge der Leisten fehlten hier — ohne Netz ließ sich nach dem Start keines
     // davon öffnen, und der gescheiterte Nachlade-Versuch riss die ganze Darstellung mit („lässt sich nicht anzeigen")
     for (const l of [ladeEinstellungen, ladeHilfe, ladeVorlagen, ladeVersionen, ladeSicherung, ladeEingang, ladeAppInstallieren]) void l().catch(() => null);
@@ -683,7 +684,14 @@ export default function App() {
         <div className={`dauerbaender${presenting ? ' im-vortrag' : ''}`} data-taste="dauerbaender">
           {/* M360: Nur lesend geteiltes Board — sagen, warum nichts geht, und den Ausweg anbieten */}
           {nurLesenBoard && view === 'board' && !presenting && !focusCard && <LeseBand id={nurLesenBoard.id} von={nurLesenBoard.von} />}
-          {writerRole === 'follower' && (
+          {/* M538: Eine neuere Fassung hat hier gespeichert — diese darf nichts schreiben (store/speicher.ts → SPEICHERFORMAT) */}
+          {writerRole === 'follower' && istZuAlt() && (
+            <div className="writer-banner" role="status" data-taste="zu-alt">
+              <span>Eine <b>neuere Fassung von PixiNotes</b> hat hier gespeichert – dieses Fenster speichert nichts, damit nichts verloren geht.</span>
+              <button onClick={() => location.reload()}>Neu laden</button>
+            </div>
+          )}
+          {writerRole === 'follower' && !istZuAlt() && (
             <div className="writer-banner" role="status">
               <span>
                 {/* M247: genauer sagen, WAS hier nicht gespeichert wird. „Liest nur mit"
