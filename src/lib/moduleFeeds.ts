@@ -50,12 +50,19 @@ export function timeSums(data: TimeData): { day: number; week: number } {
  * Soll-Minuten je Wochentag (0 = Montag … 6 = Sonntag) aus einem Wochenplan —
  * nur sinnvoll, wenn die Spalten Wochentage sind (keine freien Spalten) und
  * die Zeilen Uhrzeiten (keine eigenen Einheiten). Sonst null.
+ *
+ * M531: Es zählt nur, was der Plan zeigt — Blöcke an Tagen, die das Raster nicht hat (Samstag/Sonntag bei Mo–Fr),
+ * und der Teil eines Blocks vor dem Raster-Beginn oder nach dem Raster-Ende fallen weg. Vorher stand im Soll Zeit,
+ * die im Wochenplan nirgends zu sehen war. Raster wie in WeekCard.tsx (5 oder 7 Tage, Vorgabe 8:00 bis 17:00).
  */
 export function weekSollByDay(data: WeekData): number[] | null {
   if (data.cols?.length || data.axis === 'slots') return null;
+  const tage = data.days === 7 ? 7 : 5;
+  const von = typeof data.from === 'number' ? data.from : 480;
+  const bis = typeof data.to === 'number' && data.to > von ? data.to : von + 540;
   const out = Array.from({ length: 7 }, () => 0);
   for (const e of data.entries ?? []) {
-    if (e.day >= 0 && e.day < 7) out[e.day] += Math.max(0, e.dur);
+    if (e.day >= 0 && e.day < tage) out[e.day] += Math.max(0, Math.min(bis, e.start + Math.max(0, e.dur)) - Math.max(von, e.start));
   }
   return out;
 }

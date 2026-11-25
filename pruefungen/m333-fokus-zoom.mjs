@@ -125,7 +125,10 @@ console.log('\n════ A: Ein Tipp fährt die Kamera auf die Karte ══�
   console.log('\n════ B: Der Stift schreibt auf der fokussierten Karte ════');
   const k = await P.locator('.react-flow__node[data-id="n1"]').boundingBox();
   await zug(P, welle(k.x + 40, k.y + k.height - 40), { id: 21 });
-  await P.waitForTimeout(500);
+  // M518: Der Speicher schreibt verzögert – auf den Strich im gespeicherten Stand warten (bis 8 s) statt nach festen
+  // 500 ms einmal zu lesen (unter Last stand er dann noch nicht dort: B1 rot mit „[]", allein grün; Regel aus M484)
+  await P.waitForFunction(() => (JSON.parse(localStorage.getItem('pixinotes-board')).state.boards[0].drawings ?? []).length >= 1, null, { timeout: 8000 }).catch(() => {});
+  await P.waitForTimeout(300);
   const s1 = await striche(P);
   pruefe('B1 ein Stift-Strich entsteht im Fokus – geankert an der Karte', s1.length === 1 && s1[0].anchor === 'n1', JSON.stringify(s1.map((s) => [s.tool, s.anchor, s.points.length])));
   pruefe('B2 der Fokus bleibt dabei offen', (await lage(P, 'n1')).fokus);

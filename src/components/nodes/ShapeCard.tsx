@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react';
-import { runDerived, useBoard } from '../../store';
+import { runDerived, useBoard, useKarteFestId } from '../../store';
 import type { NoteNode, ShapeKind, ShapeNode } from '../../types';
 import { IPalette } from '../Icons';
 import { NotizEditor } from './NoteCard';
@@ -49,6 +49,7 @@ const MAX_W = 720;
  */
 export function ShapeCard({ id, data, selected }: NodeProps<ShapeNode>) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
+  const fest = useKarteFestId(id);   // M531: Form-Leiste nur, wo ich ändern darf (Stylesheet, data-fest)
 
   const cycleShape = () => updateNodeData(id, { shape: NEXT_SHAPE[data.shape] });
   const cycleColor = () => {
@@ -150,7 +151,7 @@ export function ShapeCard({ id, data, selected }: NodeProps<ShapeNode>) {
   }, [anpassen, aktiv, data.shape]);
 
   return (
-    <div className={`shape-wrap shape-${data.shape}`} ref={wrapRef}>
+    <div className={`shape-wrap shape-${data.shape}`} ref={wrapRef} data-fest={fest ? '' : undefined}>
       <NodeResizer isVisible={!!selected} minWidth={90} minHeight={54} color="#4f7cff"
         onResizeStart={() => { ziehtRef.current = true; useBoard.getState().pushHistory(); }}
         // Von Hand gezogen: das ist ihre eigene Größe — der Text wächst von hier aus weiter (nur noch nach unten)

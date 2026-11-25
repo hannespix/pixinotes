@@ -163,7 +163,11 @@ console.log('\n════ C: Tablet ════');
   pruefe('C3 Navigation: „⋮" und Aufklapp-Pfeile mindestens 40 Punkte', ziele.zahl > 0 && ziele.menue >= 40 && ziele.pfeil >= 40, JSON.stringify(ziele));
   await P.keyboard.press('Escape'); await P.waitForTimeout(300);
   await P.locator('[data-taste="einstellungen"]').first().tap(); await P.waitForSelector('.modal-x');
-  const x = await P.evaluate(() => { const r = document.querySelector('.modal-x').getBoundingClientRect(); return [r.width, r.height]; });
+  // M518: erst messen, wenn das Fenster steht (es öffnet mit einem kurzen Übergang – mittendrin gemessen ergab
+  // 44 × 43,99999), und auf Hundertstel runden: geprüft wird die Trefferfläche, nicht die letzte Stelle der Gleitkommazahl
+  const kreuz = () => P.evaluate(() => { const r = document.querySelector('.modal-x').getBoundingClientRect(); return [Math.round(r.width * 100) / 100, Math.round(r.height * 100) / 100]; });
+  let x = await kreuz();
+  for (let i = 0; i < 20; i += 1) { await P.waitForTimeout(100); const y = await kreuz(); const gleich = y[0] === x[0] && y[1] === x[1]; x = y; if (gleich) break; }
   pruefe('C4 das Schließen-Kreuz der Fenster: am Finger 44 Punkte', x[0] >= 44 && x[1] >= 44, x.join('×'));
   await ctx.close();
 }

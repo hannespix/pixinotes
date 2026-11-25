@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { NodeToolbar, Position, type NodeProps } from '@xyflow/react';
-import { runDerived, useBoard } from '../../store';
+import { runDerived, useBoard, useKarteFestId } from '../../store';
 import type { MermaidNode } from '../../types';
 import { IWand, IUhr } from '../Icons';
 import { MenuHuelle } from '../EbenenMenu';
@@ -86,6 +86,7 @@ export function MermaidCard({ id, data: roh, selected, width: nodeW, height: nod
   // M519: ohne Code (alter Stand) wie ein leeres Diagramm rechnen statt auszufallen
   const data = useMemo(() => (typeof roh.code === 'string' ? roh : { ...roh, code: '' }), [roh]);
   const updateNodeData = useBoard((s) => s.updateNodeData);
+  const fest = useKarteFestId(id);   // M531: die Diagramm-Leiste (eigenes Fenster unter der Karte) nur, wo ich ändern darf
   const resizeNode = useBoard((s) => s.resizeNode);
   const showToast = useBoard((s) => s.showToast);
   const ai = useBoard((s) => s.ai);
@@ -178,6 +179,41 @@ export function MermaidCard({ id, data: roh, selected, width: nodeW, height: nod
   // laden, KI-Diagramm, ‹/›-Spalte auf/zu oder der ⤢-Einpassen-Knopf.
   // Manuelles Ziehen bleibt ansonsten unangetastet.
   const fitOnRender = useRef(false);
+
+  // M531: Der Hinweis „Klick auf Schritt oder Pfeil = bearbeiten …" liegt unten über der Zeichenfläche. In einer
+  // schmalen Karte (zweizeilig) deckte er den letzten Schritt zu. Er erscheint jetzt nur, wenn unter dem Diagramm Platz
+  // ist (gemessen am gezeichneten Inhalt); sonst steht derselbe Text als Tooltip an der Zeichenfläche.
+  const hinweisRef = useRef<HTMLDivElement | null>(null);
+  const [hinweisFrei, setHinweisFrei] = useState(true);
+  const hinweisAn = kind !== 'other' && !error && !connectFrom && !!selected && !aboCode;
+  const hinweisText = isFlow
+    ? 'Klick auf Schritt oder Pfeil = bearbeiten · Doppelklick = umbenennen/beschriften'
+    : 'Klick auf ein Element = bearbeiten · Doppelklick = direkt umbenennen';
+  useEffect(() => {
+    const root = previewRef.current;
+    if (!hinweisAn || !root) return;
+    let rahmen = 0;
+    const messen = () => {
+      cancelAnimationFrame(rahmen);
+      rahmen = requestAnimationFrame(() => {
+        const h = hinweisRef.current?.getBoundingClientRect();
+        const svgEl = root.querySelector('.mermaid-svg svg');
+        if (!h || !svgEl) return;
+        // Was das Diagramm wirklich zeichnet: die Gruppen unter dem svg (Hintergrund und Stile zählen nicht)
+        let frei = true;
+        for (const g of svgEl.querySelectorAll(':scope > g')) {
+          const r = g.getBoundingClientRect();
+          if (!r.width || !r.height) continue;
+          if (r.left < h.right && r.right > h.left && r.top < h.bottom + 2 && r.bottom > h.top - 2) { frei = false; break; }
+        }
+        setHinweisFrei(frei);
+      });
+    };
+    messen();
+    const ro = new ResizeObserver(messen);
+    ro.observe(root);
+    return () => { ro.disconnect(); cancelAnimationFrame(rahmen); };
+  }, [hinweisAn, svg, hinweisText]);
 
   const fitToDiagram = (editNow: boolean = edit) => {
     const el = previewRef.current?.querySelector('svg');
@@ -747,7 +783,7 @@ export function MermaidCard({ id, data: roh, selected, width: nodeW, height: nod
       {/* Werkzeuge schweben UNTER dem Diagramm — FLACH wie bei Excalidraw/
           Nextcloud-Whiteboard: alles direkt sichtbar, keine Untermenüs (M98).
           Die Schritt-Zeile erscheint ZUSÄTZLICH über der Hauptzeile. */}
-      <NodeToolbar isVisible={!!selected} position={Position.Bottom} offset={14} className="mm-toolbar nodrag">
+      <NodeToolbar isVisible={!!selected && !fest} position={Position.Bottom} offset={14} className="mm-toolbar nodrag">
         {selNode && (
           <div className="mm-row mm-step-row">
             <span className="mm-sel-name" translate="no" title="Ausgewählter Schritt">„{selNode}"</span>
@@ -1030,6 +1066,7 @@ export function MermaidCard({ id, data: roh, selected, width: nodeW, height: nod
           className={`mermaid-preview nowheel${look === 'hand' ? ' mm-hand' : ''}`}
           data-kind={kind}
           ref={previewRef}
+          title={hinweisAn && !hinweisFrei ? hinweisText : undefined}
           // Abo aktiv: Klick-Bearbeitung pausiert — sie gehört zum EIGENEN Code
           onClick={aboCode ? undefined : onPreviewClick}
           onDoubleClick={aboCode ? undefined : onPreviewDblClick}
@@ -1073,11 +1110,9 @@ export function MermaidCard({ id, data: roh, selected, width: nodeW, height: nod
           {connectFrom && !error && (
             <div className="mm-hint mm-hint-connect">→ Ziel-Schritt anklicken, um „<span translate="no">{connectFrom}</span>" zu verbinden</div>
           )}
-          {kind !== 'other' && !error && !connectFrom && selected && !aboCode && (
-            <div className="mm-hint">
-              {isFlow
-                ? 'Klick auf Schritt oder Pfeil = bearbeiten · Doppelklick = umbenennen/beschriften'
-                : 'Klick auf ein Element = bearbeiten · Doppelklick = direkt umbenennen'}
+          {hinweisAn && (
+            <div className="mm-hint" ref={hinweisRef} data-taste="mm-hinweis" aria-hidden={hinweisFrei ? undefined : true} style={hinweisFrei ? undefined : { visibility: 'hidden' }}>
+              {hinweisText}
             </div>
           )}
         </div>

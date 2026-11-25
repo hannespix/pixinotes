@@ -259,6 +259,9 @@ function png(w, h) {
   await P.waitForTimeout(200);
   await P.locator('[data-taste="be-fertig"]').click().catch(() => {});
   await P.waitForSelector('.bild-editor', { state: 'detached', timeout: 8000 }).catch(() => {});
+  // M518: auf den gespeicherten Stempel warten (bis 10 s) statt 0,9 s nach dem Schließen einmal zu lesen – das neue Bild
+  // wird erst gerechnet und dann gespeichert; neben anderen Reihen stand der Stempel da noch nicht (C4 rot, allein grün)
+  await P.waitForFunction((alt) => { const b = JSON.parse(localStorage.getItem('pixinotes-board')).state.boards[0].nodes.find((n) => n.type === 'image'); return !!b && b.geaendert !== alt; }, ALT, { timeout: 10000 }).catch(() => {});
   const bild = (await stand(P)).nodes.find((n) => n.type === 'image');
   pruefe('C4 ein ersetztes Bild (Bild bearbeiten) stempelt die Karte', !!bild && bild.data.src !== '' && Math.abs((bild.geaendert ?? 0) - Date.now()) < 120_000 && bild.angelegt === ALT, { g: bild?.geaendert, a: bild?.angelegt });
   await ctx.close();

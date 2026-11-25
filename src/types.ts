@@ -332,6 +332,9 @@ export interface SheetData {
   stile?: Record<string, number>;
   /** M409: verbundene Zellen als Bereiche („A8:C8") */
   verbunden?: string[];
+  /** M528: die letzten Zeilen-/Spaltenumbauten (einfügen n > 0, löschen n < 0, `bei` ab 0) — damit der Abgleich eine
+   *  gleichzeitige Zellenänderung eines anderen Geräts an die richtige Stelle setzt (lib/tabellenUmbau.ts) */
+  umbau?: Array<{ id: string; a: 'z' | 's'; bei: number; n: number }>;
   [key: string]: unknown;
 }
 export type SheetNode = Node<SheetData, 'sheet'>;

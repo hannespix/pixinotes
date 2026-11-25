@@ -310,7 +310,7 @@ export function parseQuickTask(input: string, now: Date = new Date()): QuickPars
     due = isoLocal(d.date);
     const esc = d.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     // Frist-Phrase samt führendem „bis/am/zum/ab" aus dem Titel nehmen
-    text = text.replace(new RegExp(`(?:\\b(?:bis|am|zum|ab)\\s+)?${esc}`, 'i'), ' ');
+    text = text.replace(new RegExp(`(?:\\b(?:bis|am|zum|ab|by|on|until|due)\\s+)?${esc}`, 'i'), ' ');
   }
   return { text: text.replace(/\s{2,}/g, ' ').trim(), who, due, prio };
 }

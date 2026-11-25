@@ -27,6 +27,14 @@ Die Reihen `m383b`, `m388b`, `m391b` brauchen ein lokales Postgres
 `--ohne-datenbank` lässt sie ganz aus (und nennt sie), `--json datei` schreibt
 das Ergebnis je Reihe maschinenlesbar, `--nur-zeigen` ist der Trockenlauf.
 
+**Zeit-Messungen (M518):** Reihen, die Bildzeit oder Bilder je Sekunde messen
+(`m485`, `m491`, `m500`), binden `werkzeug/maschinen-last.mjs` ein. Der Läufer
+lässt sie allein laufen (Sperre „zeitmessung", sobald keine Bahn belegt ist).
+Auf ruhiger Maschine gilt ihre Grenze unverändert; rechnen andere Agenten
+daneben, wird sie auf den gemessenen Anteil der Rechenzeit umgerechnet und die
+Ausgabe sagt „Maschine ausgelastet". Die Schlusszeile des Läufers nennt die
+Zahl der Prüfpunkte über alle Reihen.
+
 **Nachtlauf (M468):** `.github/workflows/nachtlauf.yml` fährt jede Nacht alle
 Reihen ohne Datenbank auf einem GitHub-Runner; rote Reihen stehen im Issue
 „Nachtlauf rot" (siehe `docs/AGENTEN.md`, „Nachtlauf").

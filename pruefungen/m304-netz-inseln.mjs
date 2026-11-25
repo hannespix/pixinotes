@@ -108,6 +108,23 @@ const schwerpunkt = (pos, ids) => {
   return { x: p.reduce((a, q) => a + q.x, 0) / p.length, y: p.reduce((a, q) => a + q.y, 0) / p.length };
 };
 const abstand = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+/**
+ * M518: Warten, bis das Netz steht – mindestens so lange wie bisher fest gewartet wurde, danach, bis sich zwischen
+ * zwei Blicken im Abstand von 1,5 s nichts mehr rührt (höchstens 30 s). Unter Last rechnet die Physik langsamer; nach
+ * den festen 4,5 s + 1,5 s federte sie dann noch (A3b „Bewegung danach 2,52", A8, A9 rot, allein grün).
+ * Liefert die beiden letzten Lagen und die größte Bewegung dazwischen – ob Ruhe eintrat, prüft weiter A3b.
+ */
+const zurRuhe = async (P, mindestens = 4500, hoechstens = 30000) => {
+  await P.waitForTimeout(mindestens);
+  let vor = await lagen(P); const bis = Date.now() + hoechstens;
+  for (;;) {
+    await P.waitForTimeout(1500);
+    const lage = await lagen(P);
+    const weg = Math.max(...Object.keys(vor).map((id) => abstand(vor[id], lage[id])));
+    if (weg < 0.05 || Date.now() > bis) return { vor, lage, weg };
+    vor = lage;
+  }
+};
 /** Jedes Board näher am eigenen Bereich als an jedem fremden? */
 const heimisch = (pos) => {
   const sp = {};
@@ -149,13 +166,11 @@ console.log('════ A: Physik aus – die Landkarte liegt still ═══�
   const physik = P.locator('.ov-graph-toggle', { hasText: 'Physik' }).locator('input');
   pruefe('A2 Physik ist an (M307: auf Wunsch wieder Voreinstellung)', await physik.isChecked());
   const lStart = await lagen(P);
-  await P.waitForTimeout(4500);
-  const l0 = await lagen(P);
+  const ruhe0 = await zurRuhe(P);
+  const l0 = ruhe0.vor;
   const bewegt = Math.max(...Object.keys(lStart).map((id) => abstand(lStart[id], l0[id])));
   pruefe('A3 beim Laden federt das Netz nur nach, es sortiert sich nicht um', bewegt < 40, `größte Bewegung ${bewegt.toFixed(1)}`);
-  await P.waitForTimeout(1500);
-  const lRuhe = await lagen(P);
-  const zappelt = Math.max(...Object.keys(l0).map((id) => abstand(l0[id], lRuhe[id])));
+  const zappelt = ruhe0.weg;
   pruefe('A3b und kommt zur Ruhe', zappelt < 0.5, `Bewegung danach ${zappelt.toFixed(2)}`);
   const fremd = heimisch(l0);
   pruefe('A4 jedes Board liegt bei seinem Bereich, auch „Amrum 2026" trotz Wikilinks in die Arbeit', fremd.length === 0, fremd.join(','));
@@ -192,8 +207,7 @@ console.log('════ A: Physik aus – die Landkarte liegt still ═══�
   await P.waitForTimeout(1200);
   await P.locator('.ov-mode button', { hasText: 'Netz' }).click();
   await P.waitForSelector('.ov-graph-node[data-board]');
-  await P.waitForTimeout(6000);
-  const l2 = await lagen(P);
+  const l2 = (await zurRuhe(P, 3000)).lage;
   const abw = Math.max(...Object.keys(l0).map((id) => abstand(l0[id], l2[id])));
   pruefe('A9 nach dem Neuladen liegt alles dort wie vorher (deterministisch)', abw < 0.5, `Abweichung ${abw.toFixed(2)}`);
   // Alles einpassen zeigt das ganze Netz
@@ -219,8 +233,7 @@ console.log('\n════ B: Physik – ruhiger Start, Heimkehr nach dem Ziehe
   const { ctx, P } = await seite();
   const l0 = await lagen(P);
   await P.locator('button[aria-label="Alles einpassen"]').click();
-  await P.waitForTimeout(4500);
-  const l1 = await lagen(P);
+  const l1 = (await zurRuhe(P, 3000)).lage;
   const bewegt = Math.max(...Object.keys(l0).map((id) => abstand(l0[id], l1[id])));
   pruefe('B1 die Physik federt nur nach, statt sich neu zu sortieren', bewegt < 40, `größte Bewegung ${bewegt.toFixed(0)}`);
   pruefe('B2 danach liegt weiter jedes Board bei seinem Bereich', heimisch(l1).length === 0, heimisch(l1).join(','));
@@ -234,20 +247,30 @@ console.log('\n════ B: Physik – ruhiger Start, Heimkehr nach dem Ziehe
     return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
   };
   const arbeit = state.spaces[0].projects.flatMap((p) => p.boardIds);
-  const ziele = await Promise.all(arbeit.map(schirm));
-  const ziel = { x: ziele.reduce((a, q) => a + q.x, 0) / ziele.length, y: ziele.reduce((a, q) => a + q.y, 0) / ziele.length };
-  const von = await schirm('b10');
-  await P.mouse.move(von.x, von.y);
-  await P.mouse.down();
-  for (let i = 1; i <= 12; i += 1) { await P.mouse.move(von.x + ((ziel.x - von.x) * i) / 12, von.y + ((ziel.y - von.y) * i) / 12); await P.waitForTimeout(30); }
+  // M518: Erst greifen, wenn das Netz steht, und prüfen, dass der Punkt wirklich am Finger hängt. Nach „Alles
+  // einpassen" federt das Netz unter Last länger als die 4,5 s nach; die Maus drückte dann neben den gewanderten
+  // Punkt, nichts wurde gezogen und B5 maß ein Board, das nie bewegt worden war (im Gesamtlauf rot, allein grün).
+  let von = null; let ziel = null; let gefasst = false;
+  for (let versuch = 1; versuch <= 3 && !gefasst; versuch += 1) {
+    von = await schirm('b10');
+    for (let i = 0; i < 30; i += 1) { await P.waitForTimeout(150); const q = await schirm('b10'); const steht = Math.hypot(q.x - von.x, q.y - von.y) < 1; von = q; if (steht) break; }
+    const ziele = await Promise.all(arbeit.map(schirm));
+    ziel = { x: ziele.reduce((a, q) => a + q.x, 0) / ziele.length, y: ziele.reduce((a, q) => a + q.y, 0) / ziele.length };
+    const vorher = (await lagen(P)).b10;
+    await P.mouse.move(von.x, von.y);
+    await P.mouse.down();
+    for (let i = 1; i <= 2; i += 1) { await P.mouse.move(von.x + ((ziel.x - von.x) * i) / 12, von.y + ((ziel.y - von.y) * i) / 12); await P.waitForTimeout(30); }
+    for (let i = 0; i < 15 && !gefasst; i += 1) { gefasst = abstand((await lagen(P)).b10, vorher) > 3; if (!gefasst) await P.waitForTimeout(100); }
+    if (!gefasst) { await P.mouse.up(); await P.waitForTimeout(600); }
+  }
+  for (let i = 3; i <= 12; i += 1) { await P.mouse.move(von.x + ((ziel.x - von.x) * i) / 12, von.y + ((ziel.y - von.y) * i) / 12); await P.waitForTimeout(30); }
   await P.waitForTimeout(300);
   const mitten = await lagen(P);
   const spA = schwerpunkt(mitten, arbeit);
   const spP = schwerpunkt(mitten, state.spaces[1].projects.flatMap((p) => p.boardIds).filter((id) => id !== 'b10'));
   pruefe('B5 am Finger liegt es in der Arbeit', abstand(mitten.b10, spA) < abstand(mitten.b10, spP), JSON.stringify(mitten.b10));
   await P.mouse.up();
-  await P.waitForTimeout(4000);
-  const l2 = await lagen(P);
+  const l2 = (await zurRuhe(P, 2500)).lage;
   pruefe('B6 losgelassen kehrt es in seinen Bereich zurück', heimisch(l2).length === 0, heimisch(l2).join(','));
   const s12b = await getrennt(P, 's-s1', 's-s2');
   pruefe('B7 und die Bereichs-Hüllen sind wieder getrennt', s12b.gut, s12b.info);
