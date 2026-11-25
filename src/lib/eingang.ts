@@ -18,6 +18,7 @@
  */
 import { useMemo } from 'react';
 import { useBoard, type BoardDoc } from '../store';
+import { useImZugFest } from './imZugFest';
 import type { AppNode } from '../types';
 import { findFreeSpot } from './arrange';
 import { frisch } from './kartenZeit';
@@ -70,7 +71,8 @@ export const marke = (n: AppNode): EingangMarke | undefined => {
 
 /** Alle Boards außer dem Eingang — für jede Liste, die Boards zur Wahl stellt oder durchzählt */
 export function useNutzerBoards(): BoardDoc[] {
-  const boards = useBoard((s) => s.boards);
+  // M525: im Zug festgehalten — Kanban, Portal, Projektbaum und Aufgaben zeichneten sonst je Mausbewegung neu
+  const boards = useImZugFest((s) => s.boards);
   return useMemo(() => ohneEingang(boards), [boards]);
 }
 

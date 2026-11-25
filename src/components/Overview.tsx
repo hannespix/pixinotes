@@ -29,7 +29,7 @@ import { ohneEingang } from '../lib/eingangId';
 import { neigungsFeder, tempoMesser, type Neigung } from '../lib/ziehGefuehl';
 
 interface SpaceZoneData { space: Space; accent: string; [key: string]: unknown }
-interface ProjectZoneData { project: Project; spaceId: string; [key: string]: unknown }
+interface ProjectZoneData { project: Project; spaceId: string; leer?: boolean; [key: string]: unknown }
 interface BoardTileData { board: BoardDoc; projectId: string; accent: string; [key: string]: unknown }
 
 const SPACE_ACCENTS = ['#4f7cff', '#e07a3f', '#3fa564', '#a05fd4', '#d44f6e'];
@@ -172,7 +172,12 @@ function OverviewCanvas() {
       }),
     }));
   }, [spaces, boards, vorschau]);
-  const mindestens = useMemo(() => (vorschau ? new Map(spaces.flatMap((sp) => sp.projects.map((p) => [p.id, p.boardIds.length] as const))) : undefined), [vorschau, spaces]);
+  // M526: gezählt werden nur die SICHTBAREN Boards — archivierte belegen keinen Platz im Raster
+  const mindestens = useMemo(() => {
+    if (!vorschau) return undefined;
+    const da = new Set(boards.map((b) => b.id));
+    return new Map(spaces.flatMap((sp) => sp.projects.map((p) => [p.id, p.boardIds.filter((id) => da.has(id)).length] as const)));
+  }, [vorschau, spaces, boards]);
   const { nodes: layoutNodes, edges, projectRects, breite } = useMemo(
     () => layoutHierarchy(anzeigeSpaces, boards, schmal, mindestens),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1850,9 +1855,12 @@ function layoutHierarchy(spaces: Space[], boards: BoardDoc[], schmal = false, mi
   spaces.forEach((space, si) => {
     const accent = SPACE_ACCENTS[si % SPACE_ACCENTS.length];
 
-    const sizes = space.projects.map((p) => {
+    // M526: Archivierte (oder sonst ausgeblendete) Boards stehen weiter in boardIds — sie dürfen weder das Raster
+    // vergrößern noch einen Platz frei halten. Raster und Größe rechnen nur mit den Kacheln, die wirklich erscheinen.
+    const sichtbareIds = space.projects.map((p) => p.boardIds.filter((id) => boardById.has(id)));
+    const sizes = space.projects.map((p, pi) => {
       // M440: Während eines Zugs schrumpft kein Projekt — sonst rutschte das Ziel unter der Maus weg
-      const n = Math.max(p.boardIds.length, mindestens?.get(p.id) ?? 0);
+      const n = Math.max(sichtbareIds[pi].length, mindestens?.get(p.id) ?? 0);
       const cols = Math.max(1, Math.min(schmal ? 2 : 3, n));
       const rows = Math.max(1, Math.ceil(Math.max(n, 1) / cols));
       return {
@@ -1893,7 +1901,7 @@ function layoutHierarchy(spaces: Space[], boards: BoardDoc[], schmal = false, mi
         id: `p-${project.id}`,
         type: 'ovProject',
         position: { x: projX, y: projY },
-        data: { project, spaceId: space.id },
+        data: { project, spaceId: space.id, leer: sichtbareIds[pi].length === 0 },
         draggable: false,
         selectable: false,
         focusable: false,
@@ -1901,9 +1909,8 @@ function layoutHierarchy(spaces: Space[], boards: BoardDoc[], schmal = false, mi
         style: { width: w, height: h },
       });
 
-      project.boardIds.forEach((bid, bi) => {
-        const board = boardById.get(bid);
-        if (!board) return;
+      sichtbareIds[pi].forEach((bid, bi) => {
+        const board = boardById.get(bid)!;
         const bx = projX + GAP + (bi % cols) * (BW + GAP);
         const by = projY + PROJ_HEAD + Math.floor(bi / cols) * (BH + GAP);
         tilePos.set(bid, { x: bx, y: by });
@@ -1960,7 +1967,7 @@ function SpaceZone({ data }: NodeProps<Node<SpaceZoneData, 'ovSpace'>>) {
 }
 
 function ProjectZone({ data }: NodeProps<Node<ProjectZoneData, 'ovProject'>>) {
-  const { project } = data;
+  const { project, leer } = data;
   const renameProject = useBoard((s) => s.renameProject);
   const [editing, setEditing] = useState(false);
   return (
@@ -1973,7 +1980,8 @@ function ProjectZone({ data }: NodeProps<Node<ProjectZoneData, 'ovProject'>>) {
           <ProjektMenu projectId={project.id} onRename={() => setEditing(true)} />
         </div>
       </div>
-      {project.boardIds.length === 0 && <div className="ov-empty small nodrag">Boards hierher ziehen</div>}
+      {/* M526: auch ein Projekt, dessen Boards alle archiviert sind, wirkt leer — dann derselbe Hinweis */}
+      {leer && <div className="ov-empty small nodrag">Boards hierher ziehen</div>}
     </div>
   );
 }

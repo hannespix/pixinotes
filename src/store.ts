@@ -2,12 +2,12 @@
 // und „erster Start" nicht mehr feststellbar
 import './lib/firstRun';
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import { fristAnkerNachLaden } from './lib/fristAnker';
 import type { BoardDoc, BoardState } from './store/typen';
 import { gruppen, kartenSperren, leseschutz, leseschutzAus, notizSchutz } from './store/schutz';
 import { selectActiveBoard } from './store/selektoren';
-import { debouncedSafeStorage, speicherAuswahl, speicherMigration } from './store/speicher';
+import { speicherAblage, speicherAuswahl, speicherMigration } from './store/speicher';
 import { strukturScheibe } from './store/struktur';
 import { ansichtScheibe } from './store/ansicht';
 import { kartenScheibe } from './store/karten';
@@ -74,7 +74,8 @@ export const useBoard = create<BoardState>()(
     {
       name: 'pixinotes-board',
       version: 5,
-      storage: createJSONStorage(() => debouncedSafeStorage),
+      // M525: eigene Ablage statt createJSONStorage — die schrieb bei JEDER Store-Änderung den ganzen Stand als JSON
+      storage: speicherAblage,
       partialize: speicherAuswahl,
       migrate: speicherMigration,
     },

@@ -18,7 +18,7 @@ import './sicherGestalt';   // M522: hängt die Gestalt-Prüfung in lib/sicher.t
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc, type Space } from '../store';
 import {
   alsBase64, anhangKarte, base64AlsBlob, basisLesen, basisMerken, basisVergessen, buildSyncPayloadMitDateien, DATEI_BUDGET_MB,
-  emitSyncStatus, fremdStandEinarbeiten, idbDel, idbGet, idbHat, idbSet, KONTO_DIRTY_KEY, notiereAenderung, SYNC_DIRTY_KEY,
+  emitSyncStatus, fremdStandEinarbeiten, idbDel, idbGet, idbHat, idbSet, KONTO_DIRTY_KEY, merkeUngesichert, notiereAenderung, SYNC_DIRTY_KEY,
   uebernimmDateien, WEBDAV_DIRTY_KEY, type EinarbeitenErgebnis, type SyncDatei, type SyncPayload, type SyncWeg,
 } from './syncFolder';
 import { googleTokenFuer, loadCalAccounts, msAnmeldung, msTokenErneuern, oauthAvailable } from './calAccounts';
@@ -1549,7 +1549,7 @@ export function initKontoSync(): void {
     if (getWriterRole() !== 'writer') return;
     if (!inDerived()) {
       notiereAenderung();
-      try { localStorage.setItem(KONTO_DIRTY_KEY, '1'); } catch { /* voll */ }
+      try { merkeUngesichert(KONTO_DIRTY_KEY); } catch { /* voll */ }
     }
     if (!loadKonto()) return;
     // M524: Abgeleitetes (erkannter Text eines Bilds, gemessene Kartenhöhe, eingesammelte Tickets) entsteht auf
@@ -1564,7 +1564,10 @@ export function initKontoSync(): void {
     const jetzt = Date.now();
     if (!wartetSeit) wartetSeit = jetzt;
     const pause = kontoLiveVerbunden() ? 1000 : 2500;
-    timer = setTimeout(() => { wartetSeit = 0; void autoPush(); }, Math.max(0, Math.min(pause, wartetSeit + WARTE_HOECHSTENS - jetzt)));
+    // Nur beim PixiNotes-Konto: Dort reist je Änderung die Karte. Google Drive und OneDrive laden das ganze Board —
+    // alle sechs Sekunden wäre das zu viel Verkehr; dort bleibt es bei „nach der Pause".
+    const rest = kontoIstEigenes() ? wartetSeit + WARTE_HOECHSTENS - jetzt : pause;
+    timer = setTimeout(() => { wartetSeit = 0; void autoPush(); }, Math.max(0, Math.min(pause, rest)));
   });
   // M388: Das Netz ist wieder da → Ungesichertes gleich hochladen (vorher erst mit der nächsten Änderung)
   window.addEventListener('online', () => { if (loadKonto() && localStorage.getItem(KONTO_DIRTY_KEY)) void autoPush(); });

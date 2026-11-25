@@ -25,6 +25,13 @@ export const SYNC_DIRTY_KEY = 'pixinotes:sync-dirty';
 export const WEBDAV_DIRTY_KEY = 'pixinotes:webdav-dirty';
 /** M317: Konto-Sync (Google Drive / OneDrive) — eigener Dirty-Schlüssel wie bei WebDAV */
 export const KONTO_DIRTY_KEY = 'pixinotes:konto-dirty';
+/**
+ * M524: Das Merkzeichen „hier liegt Ungesichertes" setzen — nur, wenn es noch nicht steht. Die Zuhörer von Ordner,
+ * WebDAV und Konto schrieben es bei JEDER Store-Änderung neu (sechs Speicher-Schreibvorgänge je Mausbewegung im Zug).
+ */
+export function merkeUngesichert(...schluessel: string[]): void {
+  for (const k of schluessel) if (localStorage.getItem(k) !== '1') localStorage.setItem(k, '1');
+}
 
 // Sync-Status für die Kopfleisten-Anzeige (M85): Der Auto-Sync arbeitete
 // bisher komplett unsichtbar — schlief er (Freigabe nach Neustart weg,
@@ -836,7 +843,7 @@ export function initAutoSync(): void {
     // rekonstruierbar und dürfen die Übernahme eines Sync-Stands nicht blocken.
     if (!inDerived()) {
       notiereAenderung();
-      try { localStorage.setItem(SYNC_DIRTY_KEY, '1'); localStorage.setItem(WEBDAV_DIRTY_KEY, '1'); localStorage.setItem(KONTO_DIRTY_KEY, '1'); } catch { /* voll → sicherer ohne Fast-Forward */ }
+      try { merkeUngesichert(SYNC_DIRTY_KEY, WEBDAV_DIRTY_KEY, KONTO_DIRTY_KEY); } catch { /* voll → sicherer ohne Fast-Forward */ }
     }
     clearTimeout(timer);
     timer = setTimeout(() => { void autoSave().catch(() => {}); }, 1800);
