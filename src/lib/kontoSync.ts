@@ -16,6 +16,8 @@
 import { boardVonAussen } from './sicher';
 import './sicherGestalt';   // M522: hängt die Gestalt-Prüfung in lib/sicher.ts ein
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc, type Space } from '../store';
+import { letzterFehler } from '../store/speicher';
+import { t } from './sprache';
 import {
   alsBase64, anhangKarte, base64AlsBlob, basisLesen, basisMerken, basisVergessen, buildSyncPayloadMitDateien, DATEI_BUDGET_MB,
   emitSyncStatus, fremdStandEinarbeiten, idbDel, idbGet, idbHat, idbSet, KONTO_DIRTY_KEY, merkeUngesichert, notiereAenderung, SYNC_DIRTY_KEY,
@@ -1350,6 +1352,17 @@ export async function kontoWrite(): Promise<string> {
   window.dispatchEvent(new CustomEvent('pixinotes:konto-geschrieben'));
   return r;
 }
+/**
+ * M532: Die Meldung, wenn ein Abgleich seinen Stand nicht speichern konnte — „voll" mit Ausweg, sonst ohne Raten.
+ * (Vorher hieß es immer „Browser-Speicher voll?", auch wenn der Grund ein anderer war.)
+ */
+function speicherFehlerText(): string {
+  const art = letzterFehler;
+  if (art === 'voll') return t('Konto-Stand nicht gespeichert: Browser-Speicher voll. Bitte unter Einstellungen → Daten „Alles sichern“.');
+  if (art === 'anderer') return t('Konto-Stand nicht gespeichert: Der Browser lässt gerade nicht in seinen Speicher schreiben.');
+  return t('Konto-Stand konnte nicht eingearbeitet werden – der Abgleich versucht es gleich noch einmal.');
+}
+
 async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<string> {
   const lw = laufwerk();
   const vorab = await kennLesen();
@@ -1361,7 +1374,7 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
       const erg = await einarbeiten(r.payload);
       if (erg === 'spaeter') throw new SpaeterFehler();
       if (erg === 'konflikt') { emitSyncStatus('konto', 'conflict'); throw new Error(`${kontoLabel()} und lokaler Stand weichen ab, nichts überschrieben. Unter Einstellungen → Daten → Synchronisation wählen.`); }
-      if (erg === 'fehler') throw new Error('Der Stand aus dem Konto konnte nicht gespeichert werden (Browser-Speicher voll?).');
+      if (erg === 'fehler') throw new Error(speicherFehlerText());
       // zusammengeführt/geschrieben: die Zusammenführung hat selbst geschrieben; gleich/übernommen: jetzt der eigene Anteil
       if (erg === 'zusammengefuehrt' || erg === 'geschrieben') return kontoStamp() ?? new Date().toISOString();
     } else {
@@ -1572,7 +1585,7 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
         const erg = await einarbeiten(r.payload);
         if (erg === 'spaeter') throw new SpaeterFehler();
         if (erg === 'konflikt') { emitSyncStatus('konto', 'conflict'); throw new Error(`${kontoLabel()} und lokaler Stand weichen ab, nichts überschrieben. Unter Einstellungen → Daten → Synchronisation wählen.`); }
-        if (erg === 'fehler') throw new Error('Der Stand aus dem Konto konnte nicht gespeichert werden (Browser-Speicher voll?).');
+        if (erg === 'fehler') throw new Error(speicherFehlerText());
         return kontoStamp() ?? payload.savedAt;
       }
       return kontoWriteRoh(false);
@@ -1677,7 +1690,7 @@ function kontoVerbindenRoh(): Promise<VerbindenErgebnis> {
     }
     const e = await einarbeiten(r.payload);
     if (e === 'konflikt') { emitSyncStatus('konto', 'conflict'); return 'konflikt'; }
-    if (e === 'fehler') throw new Error('Der Stand aus dem Konto konnte nicht gespeichert werden (Browser-Speicher voll?).');
+    if (e === 'fehler') throw new Error(speicherFehlerText());
     if (e === 'uebernommen') return 'uebernommen';
     if (e === 'zusammengefuehrt' || e === 'geschrieben' || e === 'spaeter') return 'zusammengefuehrt';
     return 'gleich';

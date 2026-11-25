@@ -27,7 +27,7 @@ export { FOLIEN_SEITE } from './store/typen';
 export type { Stroke, BoardDoc, CommentThread, Tool, CardTemplate, AiProvider, AiSettings, Project, BoardSortierung, EbeneLoeschen, Space } from './store/typen';
 export { anhaengeMitnehmen } from './store/karten';
 export { hinweisMitKnopf, hinweisKnopfDruecken } from './store/hinweise';
-export { selectActiveBoard, selectNurLesen, useNurLesen, useKarteFest, useKarteFestId } from './store/selektoren';
+export { selectActiveBoard, selectNurLesen, useNurLesen, useKarteFest } from './store/selektoren';
 export { ohneLeseschutz, LESE_HINWEIS, persistHaken, vorUmbauHaken, FREMD_SCHUB_AB, setzeKartenSperren, setzeNotizSchutz, GRUPPE_EREIGNIS, setzeGruppe, karteFest, gruppeVon } from './store/schutz';
 export type { GastRecht, GruppenInfo } from './store/schutz';
 export { verlaufAbgrenzen, mutedHistory, kamVonAussen, NOTIZ_EXTERN } from './store/verlauf';

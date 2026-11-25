@@ -624,7 +624,8 @@ export default function App() {
   // Quota-Warnung aus dem Storage-Layer (Audit K1)
   useEffect(() => {
     const warn = () =>
-      showToast('Speicher voll, Änderungen werden nicht gesichert. Große Bilder löschen oder exportieren.');
+      // M532: Bilder liegen inzwischen im Datei-Speicher — voll wird es nur noch durch viel Text; der Ausweg steht dabei
+      showToast('Speicher voll – nichts wird gesichert. Bitte Einstellungen → Daten → „Alles sichern“.');
     window.addEventListener('pixinotes:quota', warn);
     return () => window.removeEventListener('pixinotes:quota', warn);
   }, [showToast]);
