@@ -15,6 +15,7 @@ import { fremdeWebAdresse } from '../../lib/sicher';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { useRandLeiste } from '../../lib/randLeiste';
+import { alleToolsAnhalten, ausserSichtMs, laufendeTools, toolLaeuft, TOOLS_ANHALTEN } from '../../lib/toolsLaufen';
 import { IAppWindow, ICloud, ICopy, IDownload, IMaximize, IMinimize, IMore, IPlay, IReload, IStopSq, IUndo, IWand } from '../Icons';
 
 /**
@@ -389,6 +390,40 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
   }, [hasSrc, id]);
   const [, neuZeichnen] = useState(0);
   const stopSelbst = () => { if (dortAn) selbstAus.current = true; vonFolgen.current = false; stop(); neuZeichnen((n) => n + 1); };
+  // ───── M535: Tools halten an, wenn sie eine Weile außerhalb des Bildes sind, und auf „Alle Tools anhalten" ─────
+  // Ein gestartetes Tool rechnet weiter (Zeitgeber, Animationen), auch wenn niemand hinsieht (M525). Nicht angehalten
+  // wird, was gerade vorgeführt oder im Vollbild gezeigt wird. Was das Tool selbst gespeichert hat, bleibt (Ablage);
+  // gestartet wird wieder per Klick. `angehaltenWeil` sagt es auf der Karte.
+  const [angehaltenWeil, setAngehaltenWeil] = useState<'' | 'sicht' | 'alle'>('');
+  const laeuftRef = useRef(false);
+  laeuftRef.current = laeuft;
+  useEffect(() => {
+    toolLaeuft(id, laeuft);
+    if (laeuft) setAngehaltenWeil('');
+    return () => toolLaeuft(id, false);
+  }, [id, laeuft]);
+  useEffect(() => {
+    const alle = () => { if (laeuftRef.current) { stopSelbst(); setAngehaltenWeil('alle'); } };
+    window.addEventListener(TOOLS_ANHALTEN, alle);
+    return () => window.removeEventListener(TOOLS_ANHALTEN, alle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dortAn]);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!laeuft || full || !el || typeof IntersectionObserver !== 'function') return;
+    let uhr = 0;
+    const io = new IntersectionObserver((e) => {
+      window.clearTimeout(uhr);
+      if (e.some((x) => x.isIntersecting)) return;
+      uhr = window.setTimeout(() => {
+        if (!laeuftRef.current || dortAn || ichFuehreVor(boardId) || document.fullscreenElement) return;
+        stop(); setAngehaltenWeil('sicht');
+      }, ausserSichtMs());
+    });
+    io.observe(el);
+    return () => { window.clearTimeout(uhr); io.disconnect(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [laeuft, full, dortAn, boardId]);
   useMitrollen(boardId, id, frameRef, srcdoc !== null);
   // M414: Spiegeln — führe ich vor (und präsentiere gerade nicht, dann zeigt die Folie das Tool), geht mein Abbild
   // hinaus; folge ich und das Tool läuft beim Vorführenden, steht hier sein Abbild statt meines eigenen Tools.
@@ -571,7 +606,11 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
                       ? 'Inhalt wird geladen …'
                       : isLive
                         ? `Live-App von ${(() => { try { return new URL(data.url!).hostname; } catch { return '?'; } })()} – läuft direkt von der Quelle und braucht dafür Internet.`
-                        : 'Bereit – die App startet erst auf Klick und läuft dann als eigene, abgeschottete Instanz.'}
+                        : angehaltenWeil === 'sicht'
+                          ? 'Angehalten, weil das Tool eine Weile außerhalb des Bildes war – mit Start geht es weiter. Was es gespeichert hat, bleibt.'
+                          : angehaltenWeil === 'alle'
+                            ? 'Angehalten – mit Start geht es weiter. Was das Tool gespeichert hat, bleibt.'
+                            : 'Bereit – die App startet erst auf Klick und läuft dann als eigene, abgeschottete Instanz.'}
                   </p>
                   <button className="happ-load happ-go nodrag" disabled={hasSrc !== true || starting} onClick={start}>
                     <IPlay size={14} /> Starten
@@ -611,6 +650,10 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
                 {full ? <><IMinimize size={14} /> Vollbild verlassen</> : <><IMaximize size={14} /> Vollbild</>}
               </button>
               <button onClick={() => { setMenuPos(null); restart(); }}><IReload size={14} /> Neu starten</button>
+              {/* M535: alle laufenden Tools des Boards auf einmal anhalten (gibt Rechenzeit und Speicher frei) */}
+              {laufendeTools() > 1 && (
+                <button data-taste="happ-alle-anhalten" onClick={() => { setMenuPos(null); alleToolsAnhalten(); }}><IStopSq size={14} /> Alle Tools anhalten</button>
+              )}
             </>
           )}
           <button

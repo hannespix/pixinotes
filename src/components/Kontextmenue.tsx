@@ -7,7 +7,8 @@ import { makeNote } from '../lib/nodes';
 import { ablageSetzen, kartenMenueWuenschen, kontextAbo, kontextSetzen, kontextZiel, MENUE_HIER, type KontextOrt } from '../lib/kontextmenue';
 import { insBild } from './EbenenMenu';
 import { taste } from '../lib/tasten';
-import { IFit, IGridLayout, IPen, IPlus, ITag, ITrash, INote } from './Icons';
+import { IFit, IGridLayout, IPen, IPlus, ITag, ITrash, INote, IStopSq } from './Icons';
+import { alleToolsAnhalten, laufendeTools } from '../lib/toolsLaufen';
 
 /** Wo das Menü erscheint: am Zeiger — per Tastatur (Kontextmenü-Taste, Umschalt+F10) an der fokussierten Stelle */
 function ortVon(e: MouseEvent, el: Element): KontextOrt {
@@ -138,6 +139,12 @@ export function BoardKontextmenue() {
         <button role="menuitemcheckbox" aria-checked={st.gridSnap} onClick={tun(() => st.setGridSnap(!st.gridSnap))}>
           <IGridLayout size={14} /><span>Raster-Fang {st.gridSnap ? 'aus' : 'an'}</span>{tk('raster')}
         </button>
+        {/* M535: laufende Tools rechnen weiter, auch wenn niemand hinsieht — alle auf einmal anhalten */}
+        {laufendeTools() > 0 && (
+          <button role="menuitem" data-taste="tools-anhalten" onClick={tun(alleToolsAnhalten)}>
+            <IStopSq size={14} /><span>Alle Tools anhalten</span>
+          </button>
+        )}
       </>
     );
   } else {
