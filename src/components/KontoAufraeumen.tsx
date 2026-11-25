@@ -30,7 +30,7 @@ export default function KontoAufraeumen() {
   };
 
   return (
-    <details className="konto-aufraeumen" data-taste="konto-aufraeumen">
+    <details className="modal-details" data-taste="konto-aufraeumen">
       <summary>Speicher aufräumen</summary>
       <div className="modal-note">
         Zeigt Dateien im Konto, auf die keine Karte mehr verweist (etwa nach einem Import). Gelöscht wird erst nach deiner Bestätigung; was jünger als 24 Stunden ist, bleibt.

@@ -705,8 +705,11 @@ export async function dateienNachreichen(erzwingen = false, nurUngenannte = fals
   }
   const bekannt = new Set(kenn.dateien);
   const ersetzt = new Set(kenn.ersetzt ?? []);
-  const hoch: string[] = [];
-  for (const id of karten.keys()) if (!bekannt.has(id) && !ersetzt.has(id) && await dateiLokal(id)) hoch.push(id);
+  // (i) nennt das Konto nicht: Das nächste Schreiben nimmt sie ohnehin mit — es muss nur eines geben
+  const ungenannt: string[] = [];
+  for (const id of karten.keys()) if (!bekannt.has(id) && !ersetzt.has(id) && await dateiLokal(id)) ungenannt.push(id);
+  // (ii) nennt das Konto, das Objekt fehlt aber
+  const fehlend: string[] = [];
   const genannt = kenn.dateien.filter((id) => karten.has(id));
   if (genannt.length && !nurUngenannte) {
     const objekte = await kontoObjekte();
@@ -717,20 +720,24 @@ export async function dateienNachreichen(erzwingen = false, nurUngenannte = fals
         const name = `${DATEI_PREFIX}${id}`;
         if (objekte.has(name) || zeilen.has(name)) continue;
         if ((await objektDa(name)) !== false) continue;
-        if (await dateiLokal(id)) hoch.push(id); else await fehltMerken(id);
+        if (await dateiLokal(id)) fehlend.push(id); else await fehltMerken(id);
       }
     }
   }
-  if (!hoch.length) return 0;
-  // Als „nicht im Konto" verbuchen: Das nächste Schreiben nimmt sie in den Beipack und lädt sie hoch. Wie ein hier
-  // ersetztes Tool (M524 `ersetzt`) — sonst machte das nächste Lesen sie wieder zu „bekannt", ehe sie hinausgingen.
+  if (!ungenannt.length && !fehlend.length) return 0;
+  let noetig = fehlend.length;
   await exklusiv(async () => {
     const k = await kennLesen();
-    await idbSet(KENN_KEY, { ...k, dateien: k.dateien.filter((id) => !hoch.includes(id)), ersetzt: [...new Set([...(k.ersetzt ?? []), ...hoch])] } satisfies Kenn);
+    // inzwischen hinaufgegangen (ein Schreiben lief gerade): nichts mehr zu tun
+    noetig += ungenannt.filter((id) => !k.dateien.includes(id)).length;
+    // Fehlende wie ein hier ersetztes Tool verbuchen (M524 `ersetzt`): nicht holen, beim nächsten Schreiben hochladen —
+    // sonst machte das nächste Lesen sie wieder zu „bekannt", ehe sie hinausgingen
+    if (fehlend.length) await idbSet(KENN_KEY, { ...k, dateien: k.dateien.filter((id) => !fehlend.includes(id)), ersetzt: [...new Set([...(k.ersetzt ?? []), ...fehlend])] } satisfies Kenn);
   });
+  if (!noetig) return 0;
   try { localStorage.setItem(KONTO_DIRTY_KEY, '1'); } catch { /* voll */ }
   void autoPush();
-  return hoch.length;
+  return noetig;
 }
 
 // ---------- M328: Realtime — Änderungen anderer Geräte sofort ----------
