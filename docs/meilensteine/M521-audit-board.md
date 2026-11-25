@@ -57,11 +57,12 @@ grün ist.
   länger beschäftigen als eine Uhr misst); der erste spätere Druck hängt den Zuhörer wieder aus.
 - `src/components/SelectionToolbar.tsx`: Layout-Effekt ohne Abhängigkeiten misst `.sel-toolbar` (nicht die feste Zeile
   `.sel-toolbar-dock`) und setzt `translate` am inneren Kasten, in Layout-Punkten (`wurzelZoom`).
-- **Start-JS (M483/M502, Grenze 2 065 000 B):** Der Hauptzweig lag 163 B unter der Grenze, die Fixes kosten rund 1 KB.
-  Dafür zwei Entlastungen: `detachStrokes` („Markierungen lösen", Kartenmenü) ruft `src/store/stricheLoesen.ts`, das
-  erst beim Aufruf lädt (die Auswahl-Leiste holt es beim eigenen Laden vor — ohne Verzug und offline da); und der
-  Doppelklick-Umweg aus M514 in `FrameCard.tsx` ist entfallen (der Titel liegt jetzt selbst über den Linien). Stand
-  danach: 2 064 789 B, 211 B frei.
+- **Start-JS (M483/M502, Grenze 2 065 000 B):** Der Hauptzweig lag zu Beginn 163 B unter der Grenze, die Fixes kosten
+  rund 1,2 KB. Dafür zwei Entlastungen: `detachStrokes` („Markierungen lösen", Kartenmenü) ruft
+  `src/store/stricheLoesen.ts`, das erst beim Aufruf lädt (die Auswahl-Leiste holt es beim eigenen Laden vor — ohne
+  Verzug und offline da); und der Doppelklick-Umweg aus M514 in `FrameCard.tsx` ist entfallen (der Titel liegt jetzt
+  selbst über den Linien). Netto kostet M521 das Start-Paket rund 50 B. Stand nach dem Einmischen von M522 (das die
+  Gestalt-Prüfung nachlädt): 2 062 462 B, 2,5 KB frei.
 
 ## Ohne Befund geprüft
 Rahmen ziehen mit verschachteltem Rahmen und Karten (Rückgängig/Wiederholen exakt), Karte löschen samt Verbindungen
@@ -88,9 +89,9 @@ Pos1/Ende/Strg+Pfeil/Tab), Finger (Schwenken, Zwei-Finger-Zoom, Karte und Rahmen
 - Reihenfolge an Verzweigungen der Rahmenpfeile umsortieren (offen aus M514) — neue Funktion, nicht Teil des Audits.
 
 ## Für andere Bereiche
-- **Orchestrator — Start-JS-Grenze:** Auf dem Hauptzweig waren vor diesem Meilenstein nur 163 B frei (jetzt 211 B).
-  Jeder weitere Fix im Start-Paket (Board, Store, Tastatur) reißt m459/m467/m483/m502 A1 — die anderen Audit-Zweige
-  brauchen entweder eigene Entlastung (etwas nachladen) oder die Grenze eine bewusste Entscheidung.
+- **Orchestrator — Start-JS-Grenze:** Zu Beginn des Audits waren auf dem Hauptzweig nur 163 B frei; nach M522 und
+  M521 sind es rund 2,5 KB. Jeder Fix im Start-Paket (Board, Store, Tastatur) zählt gegen m459/m467/m483/m502 A1 —
+  wer mehr braucht, lädt etwas nach, statt die Grenze anzuheben.
 - **M519 (Form):** `ShapeCard.tsx` Zeile ~174 `<input type="color" value={data.color}>` — eine Form ohne `color`
   (Daten von außen, alte Stände) wirft beim Auswählen die Konsolen-Warnung „The specified value "" does not conform
   to the required format"; Vorgabe wie in `makeShape` (`#eef2ff`) einsetzen.
