@@ -93,3 +93,13 @@ export const abarbeiten = (): Promise<void> => (A.lauf ??= import('./ablageIdb')
 /** Hier meldet die Speicherschicht, was nach dem Sichern zu tun ist (ablageAnmelden) */
 const melden = { an: () => {} };
 ablageAnmelden(ablageErsetzer, melden);
+
+/* M538: Ein anderes Fenster hat verwaiste Einträge gelöscht (ablageAufraeumen.ts) — sie nicht mehr als „liegt sicher"
+   führen: Hält dieses Fenster den Inhalt noch (Rückgängig-Verlauf), legt es ihn beim nächsten Schreiben wieder ab,
+   statt einen Verweis ohne Inhalt zu schreiben. */
+try {
+  new BroadcastChannel('pixinotes-ablage').onmessage = (e: MessageEvent<{ geloescht?: unknown }>) => {
+    const liste = Array.isArray(e.data?.geloescht) ? e.data.geloescht : [];
+    for (const k of liste) if (typeof k === 'string' && A.gesichert.delete(k)) gedaechtnisVerwerfen();
+  };
+} catch { /* kein Kanal */ }

@@ -557,7 +557,12 @@ async function holen(boardId: string, vorSchreiben = false): Promise<void> {
   if (!g) { beendet(boardId); return; }
   let fremd: BoardDoc;
   // M388: Der Stand vom Server wird geprüft; seine Kennung ist die des Boards, das hier abgeglichen wird
-  try { const b = boardVonAussen(JSON.parse(g.inhalt), boardId); if (!b) return; fremd = gezeichnet(b, g, e.token); } catch { return; }
+  try {
+    let roh: unknown = JSON.parse(g.inhalt);
+    // M538: Verweise einer älteren App-Fassung erst durch die Bilder dieses Geräts ersetzen (sonst würde das Bild leer)
+    if (g.inhalt.includes('"pixinotes-ablage:')) roh = (await import('../store/ablageIdb').then((a) => a.verweiseReparieren({ boards: [roh as BoardDoc] }), () => ({ boards: [roh as BoardDoc] }))).boards[0];
+    const b = boardVonAussen(roh, boardId); if (!b) return; fremd = gezeichnet(b, g, e.token);
+  } catch { return; }
   if (!tabellenMischen.f) await import('./tabellenUmbau').catch(() => null);   // M528: Tabellen nach Umbau-Protokoll mischen
   const basis = await basisLesen(boardId);
   const st = useBoard.getState();

@@ -186,7 +186,17 @@ export const gestaltLaden = () => import('./sicherGestalt');
  * „es gibt keine", und er überschriebe sie mit dem hiesigen Stand.
  */
 export const standGeprueft = <T extends { boards: BoardDoc[]; spaces: unknown[]; geloescht?: Record<string, string> }>(p: T): Promise<T | null> =>
-  gestaltLaden().then((m) => m.standVonAussen(p as never) as T | null, () => p);
+  // M538: Verweise auf die Geräte-Ablage (von einer älteren App-Fassung) erst durch ihre Inhalte ersetzen — sonst
+  // entschärfte die Prüfung sie als fremde Quelle, und das Bild wäre leer (store/ablageIdb.ts → verweiseReparieren)
+  (hatAblageVerweis(p.boards) ? import('../store/ablageIdb').then((a) => a.verweiseReparieren(p), () => p) : Promise.resolve(p))
+    .then((q) => gestaltLaden().then((m) => m.standVonAussen(q as never) as T | null, () => q));
+/** M538: Steht irgendwo ein Verweis `pixinotes-ablage:…` (ganzer Wert)? Ohne Text zu bauen. */
+export function hatAblageVerweis(v: unknown): boolean {
+  if (typeof v === 'string') return v.length < 64 && v.startsWith('pixinotes-ablage:');
+  if (Array.isArray(v)) return v.some(hatAblageVerweis);
+  if (v && typeof v === 'object') for (const k in v) if (hatAblageVerweis((v as Record<string, unknown>)[k])) return true;
+  return false;
+}
 
 /**
  * Adressen in einer Karte entschärfen, die von außen kam: Eine „Live"-Seite, die keine fremde Webseite ist,

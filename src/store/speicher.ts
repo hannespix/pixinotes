@@ -152,7 +152,28 @@ const hasLocks = typeof navigator !== 'undefined' && 'locks' in navigator;
 export const getWriterRole = (): WriterRole => writerRole;
 export const singleWriterSupported = (): boolean => hasLocks;
 
+/* M538: Speicherformat. Eine ältere App-Fassung (aus dem Offline-Speicher, ein lange offener Tab) kennt einen neueren
+   Aufbau des gespeicherten Stands nicht — M532 zeigte es: Sie sähe Verweise statt Bilder und trüge sie per Abgleich zu
+   anderen Geräten. Ab jetzt steht die Nummer des Formats im localStorage; trifft eine Fassung auf eine höhere als ihre
+   eigene, schreibt sie nichts (bleibt Mitleser, gleicht nicht ab) und bittet ums Neuladen. Wer den Aufbau so ändert,
+   dass eine ältere Fassung ihn nicht lesen kann, zählt SPEICHERFORMAT hoch. (Fassungen vor M538 kennen die Marke nicht
+   — dagegen hilft die Reparatur beim Empfang: lib/sicher.ts → standGeprueft, ablageIdb.ts → verweiseReparieren.) */
+export const SPEICHERFORMAT = 2;   // 1 = bis M531, 2 = Verweise auf die Geräte-Ablage (M532)
+const FORMAT_KEY = 'pixinotes-speicherformat';
+let zuAlt = false;
+export const istZuAlt = (): boolean => zuAlt;
+function formatPruefen(): void {
+  let f = 0;
+  try { f = Number(localStorage.getItem(FORMAT_KEY)) || 0; } catch { return; }
+  if (f > SPEICHERFORMAT) {
+    if (zuAlt) return;
+    zuAlt = true;
+    setWriterRole('follower');
+  } else if (f < SPEICHERFORMAT) { try { localStorage.setItem(FORMAT_KEY, String(SPEICHERFORMAT)); } catch { /* voll */ } }
+}
+
 function setWriterRole(role: WriterRole): void {
+  if (role === 'writer' && zuAlt) role = 'follower';
   if (writerRole === role) return;
   writerRole = role;
   // Nie einen veralteten Puffer nachschieben (z. B. via visibilitychange-Flush)
@@ -226,6 +247,8 @@ function nachpruefen(): void {
   } catch { /* voll: der Stand von eben bleibt stehen */ }
 }
 if (typeof window !== 'undefined') {
+  formatPruefen();
+  window.addEventListener('storage', (e) => { if (e.key === FORMAT_KEY) formatPruefen(); });
   // M525: Beim Verlassen sofort und gründlich schreiben — der gedrosselte Schreiber bleibt nichts schuldig
   const sofort = () => { clearTimeout(writeTimer); if (pendingWrite) flushPersist(true); else nachpruefen(); };
   window.addEventListener('beforeunload', sofort);
@@ -314,6 +337,7 @@ let succession: AbortController | null = null;
 
 /** In die Warteschlange: sobald der aktuelle Schreiber schließt, übernehmen wir. */
 function queueSuccession(): void {
+  if (zuAlt) return;   // M538: eine zu alte Fassung nimmt nie die Schreibrechte
   succession?.abort();
   const ctl = new AbortController();
   succession = ctl;
@@ -342,7 +366,7 @@ function demoted(): void {
 /** Schreibrechte JETZT in dieses Fenster holen (bewusste Nutzer-Aktion wie
  *  Import/Zurücksetzen). Wirkt sofort; der Web-Lock-Steal bestätigt asynchron. */
 export function claimWriter(): void {
-  if (!hasLocks || writerRole === 'writer') return;
+  if (!hasLocks || writerRole === 'writer' || zuAlt) return;
   succession?.abort();
   succession = null;
   setWriterRole('writer');
@@ -359,7 +383,7 @@ export function takeOverWriter(): void {
 }
 
 function initSingleWriter(): void {
-  if (!hasLocks) return; // sehr alte Browser: bisheriges Verhalten (nur Warn-Toast)
+  if (!hasLocks || zuAlt) return; // sehr alte Browser: bisheriges Verhalten (nur Warn-Toast)
   void navigator.locks
     .request(LOCK_NAME, { ifAvailable: true }, (lock) => {
       if (!lock) {

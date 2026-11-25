@@ -446,6 +446,8 @@ export function SelectionToolbar() {
   };
 
   const duplicate = () => {
+    // M538: im Karten-Fokus wie Strg+D — keine Kopie unsichtbar hinter der offenen Karte
+    if (useBoard.getState().focusCard) { showToast('Die geöffnete Karte wird nicht dupliziert. Esc schließt sie – dann dupliziert Strg+D die Auswahl.'); return; }
     // M530: gewählte Rahmen samt Inhalt (vorher nur die Karten)
     void useBoard.getState().dupliziere([...selected, ...selFrames].map((x) => x.id)).then((n) => { if (n) showToast(`${zahlWort(n, 'Karte', 'Karten')} dupliziert`); });
   };
