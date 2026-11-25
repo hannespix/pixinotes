@@ -6,7 +6,8 @@
 // Dialog den Besitzer und bietet „Freigabe verlassen" (das Board bleibt dann als
 // eigene Kopie auf dem Gerät).
 import { QR_EREIGNIS } from '../lib/qr';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { fensterDarueber } from '../lib/overlay';
 import { useBoard } from '../store';
 import { freigabeAnlegen, freigabeEntfernen, freigabenDesBoards, freigabeRolleSetzen, freigabeVerlassen, kontoIstEigenes, loadKonto, type Freigabe, type FreigabeRolle } from '../lib/kontoSync';
 import { einladungDesBoards, einladungLoeschen, EinladungNichtEingerichtet, einladungSetzen, einladungUrl, type Einladung } from '../lib/einladung';
@@ -32,6 +33,7 @@ function RollenWahl({ wert, onChange, disabled, taste, label }: { wert: Freigabe
 export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose: () => void }) {
   const board = useBoard((s) => s.boards.find((b) => b.id === boardId));
   const showToast = useBoard((s) => s.showToast);
+  const huelle = useRef<HTMLDivElement>(null);   // M530: das eigene Fenster für fensterDarueber
   const [liste, setListe] = useState<Freigabe[] | null>(null);
   const [mail, setMail] = useState('');
   // M360: Rolle der nächsten Einladung; Einladungslink des Boards (undefined = lädt, null = keiner, 'fehlt' = Server kennt ihn nicht)
@@ -77,7 +79,8 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
       einladungDesBoards(boardId).then((e) => { setLink(e); if (e) { setLinkRolle(e.rolle === 'lesen' ? 'lesen' : 'bearbeiten'); setOhneKonto(!!e.ohne_konto); setRecht(rechtAus(e.optionen)); } })
         .catch((e) => setLink(e instanceof EinladungNichtEingerichtet ? 'fehlt' : null));
     }
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    // M530: Esc gehört dem obersten Fenster (lib/overlay.ts)
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !fensterDarueber(huelle.current, e)) onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -177,7 +180,7 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="modal-backdrop" ref={huelle} onClick={onClose}>
       <div className="modal freigabe-dialog" role="dialog" aria-modal="true" aria-label="Board freigeben" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2>{gast ? 'Geteiltes Board' : 'Gemeinsam bearbeiten'}</h2>

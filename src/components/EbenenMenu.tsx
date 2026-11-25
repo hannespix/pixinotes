@@ -252,13 +252,9 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
             role="menuitem"
             className="ebenen-menu-gefahr"
             onClick={() => {
-              // M523: Das letzte sichtbare Board bleibt — das sagt der Hinweis gleich, statt erst nach der Rückfrage
-              const alle = useBoard.getState().boards;
-              if (alle.length <= 1 || (!board.archived && !alle.some((b) => b.id !== boardId && !b.archived))) { removeBoard(boardId); zu(); return; }
-              const frage = board.nodes.length > 0
-                ? `Board „${board.name}" mit ${zahlWort(board.nodes.length, 'Karte', 'Karten')} wirklich LÖSCHEN? Archivieren legt es stattdessen nur zur Seite.`
-                : `Board „${board.name}" wirklich löschen?`;
-              if (window.confirm(frage)) removeBoard(boardId);
+              // M530: ohne Browser-Rückfrage — die Meldung bietet „Rückgängig" (wie bei Bereich und Projekt); das letzte
+              // sichtbare Board bleibt (der Hinweis kommt aus removeBoard, M523)
+              removeBoard(boardId);
               zu();
             }}
           ><ITrash size={14} /> Löschen</button>}

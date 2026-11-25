@@ -45,7 +45,7 @@ console.log('\n════ A: Rechnen und Lesen ════');
   writeFileSync(einstieg, [
     `export { rechneBlatt } from ${lib('formel')};`, `export { detectDates, hatRelativesDatum, fristenLaden } from ${lib('dates')};`,
     `export { fristAnkerPflegen, fristenDerNotiz } from ${lib('fristAnker')};`, `export { linksUmbenennen } from ${lib('links')};`,
-    `export { blocksToMarkdown } from ${lib('serialize')};`, `export { textZuBloecken } from ${lib('textNotiz')};`,
+    `export { blocksToMarkdown } from ${lib('serializeFormate')};`, `export { textZuBloecken } from ${lib('textNotiz')};`,
     `export { holeZurueck, autoArchivLauf } from ${lib('ticketArchiv')};`, `export { frameMembers } from ${lib('arrange')};`,
   ].join('\n'));
   const aus = path.join(SD, 'm390-bündel.mjs');

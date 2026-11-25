@@ -3,7 +3,7 @@ import { getNodesBounds } from '@xyflow/react';
 import { allesZeigen } from './fernRuhe';
 import type { BoardDoc, Space } from '../store';
 import type { AppNode } from '../types';
-import { nodeToMarkdown } from './serialize';
+import { nodeToMarkdown } from './serializeFormate';
 import { triggerDownload } from './download';
 
 export interface BoardExportOptions {

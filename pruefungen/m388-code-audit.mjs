@@ -39,7 +39,7 @@ console.log('\n════ A: Rechnen und Prüfen ════');
   const einstieg = path.join(SD, 'm388-einstieg.ts');
   writeFileSync(einstieg, [
     `export { rechneBlatt } from ${lib('formel')};`, `export { parseIcs } from ${lib('ics')};`, `export { nextDate } from ${lib('minutes')};`,
-    `export { detectDates, fristenLaden } from ${lib('dates')};`, `export { nodeToHtml, nodeToText } from ${lib('serialize')};`, `export * as sicher from ${lib('sicher')};`,
+    `export { detectDates, fristenLaden } from ${lib('dates')};`, `export { nodeToText } from ${lib('serialize')};`, `export { nodeToHtml } from ${lib('serializeFormate')};`, `export * as sicher from ${lib('sicher')};`,
     `export { patchSaeubern } from ${lib('gastPatch')};`, `export { tagLokal } from ${lib('tag')};`, `export { resolveLink, collectBacklinks } from ${lib('links')};`, `export { passt } from ${lib('tasten')};`,
   ].join('\n'));
   const aus = path.join(SD, 'm388-bündel.mjs');

@@ -25,6 +25,7 @@ import { ich, liveVerbunden, teilnehmerVon } from '../lib/liveStand';
 import { istNurBoard, nurBoardSetzen } from '../lib/nurBoard';
 import type { AppNode } from '../types';
 import { IChevronL, IChevronR, IX } from './Icons';
+import { ansichtVormerken } from './Board';
 
 /** Platz über dem Rahmen für seinen Titel (die Titel-Leiste sitzt 30 Punkte über der Fläche, 30-zeichnen…css) */
 const KOPF = 34;
@@ -41,8 +42,15 @@ const imFeld = (t: EventTarget | null) => !!(t as HTMLElement | null)?.closest?.
  */
 let vorReise: { boardId: string; ansicht: Viewport; nur: boolean } | null = null;
 let eingehaengt = false;
-// Endet die Reise, während das Board nicht zu sehen ist (Kürzel in der Aufgaben-Zentrale), gilt das Gemerkte nicht mehr
-reiseAbo(() => { if (!reiseStand() && !eingehaengt) vorReise = null; });
+// Endet die Reise, während das Board nicht zu sehen ist (Kürzel in der Aufgaben-Zentrale), kommt es beim Wiederkommen
+// in der Ansicht von VOR der Reise zurück — M530; vorher im Ausschnitt des letzten Rahmens (der gemerkte je Board)
+reiseAbo(() => {
+  if (reiseStand() || eingehaengt || !vorReise) return;
+  const vor = vorReise;
+  vorReise = null;
+  ansichtVormerken(vor.boardId, vor.ansicht);
+  if (!vor.nur) nurBoardSetzen(false);
+});
 
 export default function RahmenReise() {
   const stand = useSyncExternalStore(reiseAbo, reiseStand);
@@ -201,6 +209,8 @@ export default function RahmenReise() {
       else if (k === 'Home') tun = () => schritt('erster');
       else if (k === 'End') tun = () => schritt('letzter');
       else if (k === 'Escape') tun = beenden;
+      // M530: F passt in der Reise den Rahmen ein (wie die Landung) — vorher das ganze Board, der Rahmen war weg
+      else if (k === 'f' || k === 'F') tun = () => fliegen(ruhig() ? 0 : 300);
       if (!tun) return;
       e.preventDefault(); e.stopImmediatePropagation();
       if (!e.repeat || k !== 'Escape') tun();
@@ -208,7 +218,7 @@ export default function RahmenReise() {
     // Leertaste loslassen: React Flow hat das Schwenken (panActivationKeyCode) gar nicht erst begonnen — nichts zu tun
     window.addEventListener('keydown', taste, true);
     return () => window.removeEventListener('keydown', taste, true);
-  }, [schritt, beenden]);
+  }, [schritt, beenden, fliegen]);
 
   // Wischen: Trackpad (waagerechtes Rad, zwei Finger) und Finger auf der Fläche
   useEffect(() => {

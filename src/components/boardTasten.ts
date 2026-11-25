@@ -6,6 +6,8 @@
 import { overlayOffen } from '../lib/overlay';
 import { reiseStand } from '../lib/rahmenReise';
 import { leseFolge } from '../lib/kartenFolge';
+import { zahlWort } from '../lib/sprache';
+import { fokusStufeLoesen, FOKUS_ANSICHT_EREIGNIS } from '../lib/fokusAnsicht';
 import { useEffect, type MutableRefObject } from 'react';
 import { selectActiveBoard, useBoard } from '../store';
 import { dokumentHatPfeile } from './nodes/FileCard';
@@ -127,10 +129,11 @@ export function useBoardTasten(kamera: Kamera, anzRef: MutableRefObject<number>)
           if (best) waehle(best, dazu);
         });
       }
-      if (strg && !e.altKey && !e.shiftKey && e.code === 'KeyD' && gewaehlt.length) {
+      // M530: auch gewählte Rahmen — samt Inhalt (store/karten.ts `dupliziere`)
+      const mitRahmen = board.nodes.filter((n) => n.selected && (!n.archived || st.showArchived));
+      if (strg && !e.altKey && !e.shiftKey && e.code === 'KeyD' && mitRahmen.length) {
         return tun(() => {
-          const zahl = st.dupliziere(gewaehlt.filter((n) => n.type !== 'frame').map((n) => n.id));
-          if (zahl) st.showToast(`${zahl} Karte${zahl > 1 ? 'n' : ''} dupliziert`);
+          void st.dupliziere(mitRahmen.map((n) => n.id)).then((zahl) => { if (zahl) st.showToast(`${zahlWort(zahl, 'Karte', 'Karten')} dupliziert`); });
         });
       }
       if (strg || e.altKey) return;
@@ -177,6 +180,9 @@ export function useBoardTasten(kamera: Kamera, anzRef: MutableRefObject<number>)
       // ── Zoom ────────────────────────────────────────────────────────────────────────────
       if (e.key === '+' || e.key === '=') return tun(() => { void kamera.zoomIn({ duration: 140 }); });
       if (e.key === '-') return tun(() => { void kamera.zoomOut({ duration: 140 }); });
+      // M530: Im Karten-Fokus heißt 0 „zurück zur gewählten Darstellung" (die Karte wieder eingepasst) — vorher 100 %,
+      // und die offene Karte stand irgendwo halb im Bild
+      if (e.key === '0' && st.focusCard) return tun(() => { fokusStufeLoesen(); window.dispatchEvent(new CustomEvent(FOKUS_ANSICHT_EREIGNIS)); });
       if (e.key === '0') return tun(() => { void kamera.zoomTo(anzRef.current || 1, { duration: 200 }); });
       // ── Werkzeuge ───────────────────────────────────────────────────────────────────────
       if (e.shiftKey) return;
