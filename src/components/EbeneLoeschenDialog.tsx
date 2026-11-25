@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { nachLazy } from '../lib/nachLazy';
+import { Suspense, useEffect, useState } from 'react';
 import { useBoard } from '../store';
 
 /**
@@ -23,7 +24,7 @@ export function ebeneLoeschenFragen(art: EbeneWunsch['art'], id: string): void {
 }
 
 /** M483: Der Dialog (EbeneLoeschenFenster.tsx) kommt erst mit dem ersten Wunsch — hier bleibt nur der Einstieg */
-const EbeneLoeschenFensterSpaet = lazy(() => import('./EbeneLoeschenFenster').then((m) => ({ default: m.EbeneLoeschenDialog })));
+const EbeneLoeschenFensterSpaet = nachLazy(() => import('./EbeneLoeschenFenster').then((m) => ({ default: m.EbeneLoeschenDialog })));
 
 export function EbeneLoeschenHost() {
   const [wunsch, setWunsch] = useState<EbeneWunsch | null>(null);

@@ -1,5 +1,6 @@
 // M379: Vorlage wählen — für ein neues Board oder für das leere Board, vor dem man gerade steht.
 import { useEffect, useMemo, useRef } from 'react';
+import { escDarueber } from '../lib/fensterEsc';
 import { useBoard } from '../store';
 import { skizzeVon, VORLAGEN, type Vorlage, type VorlagenWunsch } from '../lib/vorlagen';
 import { IX } from './Icons';
@@ -61,7 +62,8 @@ export function VorlagenDialog({ wunsch, onClose }: { wunsch: VorlagenWunsch; on
 
   useEffect(() => {
     erste.current?.focus();
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    // M534: Liegt ein anderes Fenster darüber (Alt+H, Alt+E, Strg+K), gehört Esc ihm
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !escDarueber(erste.current, e)) { e.stopPropagation(); onClose(); } };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [onClose]);

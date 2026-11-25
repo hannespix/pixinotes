@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { escDarueber } from '../lib/fensterEsc';
 import { useBoard } from '../store';
 import { IX } from './Icons';
 import type { EbeneWunsch } from './EbeneLoeschenDialog';
@@ -26,7 +27,8 @@ export function EbeneLoeschenDialog({ wunsch, onClose }: { wunsch: EbeneWunsch; 
   const knopf = useRef<HTMLButtonElement>(null);
   useEffect(() => { knopf.current?.focus(); }, []);
   useEffect(() => {
-    const taste = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    // M534: Liegt ein anderes Fenster darüber (Alt+H, Alt+E, Strg+K), gehört Esc ihm
+    const taste = (e: KeyboardEvent) => { if (e.key === 'Escape' && !escDarueber(knopf.current, e)) { e.stopPropagation(); onClose(); } };
     window.addEventListener('keydown', taste, true);
     return () => window.removeEventListener('keydown', taste, true);
   }, [onClose]);

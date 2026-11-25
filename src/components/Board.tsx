@@ -1,6 +1,7 @@
+import { nachLazy } from '../lib/nachLazy';
 import { fokusAnsicht, fokusAnsichtMarkieren, fokusStufeLoesen, fokusZoomFuer, FOKUS_ANSICHT_EREIGNIS, FOKUS_ZOOM_EREIGNIS } from '../lib/fokusAnsicht';
 import { overlayOffen } from '../lib/overlay';
-import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -124,7 +125,7 @@ const KARTEN_LADER = {
 } satisfies Record<string, () => Promise<React.ComponentType<any>>>;
 
 const spaet = (laden: () => Promise<React.ComponentType<any>>): React.ComponentType<any> => {
-  const Teil = lazy(() => laden().then((C) => ({ default: C })));
+  const Teil = nachLazy(() => laden().then((C) => ({ default: C })));
   const Spaet = (props: object) => (
     <Suspense fallback={<div className="karte-laedt" aria-hidden="true" />}><Teil {...props} /></Suspense>
   );
@@ -182,7 +183,7 @@ const PRO_OPTIONEN = { hideAttribution: true };
  * Einmal da, bleibt sie eingehängt (auch über einen Board-Wechsel). Der Verfasser-Name liegt in lib/autor.ts.
  */
 export const kommentareLaden = () => import('./CommentLayer');
-const KommentareSpaet = lazy(() => kommentareLaden().then((m) => ({ default: m.CommentLayer })));
+const KommentareSpaet = nachLazy(() => kommentareLaden().then((m) => ({ default: m.CommentLayer })));
 let kommentareEingehaengt = false;
 function Kommentare() {
   const da = useBoard((s) => (selectActiveBoard(s).comments?.length ?? 0) > 0 || s.commentOpen !== null);
@@ -191,7 +192,7 @@ function Kommentare() {
 }
 
 export const auswahlLeisteLaden = () => import('./SelectionToolbar');
-const AuswahlLeisteSpaet = lazy(() => auswahlLeisteLaden().then((m) => ({ default: m.SelectionToolbar })));
+const AuswahlLeisteSpaet = nachLazy(() => auswahlLeisteLaden().then((m) => ({ default: m.SelectionToolbar })));
 let auswahlLeisteEingehaengt = false;
 // M525: memo — das Board zeichnet beim Ziehen je Mausbewegung neu; die Leiste (gut 130 Symbole) nur, wenn sie selbst Anlass hat
 const AuswahlLeiste = memo(function AuswahlLeiste() {
@@ -942,7 +943,8 @@ export function Board() {
   // Zieh-Schwelle überschreitet, ist sie längst da.
   const zg = useRef<typeof import('../lib/ziehGefuehl') | null>(null);
   const zieh = useRef<import('../lib/ziehGefuehl').Zug | null>(null);
-  const zgLaden = useCallback(() => import('../lib/ziehGefuehl').then((m) => { zg.current = m; return m; }), []);
+  // M534: ohne Netz nicht geladen — dann ziehen die Karten eben ohne das Gefühl (kein unbehandelter Fehler)
+  const zgLaden = useCallback(() => import('../lib/ziehGefuehl').then((m) => { zg.current = m; return m; }, () => null), []);
   useEffect(() => {
     const wrap = zoomWrapRef.current;
     if (!wrap) return;
@@ -965,7 +967,7 @@ export function Board() {
     };
     if (zg.current) { starten(zg.current); return; }
     // Allererster Zug (Finger: kein Überfahren vorher) — die Datei kommt noch; dann setzt das Gefühl mitten im Zug ein
-    void zgLaden().then((m) => { if (zugSchritt.current && !zieh.current) starten(m); });
+    void zgLaden().then((m) => { if (m && zugSchritt.current && !zieh.current) starten(m); });
   }, [getViewport, zgLaden]);
   const ziehSchritt = useCallback((node: Node, e?: MouseEvent | TouchEvent) => {
     const z = zieh.current;

@@ -3,13 +3,14 @@
 // Die Marken an den Karten und die Leiste des Punkte-Modus (Punkte.tsx, ~9 KB Quelltext) laden, sobald das Board
 // Punkte trägt bzw. der Modus angeht — sonst still im Leerlauf nach dem Start (App.tsx). Einmal da, bleiben sie
 // eingehängt, wie vorher von Anfang an. Ohne Punkte hängen sie nichts ins DOM.
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { nachLazy } from '../lib/nachLazy';
+import { Suspense, useEffect, useState } from 'react';
 import { selectActiveBoard, useBoard } from '../store';
 import { PUNKTE_MODUS, punkteModus, punkteZahl } from '../lib/punkte';
 
 export const punkteLaden = () => import('./Punkte');
-const MarkenVoll = lazy(() => punkteLaden().then((m) => ({ default: m.PunkteMarken })));
-const LeisteVoll = lazy(() => punkteLaden().then((m) => ({ default: m.PunkteLeiste })));
+const MarkenVoll = nachLazy(() => punkteLaden().then((m) => ({ default: m.PunkteMarken })));
+const LeisteVoll = nachLazy(() => punkteLaden().then((m) => ({ default: m.PunkteLeiste })));
 
 let markenDa = false;
 /** Gehört in ein <ViewportPortal> des Boards */

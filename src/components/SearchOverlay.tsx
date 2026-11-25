@@ -1,5 +1,5 @@
 import { qrZeigen } from '../lib/qr';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import uFuzzy from '@leeoniya/ufuzzy';
 import { mutedHistory, useBoard } from '../store';
 import { makeKanban, makeNote } from '../lib/nodes';
@@ -33,6 +33,7 @@ import { KartenSymbol } from './KartenSymbol';
 import { EINGANG_ID, eingangOeffnen, marke, ohneEingang } from '../lib/eingang';
 import { nurBoardSetzen } from '../lib/nurBoard';
 import { fensterDarueber } from '../lib/overlay';
+import { falte, falteMitStellen, fundstellen } from '../lib/suchFalten';
 interface Hit {
   boardId: string;
   boardName: string;
@@ -43,6 +44,34 @@ interface Hit {
   imBild?: boolean;
   /** M453: letzte inhaltliche Änderung (fehlt = unbekannt) */
   zeit?: number;
+  /** M534: Karte oder Board ist archiviert */
+  archiviert?: boolean;
+}
+
+/** M534: Fundstellen der Suchwörter markieren — auch gefaltet („ubersicht" markiert „Übersicht") */
+function Markiert({ text, worte }: { text: string; worte: string[] }) {
+  const teile: ReactNode[] = [];
+  let ab = 0;
+  for (const [von, bis] of fundstellen(text, worte)) {
+    if (von > ab) teile.push(text.slice(ab, von));
+    teile.push(<mark key={von} className="such-treffer">{text.slice(von, bis)}</mark>);
+    ab = bis;
+  }
+  teile.push(text.slice(ab));
+  return <>{teile}</>;
+}
+
+/** M534: Mehrere Texte gefaltet durchsuchen — Wörter in beliebiger Folge, ein Tippfehler je Wort; sonst Teiltext */
+function suchIn(heu: string[], q: string): number[] {
+  const fq = falte(q);
+  const r = uf.search(heu, fq, 1, 1000);
+  let idx: number[] = [];
+  if (r) {
+    const [idxs, info, order] = r;
+    if (idxs && info && order) idx = order.map((k) => info.idx[k]);
+    else if (idxs) idx = [...idxs];
+  }
+  return idx.length ? idx : heu.map((h, k) => (h.includes(fq) ? k : -1)).filter((k) => k >= 0);
 }
 
 /** Spotlight-Suche (Strg/Cmd+K) über alle Boards — Treffer anklicken fliegt zur Karte. */
@@ -174,14 +203,15 @@ export function SearchOverlay() {
   // Nur bei geöffneter Suche bauen — sonst liefe das bei jedem Tastendruck
   // in irgendeiner Karte über alle Boards (Audit PERF-1).
   const entries = useMemo(() => {
-    const list: { boardId: string; boardName: string; node: AppNode; text: string; ocr: string }[] = [];
+    const list: { boardId: string; boardName: string; node: AppNode; text: string; ocr: string; falt: string; archiviert: boolean }[] = [];
     if (!open) return list;
     for (const b of boards) {
       for (const n of b.nodes) {
         // M452: Bild-Karten tragen den Text, den die Erkennung im Bild gefunden hat — er zählt mit
         const ocr = bildText(n);
         const text = ocr ? `${nodeToText(n)}\n${ocr}` : nodeToText(n);
-        if (text.trim()) list.push({ boardId: b.id, boardName: b.name, node: n, text, ocr });
+        // M534: gefaltet durchsucht (Umlaute, ß) — einmal je Öffnen, nicht je Tastendruck
+        if (text.trim()) list.push({ boardId: b.id, boardName: b.name, node: n, text, ocr, falt: falte(`${text} ${b.name}`), archiviert: !!(b.archived || n.archived) });
       }
     }
     return list;
@@ -202,41 +232,28 @@ export function SearchOverlay() {
         });
     }
     if (!q) return [];
-    const haystack = entries.map((e) => `${e.text} ${e.boardName}`);
-
-    // uFuzzy: outOfOrder=1 → Multi-Token in beliebiger Reihenfolge
-    let resultIdxs: number[] = [];
-    const searched = uf.search(haystack, q, 1, 1000);
-    if (searched) {
-      const [idxs, info, order] = searched;
-      if (idxs && info && order) resultIdxs = order.map((i) => info.idx[i]);
-      else if (idxs) resultIdxs = [...idxs];
-    }
+    // uFuzzy: outOfOrder=1 → Multi-Token in beliebiger Reihenfolge; M534: auf dem gefalteten Text (Umlaute, ß);
     // Sicherheitsnetz: simple Teilstring-Suche, falls fuzzy nichts liefert
-    if (resultIdxs.length === 0) {
-      const ql = q.toLowerCase();
-      resultIdxs = entries
-        .map((e, i) => (`${e.text} ${e.boardName}`.toLowerCase().includes(ql) ? i : -1))
-        .filter((i) => i >= 0);
-    }
+    let resultIdxs = suchIn(entries.map((e) => e.falt), q);
 
     // M453: nach Zeit — neueste zuerst, Karten ohne bekannte Änderung ans Ende (Relevanz bleibt die zweite Ordnung)
     if (nachZeit) {
       const rang = new Map(resultIdxs.map((i, r) => [i, r]));
       resultIdxs = [...resultIdxs].sort((a, b) => ((zeitVon(entries[b].node) ?? -1) - (zeitVon(entries[a].node) ?? -1)) || ((rang.get(a) ?? 0) - (rang.get(b) ?? 0)));
     }
-    const firstToken = q.split(/\s+/)[0] ?? q;
+    const worte = q.split(/\s+/).filter(Boolean).map(falte);
     return resultIdxs.slice(0, 15).map((i) => {
       const e = entries[i];
       const firstLine = e.text.split('\n').find((l) => l.trim()) ?? '';
       // M452: Steht keines der Suchwörter in Name/Titel/Board, kam der Treffer aus dem Bild — dann zeigt
       // der Ausschnitt die Stelle im erkannten Text und die Zeile sagt es dazu
-      const worte = q.toLowerCase().split(/\s+/).filter(Boolean);
-      const basis = `${e.ocr ? e.text.slice(0, e.text.length - e.ocr.length) : e.text} ${e.boardName}`.toLowerCase();
+      const basis = falte(`${e.ocr ? e.text.slice(0, e.text.length - e.ocr.length) : e.text} ${e.boardName}`);
       const imBild = !!e.ocr && !worte.some((w) => basis.includes(w));
       const quelle = imBild ? e.ocr : e.text;
-      let at = quelle.toLowerCase().indexOf(firstToken.toLowerCase());
-      if (at === -1) at = 0;
+      // M534: Ausschnitt um die erste Fundstelle — gefaltet gesucht, im Original angesetzt
+      const gefaltet = falteMitStellen(quelle);
+      const pos = gefaltet.t.indexOf(worte[0] ?? '');
+      const at = pos > 0 ? gefaltet.stelle[pos] : 0;
       const start = Math.max(0, at - 30);
       return {
         boardId: e.boardId,
@@ -246,6 +263,7 @@ export function SearchOverlay() {
         snippet: (start > 0 ? '…' : '') + quelle.slice(start, at + 70).replace(/\n/g, ' '),
         imBild,
         zeit: zeitVon(e.node),
+        archiviert: e.archiviert,
       };
     });
   }, [query, entries, nachZeit]);
@@ -310,8 +328,9 @@ export function SearchOverlay() {
   const commands = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q || q === '#' || q.length < 2) return [];
-    return buildCommands().filter((c) =>
-      `${c.label} ${c.hint} ${c.alias} ${t(c.label)} ${t(c.hint)} ${t(c.alias)}`.toLowerCase().includes(q)).slice(0, 4);   // M381: auch englisch
+    // M381: auch englisch; M534: umlaut- und tippfehlertolerant wie die Karten
+    const liste = buildCommands();
+    return suchIn(liste.map((c) => falte(`${c.label} ${c.hint} ${c.alias} ${t(c.label)} ${t(c.hint)} ${t(c.alias)}`)), q).slice(0, 4).map((k) => liste[k]);
   }, [query]);
 
   // M312: Das Suchfeld im Baum öffnet diese Suche — also muss sie auch Boards
@@ -319,9 +338,13 @@ export function SearchOverlay() {
   const boardHits = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q || q === '#') return [];
-    return ohneEingang(boards).filter((b) => b.name.toLowerCase().includes(q)).slice(0, 5);
+    // M534: umlaut- und tippfehlertolerant; archivierte Boards bleiben auffindbar (mit Marke), stehen aber hinten
+    const liste = ohneEingang(boards);
+    return suchIn(liste.map((b) => falte(b.name)), q).map((k) => liste[k])
+      .sort((a, b) => Number(!!a.archived) - Number(!!b.archived)).slice(0, 5);
   }, [query, boards]);
 
+  const queryWorte = query.trim().split(/\s+/).filter(Boolean);
   if (!open) return null;
 
   return (
@@ -427,8 +450,11 @@ export function SearchOverlay() {
                     onClick={() => { setOpen(false); setView('board'); openBoard(b.id); }}
                   >
                     <span className="hit-main">
-                      <span className="hit-title" translate="no">{b.name}</span>
-                      <span className="hit-snippet">{`${zahlWort(b.nodes.length, 'Karte', 'Karten')} · Board öffnen`}</span>
+                      <span className="hit-title" translate="no"><Markiert text={b.name} worte={queryWorte} /></span>
+                      <span className="hit-snippet">
+                        {b.archived && <span className="hit-archiviert">archiviert</span>}
+                        {`${zahlWort(b.nodes.length, 'Karte', 'Karten')} · Board öffnen`}
+                      </span>
                     </span>
                   </button>
                 ))}
@@ -444,10 +470,11 @@ export function SearchOverlay() {
               >
                 <span className="hit-icon"><KartenSymbol art={h.node.type} size={15} /></span>
                 <span className="hit-main">
-                  <span className="hit-title" translate={h.title ? 'no' : undefined}>{h.title || '(ohne Titel)'}</span>
+                  <span className="hit-title" translate={h.title ? 'no' : undefined}>{h.title ? <Markiert text={h.title} worte={queryWorte} /> : '(ohne Titel)'}</span>
                   <span className="hit-snippet">
+                    {h.archiviert && <span className="hit-archiviert">archiviert</span>}
                     {h.imBild && <span className="hit-im-bild">Treffer im Bild</span>}
-                    <span translate="no">{h.snippet}</span>
+                    <span translate="no"><Markiert text={h.snippet} worte={queryWorte} /></span>
                   </span>
                 </span>
                 {h.zeit !== undefined && <span className="hit-alter" title={`Zuletzt geändert: ${zeitLang(h.zeit)}`}>{vorWann(h.zeit)}</span>}
@@ -475,7 +502,7 @@ export function SearchOverlay() {
             ))}
           </div>
         )}
-        <div className="search-footer">↑↓ navigieren · Enter springt zur Karte · # zeigt alle Tags · Esc schließt · sucht in allen Boards, tippfehlertolerant{brainOn ? ' · findet auch nach Bedeutung' : ''}</div>
+        <div className="search-footer">↑↓ navigieren · Enter springt zur Karte · # zeigt alle Tags · Esc schließt · sucht in allen Boards, tippfehlertolerant, auch ohne Umlaute{brainOn ? ' · findet auch nach Bedeutung' : ''}</div>
       </div>
     </div>
   );

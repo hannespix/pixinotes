@@ -4,6 +4,7 @@
 // Namen lassen sich ändern, Gruppen abwählen (deren Karten bleiben dann liegen). Erst „Ordnen" ändert das Board.
 // Der Dialog hängt sich selbst in die Seite (eigene Wurzel) – so braucht App.tsx keinen weiteren Zustand.
 import { useEffect, useRef, useState } from 'react';
+import { escDarueber } from '../lib/fensterEsc';
 import { createRoot } from 'react-dom/client';
 import { selectActiveBoard, useBoard } from '../store';
 import { nodeToText } from '../lib/serialize';
@@ -23,7 +24,8 @@ function Dialog({ vorschlag, fertig }: { vorschlag: ThemenVorschlag; fertig: (g:
   const ordnenRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
     ordnenRef.current?.focus();
-    const taste = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fertig(null); } };
+    // M534: Liegt ein anderes Fenster darüber (Alt+H, Alt+E, Strg+K), gehört Esc ihm
+    const taste = (e: KeyboardEvent) => { if (e.key === 'Escape' && !escDarueber(ordnenRef.current, e)) { e.preventDefault(); e.stopPropagation(); fertig(null); } };
     window.addEventListener('keydown', taste, true);
     return () => window.removeEventListener('keydown', taste, true);
   }, [fertig]);

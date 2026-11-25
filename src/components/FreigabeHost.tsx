@@ -1,14 +1,15 @@
 // M459: Der Freigabe-Dialog (Einladen, Freigaben, Einladungslink) zieht Konto- und Gast-Abgleich nach sich — er
 // kommt darum erst mit dem ersten Öffnen. Hier steht nur, was der Start braucht: das Ereignis und der Ort, an dem
 // der Dialog aufgeht.
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { nachLazy } from '../lib/nachLazy';
+import { Suspense, useEffect, useState } from 'react';
 import { useBoard } from '../store';
 
 /** M391: Den Einladungs-Dialog von überall öffnen */
 export const FREIGABE_OEFFNEN = 'pixinotes:freigabe-oeffnen';
 
 export const freigabeDialogLaden = () => import('./FreigabeDialog');
-const FreigabeDialogLazy = lazy(() => freigabeDialogLaden().then((m) => ({ default: m.FreigabeDialog })));
+const FreigabeDialogLazy = nachLazy(() => freigabeDialogLaden().then((m) => ({ default: m.FreigabeDialog })));
 
 /** Der Dialog, nachgeladen (bis er da ist: nichts — lokal wenige Millisekunden) */
 export function FreigabeDialogSpaet(props: { boardId: string; onClose: () => void }) {

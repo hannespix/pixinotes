@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import inject from '@rollup/plugin-inject';
 import { viteSingleFile } from 'vite-plugin-singlefile';
-import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Plugin } from 'vite';
 
@@ -74,6 +74,33 @@ function frimousseNachladen(): Plugin {
   };
 }
 
+/**
+ * M534: Der Service Worker erfährt, welche Dateien zu DIESER Veröffentlichung gehören. Vorher wuchs sein Cache mit
+ * jeder Fassung (alte Dateien wurden nie entfernt, allein Mermaid bringt je Fassung 3,5 MB mit), und weil sw.js sich
+ * nie änderte, bemerkte der Browser auch keine neue Fassung des Service Workers. Jetzt setzt der Build die Liste der
+ * Dateien unter assets/ in dist/sw.js ein: Ändert sich eine Datei, ändert sich sw.js, der Browser installiert den neuen
+ * Service Worker, und der räumt beim Übernehmen auf (public/sw.js, `aufraeumen`). Die Dateien der Fassung davor bleiben
+ * noch eine Runde liegen — ein Tab, der noch die alte Fassung zeigt, lädt seine Teile weiter.
+ */
+function swDateiliste(): Plugin {
+  let outDir = 'dist';
+  return {
+    name: 'pixinotes-sw-dateiliste',
+    apply: 'build',
+    configResolved(c) { outDir = resolve(c.root, c.build.outDir); },
+    closeBundle() {
+      const sw = resolve(outDir, 'sw.js');
+      const assets = resolve(outDir, 'assets');
+      if (!existsSync(sw) || !existsSync(assets)) return;
+      const liste = readdirSync(assets).filter((f) => !f.startsWith('.')).sort();
+      const text = readFileSync(sw, 'utf8');
+      const platzhalter = '[] /*__PIXINOTES_DATEIEN__*/';
+      if (!text.includes(platzhalter)) throw new Error('sw.js: Platzhalter für die Dateiliste fehlt (M534)');
+      writeFileSync(sw, text.replace(platzhalter, JSON.stringify(liste)));
+    },
+  };
+}
+
 // Modus "single": baut EINE portable pixinotes.html (läuft per Doppelklick,
 // auch von file:// ohne Server/Installation/Adminrechte).
 export default defineConfig(({ mode }) => ({
@@ -103,7 +130,7 @@ export default defineConfig(({ mode }) => ({
     }),
     processNurMsg(),
     frimousseNachladen(),
-    ...(mode === 'single' ? [viteSingleFile({ removeViteModuleLoader: true })] : [ocrDateienKopieren()]),
+    ...(mode === 'single' ? [viteSingleFile({ removeViteModuleLoader: true })] : [ocrDateienKopieren(), swDateiliste()]),
   ],
   build:
     mode === 'single'

@@ -1,5 +1,6 @@
 // M449: Versionen eines Boards — frühere Stände ansehen und zurückholen (lib/boardVersionen.ts).
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { escDarueber } from '../lib/fensterEsc';
 import { useBoard, type Stroke } from '../store';
 import { GRUND_TEXT, kartenVergleich, versionenVon, versionLaden, versionLoeschen, versionSichern, type VersionInfo, type VersionStand } from '../lib/boardVersionen';
 import { nodeToText } from '../lib/serialize';
@@ -105,7 +106,8 @@ export function VersionenDialog({ boardId, onClose }: { boardId: string; onClose
 
   useEffect(() => {
     zu.current?.focus();
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    // M534: Liegt ein anderes Fenster darüber (Alt+H, Alt+E, Strg+K), gehört Esc ihm
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !escDarueber(zu.current, e)) { e.stopPropagation(); onClose(); } };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [onClose]);
