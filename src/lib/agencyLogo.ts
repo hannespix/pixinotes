@@ -1,6 +1,5 @@
-// M553: Die Tinte wandert innerhalb der Buchstaben. Der Takt aus vave.log
-// bewegt die gemeinsame SVG-Uhr und hält sie in den Ruhephasen an.
-import { WORTMARKE, WORTMARKE_SICHTFELD } from './agencyWortmarke';
+// M554: Die Uhr bewegt nur die Tinte. Die schlanke Grundschrift steht fest.
+import { WORTMARKE_GRUND, WORTMARKE_SICHTFELD, WORTMARKE_TINTE } from './agencyWortmarke';
 import { agencyZeigerEinrichten } from './agencyZeiger';
 import { zugBeobachten, zugLaeuft } from './zugAnzeige';
 
@@ -12,13 +11,13 @@ const BEWEGUNGEN: readonly Bewegung[] = [
   [[0.66, 3600], [0.25, 2600], [1, 4600], [1, 700], [0, 5700], [0, 2200]],
   [[0.42, 3400], [0.08, 2400], [0.78, 4300], [0.38, 2800], [0, 3900], [0, 2600]],
 ];
-// Anlauf, linke Wölbung, Übergang, rechte Wölbung und Ausklang.
-// Anlauf und Ende folgen den vier versetzten Buchstaben aus der Referenz.
+// Die Tinte sammelt sich links, fließt um die Öffnung oder Kreuzung nach
+// rechts und klingt aus. Die nächste Kontur setzt noch währenddessen ein.
 const BUCHSTABEN_ZEITEN = [
-  [0.001, 0.18, 0.335, 0.49, 0.601],
-  [0.12, 0.255, 0.4, 0.53, 0.601],
-  [0.28, 0.397, 0.515, 0.634, 0.721],
-  [0.36, 0.497, 0.63, 0.77, 0.881],
+  [0.001, 0.17, 0.31, 0.50, 0.68],
+  [0.12, 0.29, 0.41, 0.55, 0.69],
+  [0.25, 0.41, 0.54, 0.69, 0.83],
+  [0.40, 0.55, 0.70, 0.83, 0.99],
 ] as const;
 const glaetten = (t: number) => t * t * t * (t * (6 * t - 15) + 10);
 
@@ -29,10 +28,30 @@ function wortmarkeBauen(): SVGSVGElement {
   svg.setAttribute('fill', 'currentColor');
   svg.setAttribute('focusable', 'false');
 
-  WORTMARKE.forEach(([grund, links, uebergang, rechts, ende], i) => {
+  const tinte = document.createElementNS(NS, 'g');
+  tinte.setAttribute('data-tinte', '');
+  tinte.setAttribute('fill-rule', 'evenodd');
+  const grund = document.createElementNS(NS, 'g');
+  grund.setAttribute('data-grundschrift', '');
+
+  WORTMARKE_GRUND.forEach((d) => {
     const buchstabe = document.createElementNS(NS, 'path');
     // Readex zeichnet überlappende Teile am x als gemeinsame Fläche.
-    buchstabe.setAttribute('d', grund);
+    buchstabe.setAttribute('d', d);
+    grund.append(buchstabe);
+  });
+  WORTMARKE_TINTE.forEach(([trocken, links, uebergang, rechts, ende], i) => {
+    const fluessig = document.createElementNS(NS, 'path');
+    fluessig.setAttribute('d', trocken);
+    const [beginn, , , , ausklang] = BUCHSTABEN_ZEITEN[i];
+    // Deckungsgleiche, zusammengefallene Pfade können an ihren Kanten noch
+    // Pixel färben. Außerhalb des Tintenflusses malt allein die Grundschrift.
+    fluessig.setAttribute('opacity', '0');
+    const sichtbar = document.createElementNS(NS, 'set');
+    sichtbar.setAttribute('attributeName', 'opacity');
+    sichtbar.setAttribute('to', '1');
+    sichtbar.setAttribute('begin', `${(beginn * DAUER).toFixed(3)}ms`);
+    sichtbar.setAttribute('dur', `${((ausklang - beginn) * DAUER).toFixed(3)}ms`);
     const zug = document.createElementNS(NS, 'animate');
     const zeiten = [0, ...BUCHSTABEN_ZEITEN[i], 1];
     zug.setAttribute('attributeName', 'd');
@@ -41,10 +60,11 @@ function wortmarkeBauen(): SVGSVGElement {
     zug.setAttribute('calcMode', 'spline');
     zug.setAttribute('keyTimes', zeiten.map((t) => t.toFixed(3)).join(';'));
     zug.setAttribute('keySplines', '0 0 1 1;0.33 0 0.66 0.72;0.3 0.25 0.7 0.72;0.3 0.27 0.7 0.75;0.31 0.38 0.66 1;0 0 1 1');
-    zug.setAttribute('values', [grund, grund, links, uebergang, rechts, ende, ende].join(';'));
-    buchstabe.append(zug);
-    svg.append(buchstabe);
+    zug.setAttribute('values', [trocken, trocken, links, uebergang, rechts, ende, ende].join(';'));
+    fluessig.append(sichtbar, zug);
+    tinte.append(fluessig);
   });
+  svg.append(tinte, grund);
   return svg;
 }
 

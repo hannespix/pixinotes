@@ -18,6 +18,7 @@ export function NeuEn() {
             <section id="help-neu">
               <p>The latest releases in brief, newest first. Which version is currently running is shown at the bottom of the help.</p>
               <ul><NeuesteZuerst>
+                <li><b>Slim wordmark with flowing ink in Agency (M554)</b> “pixi · notes” uses a lighter type weight and appears in deep black in the light theme. Ink pools around the opening in the “p” and in the corners of the “x”. The bulges glide along the letters.</li>
                 <li><b>Flowing letters in Agency (M553)</b> One side of each letter in “pixi” swells first, then the bulge rolls to the other side. The letters move in succession. The purple dot and “notes” stay still.</li>
                 <li><b>Choose your board background (M552)</b> In <b>Settings → Appearance → Board background</b>, choose <b>Clean</b> for a plain canvas, <b>Dots</b>, <b>Lines</b>, or <b>Crosses</b>. Your choice applies to every board on this device, even when you toggle grid snap.</li>
                 <li><b>Slower wordmark and lighter Agency Dark (M551)</b> The “p” in “pixi” grows fuller as the “x” and final “i” slim down. The motion flows back more slowly. The canvas, cards and toolbar use a warm charcoal palette.</li>
