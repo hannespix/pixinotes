@@ -175,6 +175,8 @@ export function HelpOverlay() {
             <section id="help-neu">
               <p>Die letzten Ausbaustufen in Kürze, neueste zuerst. Welche Fassung gerade läuft, steht am Fuß der Hilfe.</p>
               <ul><NeuesteZuerst>
+                <li><b>Fließende Buchstaben in Agency (M553)</b> Bei „pixi“ wölbt sich erst die eine Seite eines Buchstabens, dann wandert die Verdickung zur anderen. Die Buchstaben setzen zeitversetzt ein. Der violette Punkt und „notes“ stehen still.</li>
+                <li><b>Board-Hintergrund wählen (M552)</b> Unter <b>Einstellungen → Darstellung → Board-Hintergrund</b> wählst du <b>Clean</b> für eine glatte Fläche, <b>Dots</b> für Punkte, <b>Linien</b> oder <b>Kreuze</b>. Das gewählte Muster gilt für alle Boards auf diesem Gerät, auch wenn du den Raster-Fang umschaltest.</li>
                 <li><b>Langsamere Wortmarke und helleres Agency Dunkel (M551)</b> Das „p“ von „pixi“ wird deutlich voller, während das „x“ und das letzte „i“ schlanker werden. Die Bewegung fließt langsamer zurück. Leinwand, Karten und Kopfleiste stehen in warmem Anthrazit.</li>
                 <li><b>„pixi · notes“ in Agency (M550)</b> „pixi“ atmet von selbst in wechselnden Wellen. Der violette Punkt und das leichte „notes“ stehen still. Mit „Bewegung reduzieren“ oder „Besser lesbar“ siehst du die ruhende Wortmarke.</li>
                 <li><b>Neue Wortmarke und Mauszeiger in Agency (M549)</b> PixiNotes steht in Readex Pro. Beim Darüberfahren fließt mehr Tinte in die einzelnen Buchstaben. Beim Wegfahren läuft die Umformung zurück. In den Leisten wächst der Mauszeiger über Knöpfen zu einem kontrastreichen Kreis. Mit „Bewegung reduzieren“ oder „Besser lesbar“ steht die Wortmarke still und der Systemzeiger bleibt sichtbar.</li>
@@ -515,11 +517,12 @@ export function HelpOverlay() {
               </ul>
               <h4>Board</h4>
               <ul>
-                <li>Dock <b>⋯ → „Anordnen &amp; Hintergrund"</b> räumt das Board auf: „Fluss horizontal" ordnet Verbundenes als Fluss und den Rest in Gruppen, dazu Raster, Kompakt, Schwimmbahnen, Zeitstrahl und weitere; Strg+Z stellt alles wieder her. Dort stehen auch Gitter und Tönung.</li>
+                <li>Im Dock unter <b>⋯ → „Anordnen &amp; Hintergrund“</b> sortierst du Karten mit „Fluss horizontal“, „Raster“, „Kompakt packen“ und weiteren Anordnungen. Strg+Z nimmt die Anordnung zurück. Dort findest du auch den Raster-Fang und die Tönung für das aktuelle Board.</li>
+                <li>Unter <b>Einstellungen → Darstellung → Board-Hintergrund</b> wählst du <b>Clean</b> für eine glatte Fläche, <b>Dots</b> für Punkte, <b>Linien</b> oder <b>Kreuze</b>. Die Wahl gilt für alle Boards auf diesem Gerät und ist unabhängig vom Einrasten. Bis zur ersten Auswahl siehst du wie gewohnt Punkte und bei aktivem Raster-Fang Linien.</li>
                 <li><b>Strg+K</b> sucht überall – auch Personen, Eigenschaften und #Tags, ohne Umlaute („strasse“ findet „Straße“) und mit Tippfehlern. <b>Strg+Z / Strg+Y</b> machen rückgängig und wiederholen. Die <b>Zurück-Taste</b> des Browsers führt zum vorigen Board, zurück aus Übersicht, Fokus und Fenstern.</li>
                 <li><b>Archivieren:</b> Karte → ⋯ → „Archivieren". Dock ⋯ → „Archiv einblenden" zeigt Archiviertes gedimmt; dort „Zurückholen".</li>
                 <li><b>Übereinander legen:</b> Beim Ziehen weichen andere Karten aus. Kurz über einer Karte <b>stillhalten</b> legt die gezogene darauf (Stapel); mit gedrückter <b>Alt</b>-Taste weicht nichts aus und die Karte landet frei.</li>
-                <li><b>Einrasten</b> (Einstellungen → Darstellung → Bedienung): <b>Fanglinien</b> richten gezogene Karten an anderen Karten aus, <b>Raster</b> am Gitter (Alt+R), <b>Aus</b> legt frei ab. Strg beim Ziehen legt immer frei ab. <b>Konfetti beim Erledigen</b> ist ein eigener Schalter daneben.</li>
+                <li>Unter <b>Einstellungen → Darstellung → Bedienung → Einrasten</b> richten <b>Fanglinien</b> gezogene Karten an anderen Karten aus. <b>Raster</b> lässt sie an festen Rasterpunkten einrasten (Alt+R). Mit <b>Aus</b> oder mit Strg beim Ziehen legst du Karten frei ab. <b>Konfetti beim Erledigen</b> hat daneben einen eigenen Schalter.</li>
                 <li>Du startest mit einem leeren Board. Beispiele zum Ausprobieren: ＋ Neu am Fuß der Navigation → „Beispiel-Umgebung hinzufügen".</li>
               </ul>
             </section>

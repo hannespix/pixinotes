@@ -18,6 +18,8 @@ export function NeuEn() {
             <section id="help-neu">
               <p>The latest releases in brief, newest first. Which version is currently running is shown at the bottom of the help.</p>
               <ul><NeuesteZuerst>
+                <li><b>Flowing letters in Agency (M553)</b> One side of each letter in “pixi” swells first, then the bulge rolls to the other side. The letters move in succession. The purple dot and “notes” stay still.</li>
+                <li><b>Choose your board background (M552)</b> In <b>Settings → Appearance → Board background</b>, choose <b>Clean</b> for a plain canvas, <b>Dots</b>, <b>Lines</b>, or <b>Crosses</b>. Your choice applies to every board on this device, even when you toggle grid snap.</li>
                 <li><b>Slower wordmark and lighter Agency Dark (M551)</b> The “p” in “pixi” grows fuller as the “x” and final “i” slim down. The motion flows back more slowly. The canvas, cards and toolbar use a warm charcoal palette.</li>
                 <li><b>“pixi · notes” in Agency (M550)</b> “pixi” breathes on its own in alternating waves. The purple dot and the light “notes” stay still. “Reduce motion” and “Easier to read” show the resting wordmark.</li>
                 <li><b>New wordmark and pointer in Agency (M549)</b> PixiNotes is set in Readex Pro. Ink flows into the letters when you hover, then runs back when you move away. Over toolbar buttons the pointer grows into an inverted circle. “Reduce motion” and “Easier to read” keep the wordmark still and use the system pointer.</li>
@@ -314,11 +316,12 @@ export function HilfeEn() {
               </ul>
               <h4>Board</h4>
               <ul>
-                <li>Dock <b>⋯ → “Arrange &amp; background”</b> tidies the board: “Horizontal flow” arranges connected cards as a flow and the rest in groups, plus grid, compact, swim lanes, timeline and more; Ctrl+Z restores everything. Grid and tint are there too.</li>
+                <li>In the dock under <b>⋯ → “Arrange &amp; background”</b>, arrange cards with “Horizontal flow”, “Grid”, “Pack compactly”, and other layouts. Ctrl+Z undoes the layout. This menu also holds grid snap and the tint for the current board.</li>
+                <li>In <b>Settings → Appearance → Board background</b>, choose <b>Clean</b> for a plain canvas, <b>Dots</b>, <b>Lines</b>, or <b>Crosses</b>. Your choice applies to every board on this device independently of snapping. Until you choose a pattern, boards show dots by default and lines while grid snap is on.</li>
                 <li><b>Ctrl+K</b> searches everywhere – including people, properties and #tags, without umlauts (“strasse” finds “Straße”) and with typos. <b>Ctrl+Z / Ctrl+Y</b> undo and redo. The browser’s <b>back button</b> leads to the previous board and back out of the overview, focus and windows.</li>
                 <li><b>Archiving:</b> card → ⋯ → “Archive”. Dock ⋯ → “Show archive” shows archived items dimmed; use “Restore” there.</li>
                 <li><b>Placing cards on top of each other:</b> While dragging, other cards make room. <b>Hold still</b> over a card for a moment to put the dragged one on top (stack); hold <b>Alt</b> and nothing makes room – the card lands freely.</li>
-                <li><b>Snapping</b> (Settings → Appearance → Controls): <b>snap lines</b> align dragged cards with other cards, <b>grid</b> with the grid (Alt+R), <b>off</b> drops freely. Ctrl while dragging always drops freely. <b>Confetti when done</b> is its own switch next to it.</li>
+                <li>Under <b>Settings → Appearance → Controls → Snapping</b>, <b>snap lines</b> align dragged cards with other cards. <b>Grid</b> snaps them to fixed grid points (Alt+R). Choose <b>Off</b> or hold Ctrl while dragging to place cards freely. <b>Confetti when done</b> has its own switch nearby.</li>
                 <li>You start with an empty board. Samples to try out: ＋ New at the bottom of the navigation → “Add sample workspace”.</li>
               </ul>
             </section>

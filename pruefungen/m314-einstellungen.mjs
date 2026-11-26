@@ -90,7 +90,8 @@ console.log('\n════ A: Reiter ════');
   // M490: „Lebendige Fläche" aufgelöst – „Einrasten" (Aus · Fanglinien · Raster, Nutzerwunsch) und „Konfetti beim
   //       Erledigen" als eigener Schalter; der Klick-Zoom entfiel (der Fokus hatte ihn seit M314 ohnehin verdrängt)
   // M507: „Design" (Klassisch · pix·el) – Nutzerwunsch, zweite Design-Variante
-  pruefe('B2 genau vierzehn Zeilen', JSON.stringify(z) === JSON.stringify(['Erscheinungsbild', 'Design', 'Pfeilschatten', 'Akzentfarbe', 'Sprache', 'Anzeigegröße', 'Besser lesbar', 'Mausrad zoomt', 'Bewegung beim Ziehen', 'Einrasten', 'Konfetti beim Erledigen', 'Finger-Gesten (wie Procreate)', 'Eingehendes im Eingang sammeln', 'Rechtschreibung prüfen']), JSON.stringify(z));
+  // M552: „Board-Hintergrund“ steht bei Aussehen nach „Design“.
+  pruefe('B2 genau fünfzehn Zeilen', JSON.stringify(z) === JSON.stringify(['Erscheinungsbild', 'Design', 'Board-Hintergrund', 'Pfeilschatten', 'Akzentfarbe', 'Sprache', 'Anzeigegröße', 'Besser lesbar', 'Mausrad zoomt', 'Bewegung beim Ziehen', 'Einrasten', 'Konfetti beim Erledigen', 'Finger-Gesten (wie Procreate)', 'Eingehendes im Eingang sammeln', 'Rechtschreibung prüfen']), JSON.stringify(z));
   pruefe('B3 keine Zeilen mehr für Milchglas, Navigation, Fokus, Stift, Physik, Klick-Zoom, Lebendige Fläche', !z.some((t) => /Milchglas|Navigation|Fokus|Stift|Physik|Klick|Lebendig|Kontrast|lesbare Schrift/.test(t)));
   const check = (text) => P.locator('.modal-row-check', { hasText: text }).locator('input[type="checkbox"]');
   await check('Besser lesbar').check();

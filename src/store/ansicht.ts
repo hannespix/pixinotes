@@ -76,6 +76,8 @@ export function ansichtScheibe(set: Setzen, get: Holen) {
 
     gridSnap: false,
     setGridSnap: (on) => set({ gridSnap: on }),
+    boardMuster: undefined,
+    setBoardMuster: (boardMuster) => set({ boardMuster }),
     fangLinien: true,
     setFangLinien: (on) => set({ fangLinien: on }),
     anzeige: 1,

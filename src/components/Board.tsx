@@ -18,6 +18,7 @@ import {
 } from '@xyflow/react';
 import { fangAktiv, fangen, fangSetzen, groesseFangen, type Kasten } from '../lib/fang';
 import { zugSetzen } from '../lib/zugAnzeige';
+import { sichtbaresBoardMuster } from '../lib/boardMuster';
 import { ablegenGenauAn } from '../lib/ablegenGenau';
 import { Fanglinien } from './Fanglinien';
 import { AnsichtPortal } from './AnsichtPortal';
@@ -64,6 +65,12 @@ const isPhoneFocus = () => window.matchMedia('(pointer: coarse)').matches;
 
 /** M296: Ab so vielen Karten zeigt das Board seine Minimap */
 const MINIMAP_AB = 10;
+
+const HINTERGRUND_MUSTER = {
+  dots: { variant: BackgroundVariant.Dots, gap: 26, size: 1.6 },
+  linien: { variant: BackgroundVariant.Lines, gap: 20, lineWidth: 0.6 },
+  kreuze: { variant: BackgroundVariant.Cross, gap: 26, size: 5, lineWidth: 0.7 },
+} as const;
 
 /** Mit Maus: Doppelklick öffnet den Fokus (siehe onNodeDoubleClick) */
 const istMaus = () => window.matchMedia('(pointer: fine)').matches;
@@ -840,6 +847,7 @@ export function Board() {
     return () => { for (const ev of ['beforeinput', 'cut'] as const) document.removeEventListener(ev, stopp, true); };
   }, [nurLesen]);
   const gridSnap = useBoard((s) => s.gridSnap);
+  const boardMuster = useBoard((s) => sichtbaresBoardMuster(s.boardMuster, s.gridSnap));
 
   // Archiv (M87): archivierte Karten sind ausgeblendet (React-Flow `hidden`),
   // bei aktivem Archiv-Schalter gedimmt sichtbar. Anhängende Kanten wandern mit.
@@ -1986,12 +1994,7 @@ export function Board() {
         {/* M377: Punkte an den Karten */}
         <AnsichtPortal><PunkteMarkenSpaet /></AnsichtPortal>
         <AnsichtPortal><LiveZeigerSpaet /></AnsichtPortal>
-        <Background
-          variant={gridSnap ? BackgroundVariant.Lines : BackgroundVariant.Dots}
-          gap={gridSnap ? 20 : 26}
-          size={1.6}
-          lineWidth={0.6}
-        />
+        {boardMuster !== 'clean' && <Background {...HINTERGRUND_MUSTER[boardMuster]} />}
         {/* M296: Die Minimap erst, wenn das Board groß genug ist, um sich darin
             zu verlaufen — bei fünf Karten ist sie nur ein grauer Kasten. */}
         {nodes.length >= MINIMAP_AB && (

@@ -7,6 +7,7 @@
 import type { Connection, Edge, EdgeChange, NodeChange } from '@xyflow/react';
 import type { AppNode, CardFont, CardSize } from '../types';
 import type { StoreApi } from 'zustand';
+import type { BoardMuster } from '../lib/boardMuster';
 
 /**
  * M394: „Seite" eines Strichs, der in der Präsentation auf eine Folie gezeichnet wurde und keiner Dokument-Seite
@@ -411,9 +412,12 @@ export interface BoardState {
   setBoardBg: (id: string, bg: string | undefined) => void;
   /** M509: Look des Boards setzen (undefined = keiner festgelegt) */
   setBoardLook: (id: string, look: BoardLook | undefined) => void;
-  /** Gitter anzeigen + Karten am Raster einrasten (persistiert, M88) */
+  /** Karten beim Verschieben am Raster einrasten (persistiert, M88) */
   gridSnap: boolean;
   setGridSnap: (on: boolean) => void;
+  /** M552: Hintergrundmuster für alle Boards auf diesem Gerät */
+  boardMuster?: BoardMuster;
+  setBoardMuster: (muster: BoardMuster) => void;
   /** M490: Fanglinien beim Ziehen (an Kanten/Mitten anderer Karten einrasten). Einrasten „Aus" = weder
    *  Fanglinien noch Raster; „Raster" = gridSnap (hat Vorrang, fangLinien bleibt für den Rückweg mit Alt+R stehen) */
   fangLinien: boolean;

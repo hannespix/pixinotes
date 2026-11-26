@@ -1,5 +1,5 @@
-// M551: „pixi“ folgt den Bewegungsfolgen aus vave.log. Während
-// der Ruhephasen steht die SVG-Uhr und nur ein Zeitgeber wartet auf den nächsten Zug.
+// M553: Die Tinte wandert innerhalb der Buchstaben. Der Takt aus vave.log
+// bewegt die gemeinsame SVG-Uhr und hält sie in den Ruhephasen an.
 import { WORTMARKE, WORTMARKE_SICHTFELD } from './agencyWortmarke';
 import { agencyZeigerEinrichten } from './agencyZeiger';
 import { zugBeobachten, zugLaeuft } from './zugAnzeige';
@@ -12,8 +12,14 @@ const BEWEGUNGEN: readonly Bewegung[] = [
   [[0.66, 3600], [0.25, 2600], [1, 4600], [1, 700], [0, 5700], [0, 2200]],
   [[0.42, 3400], [0.08, 2400], [0.78, 4300], [0.38, 2800], [0, 3900], [0, 2600]],
 ];
+// Anlauf, linke Wölbung, Übergang, rechte Wölbung und Ausklang.
 // Anlauf und Ende folgen den vier versetzten Buchstaben aus der Referenz.
-const BUCHSTABEN_ZEITEN = [[0.001, 0.41, 0.601], [0.12, 0.47, 0.601], [0.28, 0.54, 0.721], [0.36, 0.63, 0.881]] as const;
+const BUCHSTABEN_ZEITEN = [
+  [0.001, 0.18, 0.335, 0.49, 0.601],
+  [0.12, 0.255, 0.4, 0.53, 0.601],
+  [0.28, 0.397, 0.515, 0.634, 0.721],
+  [0.36, 0.497, 0.63, 0.77, 0.881],
+] as const;
 const glaetten = (t: number) => t * t * t * (t * (6 * t - 15) + 10);
 
 function wortmarkeBauen(): SVGSVGElement {
@@ -23,7 +29,7 @@ function wortmarkeBauen(): SVGSVGElement {
   svg.setAttribute('fill', 'currentColor');
   svg.setAttribute('focusable', 'false');
 
-  WORTMARKE.forEach(([grund, mitte, ende], i) => {
+  WORTMARKE.forEach(([grund, links, uebergang, rechts, ende], i) => {
     const buchstabe = document.createElementNS(NS, 'path');
     // Readex zeichnet überlappende Teile am x als gemeinsame Fläche.
     buchstabe.setAttribute('d', grund);
@@ -34,8 +40,8 @@ function wortmarkeBauen(): SVGSVGElement {
     zug.setAttribute('fill', 'freeze');
     zug.setAttribute('calcMode', 'spline');
     zug.setAttribute('keyTimes', zeiten.map((t) => t.toFixed(3)).join(';'));
-    zug.setAttribute('keySplines', '0 0 1 1;0.33 0 0.40 1;0.46 0 0.52 1;0 0 1 1');
-    zug.setAttribute('values', [grund, grund, mitte, ende, ende].join(';'));
+    zug.setAttribute('keySplines', '0 0 1 1;0.33 0 0.66 0.72;0.3 0.25 0.7 0.72;0.3 0.27 0.7 0.75;0.31 0.38 0.66 1;0 0 1 1');
+    zug.setAttribute('values', [grund, grund, links, uebergang, rechts, ende, ende].join(';'));
     buchstabe.append(zug);
     svg.append(buchstabe);
   });
