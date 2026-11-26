@@ -152,6 +152,15 @@
 .pixi-tools button:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
 
 /* Folie: groß in der Mitte */
-.slide-pixi { display: flex; flex-direction: column; align-items: center; justify-content: center; width: min(60vmin, 480px); height: min(60vmin, 480px); margin: 0 auto; }
-.slide-pixi .pixi { flex: 1; min-height: 0; }
-.slide-pixi-name { margin: 8px 0 0; font-size: 20px; }
+/* M545: Die Zeichenfläche hat oben Platz für Zzz, Noten und Herzen (Körper in 0…30 der viewBox −16…32, lib/pixiBild.ts) –
+   mittig gesetzt stand Pixi deshalb um 7/48 der Fläche zu tief, mit Namen noch tiefer. Jetzt zählt für die Lage nur der
+   Körper samt Schatten (0…32): ein negativer Rand nimmt den Spielraum oben (16/48) aus dem Fluss, die Figur selbst bleibt so
+   groß wie bisher und Zzz/Herzen dürfen weiter darüber hinausragen. Die Fläche ist ein Vielfaches von 48 Punkten (wie
+   die Figur, PixiFigur), damit die Rechnung aufgeht. Figur samt Name steht so in der Mitte der Folie. */
+.slide-pixi {
+  --pixi-s: min(60vmin, 480px);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; width: var(--pixi-s); margin: 0 auto;
+}
+@supports (width: round(down, 10px, 48px)) { .slide-pixi { --pixi-s: round(down, min(60vmin, 480px), 48px); } }
+.slide-pixi .pixi { flex: none; width: var(--pixi-s); height: var(--pixi-s); margin: calc(var(--pixi-s) * -16 / 48) 0 0; }
+.slide-pixi-name { margin: 8px 0 0; font-size: 20px; line-height: 30px; }
