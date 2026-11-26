@@ -168,6 +168,21 @@
 .comment-blase-text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .comment-blase.resolved { opacity: .6; }
 .comment-blase.open { border-color: var(--accent); }
+/* M546: Pin und Blase lassen sich ziehen (Maus, Stift, Finger) — die Fläche schwenkt dabei nicht mit */
+.comment-pin.verschiebbar, .comment-blase.verschiebbar { touch-action: none; }
+.comment-pin.zieht, .comment-blase.zieht { cursor: grabbing; }
+.comment-blase { transform-origin: 0 0; }
+.comment-blase.weg { border-radius: var(--r-sm); }
+/* Dünne Linie vom Pin zur weggelegten Blase; Stärke in Bildschirm-Punkten */
+.comment-blase-linie {
+  position: absolute; left: 0; top: 0; z-index: 2999; pointer-events: none; transform-origin: 0 0;
+  height: calc(1px * var(--pn-inv, 1)); background: var(--muted); opacity: .6;
+}
+/* Stift, Textmarker oder Radierer in der Hand: Blasen treten zurück — man sieht, was darunter liegt, und
+   arbeitet durch sie hindurch. Die Pins bleiben, wie sie sind. */
+.comment-blase.durchlaessig { opacity: .2; pointer-events: none; transition: opacity .15s ease; }
+.comment-blase-linie.durchlaessig { opacity: .2; }
+@media (prefers-reduced-motion: reduce) { .comment-blase.durchlaessig { transition: none; } }
 .comment-seite { margin-left: 8px; font-size: 11px; color: var(--muted); font-weight: 600; }
 .pdf-kommentar-zahl { margin-left: 3px; font-size: 10px; font-weight: 700; color: var(--accent-strong); }
 .pdf-seite-bar button.on .pdf-kommentar-zahl { color: #fff; }

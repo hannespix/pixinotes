@@ -6,7 +6,8 @@
  */
 import type { Edge } from '@xyflow/react';
 import type { AppNode } from '../types';
-import type { Stroke, BoardDoc, CommentThread, BoardSnap, HistoryEntry, BoardState, Setzen, Holen } from './typen';
+import type { Stroke, BoardDoc, CommentThread, BoardSnap, HistoryEntry, BoardState, Setzen, Holen, KommentarLage } from './typen';
+import { KOMMENTAR_LAGE } from './typen';
 import { ohneStempel } from './schutz';
 import { inDerived } from './speicher';
 import { useBoard } from '../store';
@@ -36,6 +37,42 @@ function kommentareNach(jetzt: CommentThread[] | undefined, gemerkt: CommentThre
     if (c.nodeId && bleibt.has(c.nodeId) && !war.has(c.nodeId) && !da.has(c.id)) { aus.push(c); dazu = true; }
   }
   return !dazu && aus.length === (jetzt ?? []).length ? jetzt : aus;
+}
+
+/** M546: Lage (Pin, Blase) eines Gesprächs — fehlende Felder als `null`, damit das Zurücklegen sie wieder herausnimmt */
+export function lageVon(c: CommentThread): KommentarLage {
+  const aus: KommentarLage = {};
+  for (const k of KOMMENTAR_LAGE) aus[k] = typeof c[k] === 'number' ? c[k] : null;
+  return aus;
+}
+/** M546: Lage setzen (`null` nimmt das Feld heraus) — dasselbe Objekt, wenn sich nichts ändert */
+export function lageSetzen(c: CommentThread, lage: KommentarLage): CommentThread {
+  let aus: CommentThread | null = null;
+  for (const k of KOMMENTAR_LAGE) {
+    if (!(k in lage)) continue;
+    const v = lage[k];
+    if (v === null || v === undefined) { if (k in c) { aus ??= { ...c }; delete aus[k]; } }
+    else if (c[k] !== v) { aus ??= { ...c }; aus[k] = v; }
+  }
+  return aus ?? c;
+}
+/**
+ * M546: Ein Schritt, der Pins/Blasen verschoben hat, merkt sich deren Lage davor (`kommentarOrte`). Rückgängig legt
+ * sie zurück und gibt dem Gegen-Schritt die Lage von jetzt mit — sonst sind Gespräche kein Teil des Verlaufs (M388).
+ */
+function orteTauschen(comments: CommentThread[] | undefined, orte: Record<string, KommentarLage> | undefined): { comments: CommentThread[] | undefined; gegen?: Record<string, KommentarLage> } {
+  if (!orte || !comments) return { comments };
+  const gegen: Record<string, KommentarLage> = {};
+  let anders = false;
+  const aus = comments.map((c) => {
+    const lage = orte[c.id];
+    if (!lage) return c;
+    gegen[c.id] = lageVon(c);
+    const neu = lageSetzen(c, lage);
+    if (neu !== c) anders = true;
+    return neu;
+  });
+  return { comments: anders ? aus : comments, gegen };
 }
 
 export const HISTORY_LIMIT = 50;
@@ -155,19 +192,23 @@ function schrittGezielt(
   // Abgeschlossener Schritt: sein gemerkter Stand danach. Offener (jüngster) Schritt: der Stand von jetzt.
   const von: Stand = entry.nach ?? jetzt;
   const r = gezieltZurueck(jetzt, von, zu, new Set(entry.fremd ?? []), new Set(entry.gemischt ?? []));
-  const gegen: HistoryEntry = { boardId: entry.boardId, ...von, nach: zu, ...(entry.fremd ? { fremd: entry.fremd } : {}) };
+  // M546: verschobene Pins/Blasen gehen mit (ihr Zurücklegen zählt als getan)
+  const orte = orteTauschen(board.comments, entry.kommentarOrte);
+  const orteGetan = orte.comments !== board.comments;
+  const getan = r.getan > 0 || orteGetan;
+  const gegen: HistoryEntry = { boardId: entry.boardId, ...von, nach: zu, ...(entry.fremd ? { fremd: entry.fremd } : {}), ...(orte.gegen ? { kommentarOrte: orte.gegen } : {}) };
   const stapel = richtung === 'zurueck'
-    ? { past: s.past.slice(0, -1), future: r.getan ? [...s.future, gegen] : s.future }
-    : { future: s.future.slice(0, -1), past: r.getan ? [...s.past, gegen] : s.past };
+    ? { past: s.past.slice(0, -1), future: getan ? [...s.future, gegen] : s.future }
+    : { future: s.future.slice(0, -1), past: getan ? [...s.past, gegen] : s.past };
   const notizen = s.activeId === entry.boardId ? geaenderteNotizen(board.nodes, r.stand.nodes) : [];
   set({
     ...stapel,
-    ...(r.getan ? { boards: s.boards.map((b) => (b.id === entry.boardId ? { ...b, nodes: r.stand.nodes, edges: r.stand.edges, drawings: r.stand.drawings } : b)) } : {}),
+    ...(getan ? { boards: s.boards.map((b) => (b.id === entry.boardId ? { ...b, nodes: r.stand.nodes, edges: r.stand.edges, drawings: r.stand.drawings, comments: orte.comments } : b)) } : {}),
   });
   if (notizen.length) window.dispatchEvent(new CustomEvent(NOTIZ_EXTERN, { detail: notizen }));
   const was = richtung === 'zurueck' ? 'Zurückgenommen' : 'Wiederholt';
   if (r.uebersprungen && r.getan) useBoard.getState().showToast(`↩ ${was} – ${r.uebersprungen === 1 ? 'eine Stelle blieb' : `${r.uebersprungen} Stellen blieben`}, wie sie ist: Jemand anderes hat sie inzwischen geändert.`, false, 6000);
-  else if (r.uebersprungen) useBoard.getState().showToast('↩ Nichts zurückgenommen – was dieser Schritt betraf, hat inzwischen jemand anderes geändert.', false, 6000);
+  else if (r.uebersprungen && !orteGetan) useBoard.getState().showToast('↩ Nichts zurückgenommen – was dieser Schritt betraf, hat inzwischen jemand anderes geändert.', false, 6000);
 }
 
 /** Sammel-Aktionen (z. B. KI-Pläne): innere Mutatoren pushen KEINE eigenen
@@ -276,17 +317,20 @@ export function verlaufScheibe(set: Setzen, get: Holen) {
       // und „Wiederholen" legte danach den alten Text über den neuen) — und das „zuletzt Gelöschte" ist mit dem
       // Zurücknehmen erledigt: Der Hinweis-Knopf legte es sonst ein zweites Mal aufs Board.
       lastEditKey = '';
+      // M546: verschobene Pins/Blasen zurücklegen; der Gegen-Schritt merkt sich ihre Lage von jetzt
+      const orte = orteTauschen(kommentareNach(board.comments, entry.comments, board.nodes, entry.nodes), entry.kommentarOrte);
       set({
         lastDeleted: null,
         past: s.past.slice(0, -1),
         future: [...s.future, {
           boardId: board.id, nodes: board.nodes, edges: board.edges, drawings: board.drawings, comments: board.comments, remount,
           others: snapBoards(s.boards, [...restore.keys()]),
+          ...(orte.gegen ? { kommentarOrte: orte.gegen } : {}),
         }],
         activeId: entry.boardId,
         view: 'board',
         boards: s.boards.map((b) => {
-          if (b.id === entry.boardId) return { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings, comments: kommentareNach(b.comments, entry.comments, b.nodes, entry.nodes) };
+          if (b.id === entry.boardId) return { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings, comments: orte.comments };
           const o = restore.get(b.id);
           return o ? { ...b, nodes: o.nodes, edges: o.edges, drawings: o.drawings, comments: kommentareNach(b.comments, o.comments, b.nodes, o.nodes) } : b;
         }),
@@ -304,17 +348,19 @@ export function verlaufScheibe(set: Setzen, get: Holen) {
       const remount = entry.remount || notesDiffer(board.nodes, entry.nodes);
       const restore = new Map((entry.others ?? []).map((o) => [o.boardId, o]));
       lastEditKey = '';
+      const orte = orteTauschen(kommentareNach(board.comments, entry.comments, board.nodes, entry.nodes), entry.kommentarOrte);   // M546
       set({
         lastDeleted: null,
         future: s.future.slice(0, -1),
         past: [...s.past, {
           boardId: board.id, nodes: board.nodes, edges: board.edges, drawings: board.drawings, comments: board.comments, remount,
           others: snapBoards(s.boards, [...restore.keys()]),
+          ...(orte.gegen ? { kommentarOrte: orte.gegen } : {}),
         }],
         activeId: entry.boardId,
         view: 'board',
         boards: s.boards.map((b) => {
-          if (b.id === entry.boardId) return { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings, comments: kommentareNach(b.comments, entry.comments, b.nodes, entry.nodes) };
+          if (b.id === entry.boardId) return { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings, comments: orte.comments };
           const o = restore.get(b.id);
           return o ? { ...b, nodes: o.nodes, edges: o.edges, drawings: o.drawings, comments: kommentareNach(b.comments, o.comments, b.nodes, o.nodes) } : b;
         }),

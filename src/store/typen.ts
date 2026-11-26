@@ -104,12 +104,22 @@ export interface CommentThread {
   seite?: number;
   px?: number;
   py?: number;
+  /** M546: Textblase aus dem Weg gelegt — Versatz ihrer oberen linken Ecke zum Pin, in Seitenpunkten (fehlt = neben dem Pin) */
+  bx?: number;
+  by?: number;
+  /** M546: Pin an einer Karte (ohne Seite) verschoben — Stelle als Anteil von Breite und Höhe der Karte (fehlt = Ecke oben rechts) */
+  kx?: number;
+  ky?: number;
   resolved?: boolean;
   /** M362: `bearbeitet` = Zeitpunkt der letzten nachträglichen Änderung des Textes (fehlt bei unveränderten Beiträgen) */
   msgs: Array<{ author: string; text: string; at: string; bearbeitet?: string }>;
 }
 
 export type Tool = 'select' | 'pen' | 'marker' | 'eraser';
+
+/** M546: die verschiebbaren Felder eines Gesprächs (Pin, Blase) — `null` beim Setzen nimmt das Feld heraus */
+export const KOMMENTAR_LAGE = ['px', 'py', 'bx', 'by', 'kx', 'ky'] as const;
+export type KommentarLage = Partial<Record<(typeof KOMMENTAR_LAGE)[number], number | null>>;
 
 /** Ein Undo-Schritt: kompletter Struktur-Stand eines Boards (Referenzen, kein Deep-Copy —
  *  alle Mutationen laufen immutabel, alte Objekte bleiben gültig). */
@@ -139,6 +149,8 @@ export interface HistoryEntry extends BoardSnap {
   fremd?: string[];
   /** … davon die Stellen, die der Schritt selbst schon geändert hatte — sie bleiben, mit Hinweis */
   gemischt?: string[];
+  /** M546: Lage von Pins/Blasen vor dem Schritt (Gespräche sind sonst kein Teil des Verlaufs, siehe kommentareNach) */
+  kommentarOrte?: Record<string, KommentarLage>;
 }
 
 /** Wiederverwendbare Karten-Vorlage */
@@ -464,6 +476,8 @@ export interface BoardState {
   removeCommentMsg: (threadId: string, at: string, author: string) => void;
   toggleCommentResolved: (threadId: string) => void;
   removeCommentThread: (threadId: string) => void;
+  /** M546: Pin oder Blase eines Gesprächs verschieben (oder die Blase zurücklegen: `bx/by: null`) — ein Rückgängig-Schritt */
+  setCommentLage: (threadId: string, lage: KommentarLage) => void;
 
   updateEdgeLabel: (id: string, label: string) => void;
   updateEdgeKind: (id: string, kind: string) => void;

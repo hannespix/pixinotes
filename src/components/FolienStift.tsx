@@ -120,6 +120,7 @@ export function FolienStift({ folie, werkzeug, farbe, darf, onPin, onWisch }: {
   const zwei = useRef<{ mx: number; my: number; d: number } | null>(null);
   const stumm = useRef<Set<number>>(new Set());
   const bild = useRef(0);
+  const pinGetippt = useRef(0);   // M546
 
   // Die Folie lebt: Sie rollt, zoomt, blättert, baut sich um. Statt jedem Auslöser nachzulaufen, wird je Bild
   // einmal gemessen (ein Rechteck lesen) — gesetzt wird nur, wenn sich etwas geändert hat.
@@ -146,11 +147,24 @@ export function FolienStift({ folie, werkzeug, farbe, darf, onPin, onWisch }: {
     [comments, folie, lage?.mass, lage?.seite],
   );
 
+  // M546: Pin der Seite ziehen = an eine andere Stelle legen (wie auf dem Board); Tipp ohne Bewegung öffnet das Gespräch
+  const pinZug = useRef<{ id: string; pid: number; x0: number; y0: number; px0: number; py0: number; ab: number; bewegt: boolean } | null>(null);
+  const [pinLage, setPinLage] = useState<{ id: string; px: number; py: number } | null>(null);
   if (!lage) return null;
   const aktiv = !!werkzeug && darf;
   const seitenModus = lage.seite !== FOLIEN_SEITE;
   if (!aktiv && folienStriche.length === 0 && pins.length === 0) return null;
 
+  /** M546: Pin an die Stelle unter dem Zeiger — in Seitenpunkten, auf der Seite gehalten */
+  const pinZiehen = (z: NonNullable<typeof pinZug.current>, e: { clientX: number; clientY: number }) => {
+    const l = lageRef.current ?? lage;
+    if (!z.bewegt && Math.hypot(e.clientX - z.x0, e.clientY - z.y0) < z.ab) return { px: z.px0, py: z.py0 };
+    z.bewegt = true;
+    const b = l.mass?.b ?? Infinity; const h = l.mass?.h ?? Infinity;
+    const p = { id: z.id, px: Math.min(b, Math.max(0, z.px0 + (e.clientX - z.x0) / l.k)), py: Math.min(h, Math.max(0, z.py0 + (e.clientY - z.y0) / l.k)) };
+    setPinLage(p);
+    return p;
+  };
   /** Zeiger → Einheiten der Zeichenfläche */
   const ort = (e: { clientX: number; clientY: number }, el: Element): [number, number] => {
     const r = el.getBoundingClientRect(); const l = lageRef.current ?? lage;
@@ -335,9 +349,27 @@ export function FolienStift({ folie, werkzeug, farbe, darf, onPin, onWisch }: {
         {pins.map((c, i) => (
           <g key={c.id} className={`folien-pin${c.resolved ? ' erledigt' : ''}`} data-taste="folien-pin" role="button" tabIndex={0}
             aria-label={`Kommentar ${i + 1} öffnen`}
-            transform={`translate(${lage.fx + c.px! * lage.k},${lage.fy + c.py! * lage.k})`}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => { e.stopPropagation(); onPin(c.id); }}
+            transform={`translate(${lage.fx + (pinLage?.id === c.id ? pinLage.px : c.px!) * lage.k},${lage.fy + (pinLage?.id === c.id ? pinLage.py : c.py!) * lage.k})`}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              if (!darf || e.button !== 0) return;
+              pinZug.current = { id: c.id, pid: e.pointerId, x0: e.clientX, y0: e.clientY, px0: c.px!, py0: c.py!, ab: e.pointerType === 'touch' ? 9 : 4, bewegt: false };
+              try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* egal */ }
+            }}
+            onPointerMove={(e) => { const z = pinZug.current; if (z && z.pid === e.pointerId) pinZiehen(z, e); }}
+            onPointerUp={(e) => {
+              const z = pinZug.current;
+              if (!z || z.pid !== e.pointerId) return;
+              pinZug.current = null;
+              e.stopPropagation();
+              if (!z.bewegt) { pinGetippt.current = performance.now(); onPin(c.id); return; }
+              pinGetippt.current = performance.now();
+              const p = pinZiehen(z, e);
+              useBoard.getState().setCommentLage(c.id, { px: p.px, py: p.py });
+              setPinLage(null);
+            }}
+            onPointerCancel={() => { pinZug.current = null; setPinLage(null); }}
+            onClick={(e) => { e.stopPropagation(); if (performance.now() - pinGetippt.current > 700) onPin(c.id); }}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onPin(c.id); } }}>
             <circle r={12 * wurzelZoom()} />
             <text textAnchor="middle" dominantBaseline="central" fontSize={12 * wurzelZoom()}>{i + 1}</text>

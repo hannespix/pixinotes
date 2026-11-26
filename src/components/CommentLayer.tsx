@@ -2,7 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useInternalNode, useReactFlow, useStore } from '@xyflow/react';
 import { AnsichtPortal } from './AnsichtPortal';
-import { selectActiveBoard, useBoard, type CommentThread } from '../store';
+import { selectActiveBoard, selectNurLesen, useBoard, type CommentThread } from '../store';
+import { useKarteFestId } from '../store/selektoren';
 import { drehe, winkelVon } from '../lib/drehung';
 import { IPen, ITrash, IX } from './Icons';
 import { wurzelZoom } from '../lib/anzeige';
@@ -21,54 +22,179 @@ const timeOf = (iso: string) => {
   return today ? d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('de-DE');
 };
 
+/** M546: Ab wie vielen Bildpunkten aus einem Tipp ein Zug wird (Finger zittern mehr als Maus und Stift) */
+const ZUG_AB = { maus: 4, finger: 9 };
+const grenze = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
+
+/**
+ * M546: Ein Zug an Pin oder Blase. `a`/`b` sind die Werte, die sich ändern: Seitenpunkte (`px/py`) eines Seiten-Pins,
+ * Anteile an der Karte (`kx/ky`) eines Karten-Pins oder der Versatz der Blase (`bx/by`, Seitenpunkte). `sa/sb` =
+ * Bildpunkte je Einheit, beim Anfassen einmal gemessen — gezogen wird ohne Messen und ohne Speichern; erst das
+ * Loslassen schreibt (ein Rückgängig-Schritt).
+ */
+interface Zug {
+  pid: number; art: 'pin' | 'blase'; x0: number; y0: number; sa: number; sb: number; grad: number;
+  a0: number; b0: number; min: [number, number]; max: [number, number]; ab: number; bewegt: boolean;
+}
+
 /** Ein Pin am oberen rechten Kartenrand — folgt der Karte live (M148) */
-function CommentPin({ thread, nr }: { thread: CommentThread; nr?: number }) {
+function CommentPin({ thread, nr, werkzeug }: { thread: CommentThread; nr?: number; werkzeug: boolean }) {
   const node = useInternalNode(thread.nodeId);
   const setCommentOpen = useBoard((s) => s.setCommentOpen);
   const openId = useBoard((s) => s.commentOpen);
+  const nurLesen = useBoard(selectNurLesen);
+  const fest = useKarteFestId(thread.nodeId);
+  const zugRef = useRef<Zug | null>(null);
+  const [zug, setZug] = useState<{ art: 'pin' | 'blase'; a: number; b: number } | null>(null);
+  const offenAm = useRef(0);
   if (!node) return null; // Karte existiert (noch) nicht — Pin bleibt stumm
   const w = node.measured.width ?? 260;
+  const h = node.measured.height ?? 160;
   const last = thread.msgs[thread.msgs.length - 1];
   const erste = thread.msgs[0];
-  // M335: Pin an einer STELLE auf einer PDF-Seite — nur sichtbar, wenn die Seite offen liegt
-  let lage = { x: node.internals.positionAbsolute.x + w + 3, y: node.internals.positionAbsolute.y - 13 };
+  // M546: verschieben darf, wer das Board bearbeiten darf — als Gast mit „nur Eigenes" an fremden Karten nur den eigenen Kommentar
+  const darf = !nurLesen && (!fest || erste?.author === getAuthor());
+  const ecke = node.internals.positionAbsolute;
   // M400: An der schrägen Karte sitzt der Pin an der gedrehten Ecke
   const grad = winkelVon(node as unknown as { winkel?: number });
-  const mitte = { x: node.internals.positionAbsolute.x + w / 2, y: node.internals.positionAbsolute.y + (node.measured.height ?? 160) / 2 };
-  if (grad) { const ecke = drehe({ x: lage.x + 13, y: lage.y + 13 }, mitte, grad); lage = { x: ecke.x - 13, y: ecke.y - 13 }; }
+  const mitte = { x: ecke.x + w / 2, y: ecke.y + h / 2 };
+  const gedreht = (p: { x: number; y: number }) => (grad ? drehe(p, mitte, grad) : p);
   const aufSeite = thread.seite != null && thread.px != null && thread.py != null;
-  if (aufSeite) {
-    const g = seiteVon(thread.nodeId);
-    if (!g || g.seite !== thread.seite) return null;
-    lage = { x: node.internals.positionAbsolute.x + g.dx + thread.px! * g.k - 13, y: node.internals.positionAbsolute.y + g.dy + thread.py! * g.k - 13 };
-    if (grad) { const ort = drehe({ x: lage.x + 13, y: lage.y + 13 }, mitte, grad); lage = { x: ort.x - 13, y: ort.y - 13 }; }
-  }
-  const oeffnen = (e: React.MouseEvent) => { e.stopPropagation(); setCommentOpen(thread.id); };
+  const g = aufSeite ? seiteVon(thread.nodeId) : undefined;
+  // M335: Pin an einer STELLE auf einer PDF-Seite — nur sichtbar, wenn die Seite offen liegt
+  if (aufSeite && (!g || g.seite !== thread.seite)) return null;
+  const pinZug = zug?.art === 'pin' ? zug : null;
+  const blaseZug = zug?.art === 'blase' ? zug : null;
+  // M546: verschobener Karten-Pin (kx/ky) — sonst rechts außerhalb der Ecke wie bisher
+  const kx = pinZug && !aufSeite ? pinZug.a : thread.kx;
+  const ky = pinZug && !aufSeite ? pinZug.b : thread.ky;
+  const versetzt = !aufSeite && kx != null && ky != null;
+  /** Die Stelle, auf die der Pin zeigt (Flächenpunkte) — um sie wächst und schrumpft er mit dem Zoom (M527) */
+  let anker: { x: number; y: number };
+  if (aufSeite && g) {
+    const px = pinZug ? pinZug.a : thread.px!;
+    const py = pinZug ? pinZug.b : thread.py!;
+    anker = gedreht({ x: ecke.x + g.dx + px * g.k, y: ecke.y + g.dy + py * g.k });
+  } else if (versetzt) anker = gedreht({ x: ecke.x + kx * w, y: ecke.y + ky * h });
+  else anker = gedreht({ x: ecke.x + w + 16, y: ecke.y });
+  const lage = { x: anker.x - 13, y: anker.y - 13 };
+  const oeffnen = () => { offenAm.current = performance.now(); setCommentOpen(thread.id); };
+
+  /** M546: Pin oder Blase anfassen — gemessen wird hier einmal, gezogen ohne weiteres Messen */
+  const runter = (art: 'pin' | 'blase') => (e: React.PointerEvent<HTMLElement>) => {
+    if (e.button !== 0 || !e.isPrimary) return;
+    e.stopPropagation();
+    const knoten = document.querySelector(`.react-flow__node[data-id="${CSS.escape(thread.nodeId)}"]`);
+    const kasten = knoten?.getBoundingClientRect();
+    const fl = kasten && kasten.width > 0 ? kasten.width / w : 0;   // Bildpunkte je Flächenpunkt (Zoom × Anzeige-Größe)
+    if (!fl) return;
+    const z = {
+      pid: e.pointerId, art, x0: e.clientX, y0: e.clientY, grad: art === 'pin' ? grad : 0,
+      ab: e.pointerType === 'touch' ? ZUG_AB.finger : ZUG_AB.maus, bewegt: false,
+    };
+    if (art === 'blase' && g) {
+      // Liegt die Blase noch neben dem Pin, steht sie 15 Bildpunkte (× Zoom-Kehrwert) daneben — von dort geht es los
+      const inv = parseFloat(getComputedStyle(e.currentTarget).getPropertyValue('--pn-inv')) || 1;
+      const bx0 = thread.bx ?? (15 * inv) / g.k; const by0 = thread.by ?? (-15 * inv) / g.k;
+      zugRef.current = { ...z, sa: fl * g.k, sb: fl * g.k, a0: bx0, b0: by0, min: [-g.breite, -g.hoehe], max: [g.breite, g.hoehe] };
+    } else if (art === 'pin' && aufSeite && g) {
+      zugRef.current = { ...z, sa: fl * g.k, sb: fl * g.k, a0: thread.px!, b0: thread.py!, min: [0, 0], max: [g.breite, g.hoehe] };
+    } else if (art === 'pin') {
+      zugRef.current = {
+        ...z, sa: fl * w, sb: fl * h, a0: thread.kx ?? (w + 16) / w, b0: thread.ky ?? 0,
+        min: [-16 / w, -16 / h], max: [1 + 16 / w, 1 + 16 / h],
+      };
+    } else return;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* synthetischer Zeiger — Ziehen geht trotzdem */ }
+  };
+  const wohin = (z: Zug, e: { clientX: number; clientY: number }): [number, number] => {
+    let dx = e.clientX - z.x0; let dy = e.clientY - z.y0;
+    if (z.grad) { const d = drehe({ x: dx, y: dy }, { x: 0, y: 0 }, -z.grad); dx = d.x; dy = d.y; }
+    return [grenze(z.a0 + dx / z.sa, z.min[0], z.max[0]), grenze(z.b0 + dy / z.sb, z.min[1], z.max[1])];
+  };
+  const bewegt = (e: React.PointerEvent<HTMLElement>) => {
+    const z = zugRef.current;
+    if (!z || e.pointerId !== z.pid) return;
+    if (!z.bewegt && Math.hypot(e.clientX - z.x0, e.clientY - z.y0) < z.ab) return;
+    z.bewegt = true;
+    e.stopPropagation();
+    const [a, b] = wohin(z, e);
+    setZug({ art: z.art, a, b });
+  };
+  const hoch = (e: React.PointerEvent<HTMLElement>) => {
+    const z = zugRef.current;
+    if (!z || e.pointerId !== z.pid) return;
+    zugRef.current = null;
+    e.stopPropagation();
+    if (!z.bewegt) { oeffnen(); return; }
+    offenAm.current = performance.now();   // der Klick nach dem Loslassen öffnet nicht
+    const [a, b] = wohin(z, e);
+    useBoard.getState().setCommentLage(thread.id, z.art === 'blase' ? { bx: a, by: b } : aufSeite ? { px: a, py: b } : { kx: a, ky: b });
+    setZug(null);
+  };
+  const abbruch = () => { zugRef.current = null; setZug(null); };
+  const klick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (performance.now() - offenAm.current < 700) return;   // Tipp oder Zug hat schon entschieden
+    setCommentOpen(thread.id);
+  };
+  const zeiger = (art: 'pin' | 'blase') => (darf ? { onPointerDown: runter(art), onPointerMove: bewegt, onPointerUp: hoch, onPointerCancel: abbruch } : {});
+
+  // M336/M546: Textblase — neben dem Pin, oder dort, wo sie hingelegt wurde (Versatz in Seitenpunkten, mit Linie)
+  const blase = aufSeite && g && blasenAn() && erste;
+  const bx = blaseZug ? blaseZug.a : thread.bx;
+  const by = blaseZug ? blaseZug.b : thread.by;
+  const weg = !!blase && bx != null && by != null;
+  const ziel = weg && g ? { x: anker.x + bx! * g.k, y: anker.y + by! * g.k } : anker;
+  const laenge = Math.hypot(ziel.x - anker.x, ziel.y - anker.y);
   return (
     <>
       <button
-        className={`comment-pin nodrag nopan ${thread.resolved ? 'resolved' : ''} ${openId === thread.id ? 'open' : ''} ${aufSeite ? 'auf-seite' : ''}`}
+        className={`comment-pin nodrag nopan ${thread.resolved ? 'resolved' : ''} ${openId === thread.id ? 'open' : ''} ${aufSeite ? 'auf-seite' : ''} ${pinZug ? 'zieht' : ''} ${darf ? 'verschiebbar' : ''}`}
         data-seite={thread.seite}
         data-nr={nr}
+        data-taste="kommentar-pin"
         translate="no"
         // BEWUSST rechts AUSSERHALB der Ecke: genau auf der Ecke säße der Pin
         // über dem ✕-Löschknopf der ausgewählten Karte (E2E-Fund M148)
-        style={{ transform: `translate(${lage.x}px, ${lage.y}px)` }}
-        title={thread.resolved ? 'Erledigter Kommentar (Klick zum Öffnen)' : `Kommentar von ${last?.author ?? '?'} (Klick zum Öffnen)`}
-        onClick={oeffnen}
+        // M546: feste Bildschirm-Größe in jeder Zoomstufe (M527) — er wächst um die Stelle, auf die er zeigt
+        style={{ transform: `translate(${lage.x}px, ${lage.y}px) scale(var(--pn-inv, 1))`, transformOrigin: aufSeite || versetzt ? '13px 13px' : '0 50%' }}
+        title={thread.resolved ? 'Erledigter Kommentar (Klick zum Öffnen)' : `Kommentar von ${last?.author ?? '?'} (Klick zum Öffnen${darf ? ', ziehen zum Verschieben' : ''})`}
+        onClick={klick}
+        {...zeiger('pin')}
       >
         {/* M336: Auf einer Seite zählt der Pin durch (1, 2, 3 …) — dieselbe Nummer steht in der Liste unter der Seite */}
         {thread.resolved ? '✓' : aufSeite && nr ? nr : initials(last?.author ?? '?')}
         {!thread.resolved && thread.msgs.length > 1 && <span className="comment-pin-count">{thread.msgs.length}</span>}
       </button>
-      {/* M336: Textblase neben dem Seiten-Pin — Verfasser und Anfang des Kommentars, ohne Klick lesbar */}
-      {aufSeite && blasenAn() && erste && (
+      {/* M546: Linie zur weggelegten Blase — immer da (nichts wird mitten im Zug eingehängt), sichtbar nur mit Versatz */}
+      {blase && (
         <div
-          className={`comment-blase nodrag nopan ${thread.resolved ? 'resolved' : ''} ${openId === thread.id ? 'open' : ''}`}
-          style={{ transform: `translate(${lage.x + 28}px, ${lage.y - 2}px)` }}
-          onClick={oeffnen}
+          className={`comment-blase-linie ${werkzeug ? 'durchlaessig' : ''}`}
+          aria-hidden="true"
+          style={{
+            display: weg ? undefined : 'none', width: laenge,
+            transform: `translate(${anker.x}px, ${anker.y}px) rotate(${Math.atan2(ziel.y - anker.y, ziel.x - anker.x)}rad)`,
+          }}
+        />
+      )}
+      {/* M336: Textblase neben dem Seiten-Pin — Verfasser und Anfang des Kommentars, ohne Klick lesbar */}
+      {blase && (
+        <div
+          className={`comment-blase nodrag nopan ${thread.resolved ? 'resolved' : ''} ${openId === thread.id ? 'open' : ''} ${weg ? 'weg' : ''} ${blaseZug ? 'zieht' : ''} ${werkzeug ? 'durchlaessig' : ''} ${darf ? 'verschiebbar' : ''}`}
+          // M546: Die Blase liest sich in Bildschirm-Größe, wächst beim Hineinzoomen aber nicht mit (sie verdeckte sonst immer mehr der Seite)
+          style={{
+            transform: weg
+              ? `translate(${ziel.x}px, ${ziel.y}px) scale(min(1, var(--pn-inv, 1)))`
+              : `translate(calc(${anker.x}px + 15px * var(--pn-inv, 1)), calc(${anker.y}px - 15px * var(--pn-inv, 1))) scale(min(1, var(--pn-inv, 1)))`,
+          }}
+          onClick={klick}
+          // M546: Doppelklick legt eine weggelegte Blase wieder neben den Pin
+          onDoubleClick={(e) => { e.stopPropagation(); if (weg && darf) useBoard.getState().setCommentLage(thread.id, { bx: null, by: null }); }}
+          {...zeiger('blase')}
           role="button"
-          title="Kommentar öffnen"
+          data-taste="kommentar-blase"
+          title={darf ? 'Kommentar öffnen – ziehen legt die Blase aus dem Weg' : 'Kommentar öffnen'}
         >
           <b translate="no">{erste.author}</b>{thread.msgs.length > 1 ? ` · ${thread.msgs.length} Beiträge` : ''}
           <span className="comment-blase-text" translate="no">{erste.text.length > 80 ? `${erste.text.slice(0, 78)}…` : erste.text}</span>
@@ -184,6 +310,12 @@ function CommentPanel() {
           <span className="comment-seite" data-taste="kommentar-seite">Seite {thread?.seite ?? useBoard.getState().commentOrt?.seite}</span>
         )}
         <span className="comment-panel-tools">
+          {/* M546: Die Blase wurde aus dem Weg gelegt — hier kommt sie wieder neben den Pin */}
+          {thread && thread.bx != null && board.geteiltRolle !== 'lesen' && (
+            <button onClick={() => useBoard.getState().setCommentLage(thread.id, { bx: null, by: null })} title="Blase wieder neben den Pin legen" data-taste="kommentar-blase-zurueck">
+              Blase zurück
+            </button>
+          )}
           {thread && (
             <>
               <button onClick={() => toggleCommentResolved(thread.id)} title={thread.resolved ? 'Wieder öffnen' : 'Als erledigt markieren'}>
@@ -277,6 +409,8 @@ function CommentPanel() {
 export function CommentLayer() {
   const board = useBoard(selectActiveBoard);
   const threads = board.comments ?? [];
+  // M546: Stift, Textmarker oder Radierer in der Hand — die Blasen treten zurück, damit man sieht und erreicht, was darunter liegt
+  const werkzeug = useBoard((s) => s.tool !== 'select');
   // M335: Blättert eine PDF-Karte, wandern oder verschwinden ihre Seiten-Pins
   const [, seitenTakt] = useState(0);
   useEffect(() => {
@@ -288,7 +422,7 @@ export function CommentLayer() {
     <>
       <AnsichtPortal>
         {threads.map((t) => (
-          <CommentPin key={t.id} thread={t}
+          <CommentPin key={t.id} thread={t} werkzeug={werkzeug}
             nr={t.seite != null ? seitenKommentare(threads, t.nodeId, t.seite).findIndex((c) => c.id === t.id) + 1 : undefined} />
         ))}
       </AnsichtPortal>

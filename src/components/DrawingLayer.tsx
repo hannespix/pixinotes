@@ -486,6 +486,9 @@ export function DrawingLayer() {
   const onDown = (e: React.PointerEvent) => {
     // Handballen-Abweisung: Solange der Stift zeichnet, sind Finger tabu
     if (fuehrend.current?.art === 'pen' && e.pointerType !== 'pen') return;
+    // M546: Ein Kommentar-Pin unter der Ebene bleibt greifbar — er bekommt den Druck (ziehen = verschieben, tippen = öffnen)
+    const pin = document.elementsFromPoint(e.clientX, e.clientY).find((el) => el.classList.contains('comment-pin'));
+    if (pin && !pinch.current) { pin.dispatchEvent(new PointerEvent('pointerdown', e.nativeEvent)); return; }
     if (e.pointerType === 'touch') {
       fingerZeiger.current.set(e.pointerId, [e.clientX, e.clientY]);
       // Ein zweiter Finger beendet den Strich des ersten — und ab jetzt zoomen und schwenken die zwei (M326)
@@ -597,6 +600,7 @@ export function DrawingLayer() {
       if (!ziel?.closest) return;
       if (ziel.closest(CHROME)) return;
       if (!ziel.closest('.react-flow')) return;
+      if (ziel.closest('.comment-pin')) return;   // M546: Pins bleiben Pins (ziehen, tippen) — auch beim Zeichnen
       const stift = e.pointerType === 'pen';
       /**
        * M325: Das Radierer-Ende des Stifts (Surface Pen, Wacom: buttons 32)
