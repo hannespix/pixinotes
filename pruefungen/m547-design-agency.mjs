@@ -10,8 +10,8 @@
  *      der Maus violett umrissen; Kanban-Spalte 13 px auf #f0f2eb, Ticket 9 px; Umschalter als Segment (8/5 px, gewählt
  *      weiß mit violetter Schrift); Fenster 17 px mit Etikett „PIXINOTES" über dem Titel (500, −0,045 em); Felder 7 px;
  *      Kontextmenü mit weicher Wolke; Hinweis (Toast) warm-schwarz, 8 px; Fokusring 3 px #8951ff.
- *   D  Wortmarke (M549, Einzelheiten in m548-agency-logo.mjs): PixiNotes fließt beim Zeigen
- *      und steht bei „Besser lesbar" still.
+ *   D  Wortmarke (M550, Einzelheiten in m548-agency-logo.mjs): „pixi · notes“ fließt von selbst
+ *      und steht bei „Besser lesbar“ still.
  *   E  Kontrast-Scan (werkzeug/kontrast-pruefen.mjs) hell und dunkel: Karten (Notiz mit allen Editor-Farben, Kanban,
  *      Protokoll, Tabelle) ruhend/ausgewählt/Fokus, Board, Einstellungen (dazu Ränder und Fokusringe ≥ 3:1), Hilfe,
  *      Suche, Kontextmenü — keine Schrift unter 4,5:1. Dunkel: eigener Grund.
@@ -96,7 +96,7 @@ const grund = (P) => P.evaluate(() => getComputedStyle(document.querySelector('.
 const vorlieben = (P) => P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-einstellungen') || '{}').ui ?? {});
 const stil = (P, sel, prop, pseudo = null) => P.evaluate(([sel, prop, pseudo]) => { const e = document.querySelector(sel); return e ? getComputedStyle(e, pseudo)[prop] : null; }, [sel, prop, pseudo]);
 const readex = (u) => /readex/i.test(u);
-/** M549: Die sichtbaren Buchstabenkonturen werden vom SVG-Zeitgeber geformt. */
+/** Die sichtbaren Buchstabenkonturen werden vom SVG-Zeitgeber geformt. */
 const wasserSammeln = (P, ms) => P.evaluate((ms) => new Promise((fertig) => {
   const liste = []; const ab = performance.now();
   const iv = setInterval(() => {
@@ -227,12 +227,21 @@ console.log('════ D: Marke ════');
   await P.waitForSelector('.agency-wortmarke svg');
   const marke = await P.evaluate(() => {
     const l = document.querySelector('.logo');
-    return { zusatz: l.querySelector('.agency-wortmarke-text')?.textContent, label: l.getAttribute('aria-label'), versteckt: l.querySelector('.agency-wortmarke')?.getAttribute('aria-hidden') };
+    return {
+      pixi: l.querySelector('.agency-wortmarke-text')?.textContent,
+      notes: l.querySelector('.agency-notes')?.textContent,
+      label: l.getAttribute('aria-label'),
+      versteckt: l.querySelector('.agency-wortmarke')?.getAttribute('aria-hidden'),
+    };
   });
-  pruefe('D Wortmarke PixiNotes, Name für Vorleser bleibt', marke.zusatz === 'PixiNotes' && marke.label === 'PixiNotes – zur Übersicht' && marke.versteckt === 'true', marke);
-  await P.locator('.logo').hover();
-  const g = await wasserSammeln(P, 1200);
-  pruefe('D die Kontur der Buchstaben verändert sich beim Zeigen', new Set(g).size > 3, new Set(g).size);
+  pruefe('D Wortmarke pixi · notes, Name für Vorleser bleibt',
+    marke.pixi === 'pixi' && marke.notes === 'notes' && marke.label === 'PixiNotes – zur Übersicht' && marke.versteckt === 'true', marke);
+  await P.waitForFunction(() => {
+    const zeit = document.querySelector('.agency-wortmarke svg').getCurrentTime();
+    return zeit > 0.1 && zeit < 0.6;
+  });
+  const g = await wasserSammeln(P, 700);
+  pruefe('D die Kontur von pixi verändert sich von selbst', new Set(g).size > 3, new Set(g).size);
   await ctx.close();
 }
 

@@ -1,6 +1,6 @@
 /**
- * Agency-Marke (M548, überarbeitet in M549): echte Bildpunkte beim Verformen der
- * Schrift, Rücklauf, Pausen, Kontrast und die beiden anderen Designs.
+ * Agency-Marke (M548, überarbeitet in M550): echte Bildpunkte beim Verformen von
+ * pixi, selbsttätiger Rücklauf, Pausen, Kontrast und die beiden anderen Designs.
  * M548_BILDER=<ordner> legt eine groß gerenderte Folge und die Kopfleisten ab.
  */
 import { fileURLToPath } from 'node:url';
@@ -63,8 +63,8 @@ async function seite({ dunkel = false, design = 'agency', lesbar = false, anfrag
 }
 
 const ausschnitt = async (P) => {
-  const r = await P.locator('.agency-wortmarke').boundingBox();
-  return { x: r.x - 4, y: r.y - 3, width: r.width + 8, height: r.height + 6 };
+  const r = await P.locator('.agency-wortmarke svg').boundingBox();
+  return { x: r.x - 2, y: r.y - 3, width: r.width + 4, height: r.height + 6 };
 };
 /**
  * Bildpunkte eines Fotos als Tinten-Maske (in der Seite dekodiert): 1 = Tinte, 0 = Fläche; dazu der Anteil der
@@ -88,7 +88,7 @@ const maske = (P, png) => P.evaluate(async (b64) => {
 }, png.toString('base64'));
 const foto = async (P, clip) => P.screenshot({ clip: { x: clip.x, y: clip.y, width: clip.width, height: clip.height } });
 
-/** Neun Buchstaben und zwei i-Punkte. Überhängende Konturen dürfen sich in einer Spalte kreuzen. */
+/** Vier Buchstaben und zwei i-Punkte. Überhängende Konturen dürfen sich in einer Spalte kreuzen. */
 function zusammenhaengendeFlaechen({ b, h, m }) {
   const offen = Uint8Array.from(m);
   let anzahl = 0;
@@ -115,16 +115,20 @@ function zusammenhaengendeFlaechen({ b, h, m }) {
 }
 /** Pausieren darf die Flüssigkeit nicht zum Anfang des Zugs zurücksetzen. */
 const zeit = (P) => P.locator('.agency-wortmarke svg').evaluate((svg) => svg.getCurrentTime());
-const pausePruefen = async (P) => {
+const pausePruefen = async (P, dauer = 1100) => {
   const stand = await zeit(P);
   const bilder = await P.evaluate(() => window.__bilder);
-  await P.waitForTimeout(1100);
-  return { gleich: await zeit(P) === stand, bilder: (await P.evaluate(() => window.__bilder)) - bilder };
+  await P.waitForTimeout(dauer);
+  // Ein fast erreichtes Ende und der folgende Halt können sich um wenige SVG-Mikrosekunden unterscheiden.
+  return { stand, gleich: Math.abs(await zeit(P) - stand) < 0.00001, bilder: (await P.evaluate(() => window.__bilder)) - bilder };
 };
 const wartenAufZeit = (P, min, max) => P.waitForFunction(([a, b]) => {
   const t = document.querySelector('.agency-wortmarke svg').getCurrentTime();
   return t >= a && t <= b;
 }, [min, max]);
+const wartenAufWeiterlauf = (P, stand) => P.waitForFunction((vorher) => {
+  return Math.abs(document.querySelector('.agency-wortmarke svg').getCurrentTime() - vorher) > 0.005;
+}, stand);
 const tabVerdeckt = (P, an) => P.evaluate((verdeckt) => {
   if (verdeckt) Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
   else delete document.hidden;
@@ -138,7 +142,7 @@ const kontrast = (a, b) => {
 };
 const rgb = (s) => s.match(/[\d.]+/g).slice(0, 3).map(Number);
 
-console.log('════ A: Die ganze Wortmarke verformt sich ════');
+console.log('════ A: Die Konturen von pixi verformen sich ════');
 {
   const { ctx, P } = await seite({ dpr: 4 });
   await tabVerdeckt(P, true);
@@ -156,7 +160,7 @@ console.log('════ A: Die ganze Wortmarke verformt sich ════');
     for (let x = 0; x < m.b; x++) {
       for (let y = 0; y < m.h; y++) {
         const i = y * m.b + x;
-        if (!m.m[i] || trocken.m[i]) continue;
+        if (m.m[i] === trocken.m[i]) continue;
         if (x < m.b / 3) links += 1;
         if (x > 2 * m.b / 3) rechts += 1;
       }
@@ -164,21 +168,29 @@ console.log('════ A: Die ganze Wortmarke verformt sich ════');
     film.push({ s, links, rechts, flaechen: zusammenhaengendeFlaechen(m), klar: m.zwischen < 0.4 });
   }
   pruefe('A Die Flüssigkeit beginnt links sichtbar in der Schrift',
-    film.some(({ s, links, rechts }) => s < 0.3 && links >= 40 && rechts === 0), film);
-  pruefe('A Die Flüssigkeit fließt später in den rechten Teil',
-    film.some(({ s, links, rechts }) => s >= 0.59 && rechts > links + 40), film);
-  pruefe('A Neun voneinander lesbare Buchstaben und scharfe Kanten',
-    film.every(({ flaechen, klar }) => flaechen === 11 && klar), film);
+    film.some(({ s, links, rechts }) => s < 0.3 && links >= 20 && rechts === 0), film);
+  pruefe('A Die Flüssigkeit erreicht später den rechten Teil von pixi',
+    film.some(({ s, rechts }) => s >= 0.34 && rechts >= 20), film);
+  pruefe('A Vier lesbare Buchstaben mit zwei i-Punkten und scharfen Kanten',
+    film.every(({ flaechen, klar }) => flaechen === 6 && klar), film);
   await zumBild(0);
   pruefe('A Die Grundform bleibt beim Rücklauf pixelgleich', standbild.equals(await foto(P, clip)));
 
   if (BILDER) {
     const marke = P.locator('.agency-wortmarke');
     await marke.evaluate((e) => {
+      const skalierung = 600 / e.getBoundingClientRect().width;
+      const stil = getComputedStyle(e);
+      const punkt = e.querySelector('.agency-trennpunkt');
+      const { width, height } = punkt.getBoundingClientRect();
+      e.style.fontSize = `${parseFloat(stil.fontSize) * skalierung}px`;
+      e.style.gap = `${parseFloat(stil.columnGap) * skalierung}px`;
+      punkt.style.width = `${width * skalierung}px`;
+      punkt.style.height = `${height * skalierung}px`;
       const buehne = document.createElement('div');
       buehne.id = 'logo-buehne';
+      buehne.className = 'logo';
       buehne.style.cssText = 'position:fixed;left:35px;top:120px;z-index:9999;padding:22px 38px;background:var(--surface);color:var(--ink)';
-      e.style.cssText = 'position:relative;display:block;width:600px;height:164px;line-height:1.25;font-size:131.4px';
       buehne.appendChild(e);
       document.body.appendChild(buehne);
     });
@@ -190,48 +202,51 @@ console.log('════ A: Die ganze Wortmarke verformt sich ════');
   await ctx.close();
 }
 
-console.log('════ B: Zeigen, Rücklauf und Ruhe ════');
+console.log('════ B: Atmen, Rücklauf und Ruhe ════');
 {
   const { ctx, P } = await seite();
-  // Der Einlauf endet von selbst. Danach steuert Zeigen und Wegfahren die Richtung.
-  await wartenAufZeit(P, 0, 0);
-  await P.locator('.logo').hover();
   await wartenAufZeit(P, 0.12, 0.74);
+  pruefe('B Die Kontur kommt ohne Zeigergeste in Bewegung', await zeit(P) > 0);
+
   await tabVerdeckt(P, true);
   const verdeckt = await pausePruefen(P);
   pruefe('B Im verdeckten Tab stehen SVG-Zeit und Bild-Takt', verdeckt.gleich && verdeckt.bilder < 2, verdeckt);
   await tabVerdeckt(P, false);
+  await wartenAufWeiterlauf(P, verdeckt.stand);
   await wartenAufZeit(P, DAUER - 0.00001, DAUER + 0.00001);
-  const hover = await pausePruefen(P);
-  pruefe('B Die Endform bleibt beim Zeigen stehen und braucht keinen Bild-Takt', hover.gleich && hover.bilder < 2, hover);
-
-  await P.mouse.move(880, 140);
-  await wartenAufZeit(P, 0.14, 0.69);
-  pruefe('B Beim Wegfahren läuft die Form rückwärts', await zeit(P) < 0.75);
+  const gipfel = await pausePruefen(P, 400);
+  pruefe('B Die Kontur hält auf dem Gipfel ohne Bild-Takt inne', gipfel.gleich && gipfel.bilder <= 2, gipfel);
+  await wartenAufZeit(P, 0.12, 0.7);
+  pruefe('B Nach dem Gipfel läuft die Form von selbst zurück', await zeit(P) < gipfel.stand);
   await wartenAufZeit(P, 0, 0);
-  const ruhe = await pausePruefen(P);
-  pruefe('B Im Leerlauf hält die Animation an', ruhe.gleich && ruhe.bilder < 2, ruhe);
+  const ruhe = await pausePruefen(P, 850);
+  // Die App darf dazwischen vereinzelt ein Bild anfordern. Das Logo hat in der Pause keinen Bild-Takt.
+  pruefe('B Zwischen den Gesten ruht die Grundform ohne Bild-Takt', ruhe.gleich && ruhe.bilder <= 2, ruhe);
 
-  await P.keyboard.press('Tab');
-  await P.locator('.logo').focus();
-  await wartenAufZeit(P, 0.1, 0.74);
-  await P.locator('.logo-wrap').evaluate((e) => { e.style.display = 'none'; });
-  await P.waitForTimeout(100);
+  await wartenAufZeit(P, 0.1, 0.68);
+  const kopfleiste = P.locator('.logo-wrap');
+  await kopfleiste.evaluate((e) => new Promise((fertig) => {
+    const beobachter = new IntersectionObserver(([eintrag]) => {
+      if (!eintrag.isIntersecting) { beobachter.disconnect(); fertig(); }
+    });
+    beobachter.observe(e);
+    e.style.display = 'none';
+  }));
   const weg = await pausePruefen(P);
   pruefe('B Bei unsichtbarer Kopfleiste steht die Animation', weg.gleich && weg.bilder < 2, weg);
-  await P.locator('.logo-wrap').evaluate((e) => { e.style.display = ''; });
-  await P.locator('.logo').hover();
-  await wartenAufZeit(P, DAUER - 0.00001, DAUER + 0.00001);
+  await kopfleiste.evaluate((e) => { e.style.display = ''; });
+  await wartenAufWeiterlauf(P, weg.stand);
 
   const titel = await P.locator('.react-flow__node[data-id="k1"] .kanban-title').boundingBox();
+  await wartenAufZeit(P, 0.1, 0.68);
   await P.mouse.move(titel.x + 60, titel.y + 4);
   await P.mouse.down();
   await P.mouse.move(titel.x + 125, titel.y + 50, { steps: 3 });
   const zug = await pausePruefen(P);
   await P.mouse.up();
-  pruefe('B Beim Ziehen bleibt die laufende Form stehen', zug.gleich);
-  await wartenAufZeit(P, 0, 0);
-  pruefe('B Nach dem Ablegen erreicht die Form wieder die Grundstellung', await zeit(P) === 0);
+  pruefe('B Beim Ziehen bleibt die laufende Form stehen', zug.gleich, zug);
+  await wartenAufWeiterlauf(P, zug.stand);
+  pruefe('B Nach dem Ablegen läuft die Form an ihrer Position weiter', await zeit(P) > 0);
   await ctx.close();
 }
 
@@ -271,7 +286,7 @@ for (const design of ['klassisch', 'pixel']) {
   await ctx.close();
 }
 pruefe('D Keine Seitenfehler', fehler.length === 0, fehler.slice(0, 3).join(' | '));
-if (BILDER) writeFileSync(path.join(BILDER, 'LIESMICH.txt'), 'M549: Konturen als Bildfolge und Kopfleiste (Hell/Dunkel).\n');
+if (BILDER) writeFileSync(path.join(BILDER, 'LIESMICH.txt'), 'M550: Konturen als Bildfolge und Kopfleiste (Hell/Dunkel).\n');
 await browser.close(); app.close();
 console.log(`\nM548: ${ok} bestanden, ${bad} fehlgeschlagen`);
 process.exit(bad ? 1 : 0);
