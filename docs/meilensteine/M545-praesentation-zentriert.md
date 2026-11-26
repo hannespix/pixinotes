@@ -13,10 +13,10 @@ Abweichung der Inhaltsmitte von der Folienmitte in Punkten (waagrecht / senkrech
 |---|---|---|---|---|
 | Mermaid (Ablauf von oben nach unten) | **−453 / 9** (am linken Rand) | 0 / 0 | **−21 / 11** | 0 / 0 |
 | Mermaid (Ablauf von links nach rechts) | **−396 / 9** | 0 / 0 | 0 / **11** | 0 / 0 |
-| Pixi (Figur samt Name) | 0 / **75** | 0 / 0 | 0 / **29** | 0 / 0 |
-| E-Mail | 1 / **−14** | 1 / −1 | 0 / **−8** | siehe Reihe |
-| Rahmen (Abschnittsfolie) | 0 / **13** | 0 / 2 | 0 / **8** | siehe Reihe |
-| Zeiterfassung | 1 / 1 | 1 / 1 | 7 / 1, **50 Punkte quer über die Folie hinaus** | siehe Reihe |
+| Pixi (Figur samt Name) | 0 / **75** | 0 / 0 | 0 / **33** | 0 / 0 |
+| E-Mail | 1 / **−14** | 1 / −1 | 0 / **−8** | 0 / 0 |
+| Rahmen (Abschnittsfolie) | 0 / **13** | 0 / 2 | 0 / **8** | 0 / 1 |
+| Zeiterfassung | 1 / 1 | 1 / 1 | 7 / 1, **50 Punkte quer über die Folie hinaus** | 0 / 1, kein Überlauf |
 | Notiz, Form, Kanban, Gantt, Kalender, Wochenplan, Protokoll, Tabelle, Kontakt, Datei, Bild, Flüssige Schrift, Ideen-Bubbles, Tool | ≤ 5 | unverändert | ≤ 2 | unverändert |
 
 (Wochenplan und Kalender sahen in einer ersten Messung nur mit dunkler Schrift schief aus — ihr Kasten steht mittig,
@@ -47,7 +47,7 @@ Pixi, E-Mail, Kanban), D Mermaid füllt die Fläche (≥ 80 % in einer Richtung)
 Inhalt" mittig, E Board unverändert. Grenze: 8 Punkte (Rundung beim Einpassen in Raster bzw. viewBox bis 3 Punkte;
 schief stand vorher 13 bis 453 Punkte daneben; auf dem Telefon gut 2 % der Folie). Pixi bewegt sich — dort zählt die
 Lage aus der Zeichenfläche statt aus dem Bild. Gegen den Stand davor rot für Mermaid, Pixi, E-Mail, Rahmen und die
-Zeiterfassung auf dem Telefon.
+Zeiterfassung auf dem Telefon (Stand davor: 82 grün, 17 rot; jetzt 99 grün).
 
 ## Grenzen
 - Ideen-Bubbles und Tools (eigene Apps) füllen die Folie ganz; geprüft wird, dass die Fläche symmetrisch sitzt, nicht
