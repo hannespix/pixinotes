@@ -214,6 +214,8 @@ console.log('════ B: Atmen, Rücklauf und Ruhe ════');
   await tabVerdeckt(P, false);
   await wartenAufWeiterlauf(P, verdeckt.stand);
   await wartenAufZeit(P, DAUER - 0.00001, DAUER + 0.00001);
+  // Die SVG-Uhr liegt bei fast voller Form schon im Toleranzfenster. Zuerst den Übergang auf den Halt abwarten.
+  await P.waitForTimeout(100);
   const gipfel = await pausePruefen(P, 400);
   pruefe('B Die Kontur hält auf dem Gipfel ohne Bild-Takt inne', gipfel.gleich && gipfel.bilder <= 2, gipfel);
   await wartenAufZeit(P, 0.12, 0.7);
