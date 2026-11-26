@@ -385,7 +385,7 @@
   --agency-abdunkler: rgba(20, 23, 18, 0.46);
   --bg: #282b25;
   --ink: #ecede8;              /* 12,2:1 auf der Leinwand */
-  --muted: #b4b8ad;            /* 7,1:1 auf der Leinwand, 5,4:1 auf --surface-2 */
+  --muted: #bec2b7;            /* ≥ 4,5:1 auch auf dem violett hinterlegten Suchtreffer */
   --accent: #9a6bff;           /* 3,6:1 auf --surface, für Punkt und Markierungen */
   --accent-strong: #c3aaff;    /* Linkschrift, 5,5:1 auf --surface-2 */
   --accent-soft: rgba(137, 81, 255, 0.2);
