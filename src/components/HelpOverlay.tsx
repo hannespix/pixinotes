@@ -175,6 +175,7 @@ export function HelpOverlay() {
             <section id="help-neu">
               <p>Die letzten Ausbaustufen in Kürze, neueste zuerst. Welche Fassung gerade läuft, steht am Fuß der Hilfe.</p>
               <ul><NeuesteZuerst>
+                <li><b>Deutlichere Welle in der Agency-Wortmarke (M556)</b> Der Bauch des „p“ wölbt sich stärker. Während die Bewegung durch „pixi“ läuft, werden das „x“ und das letzte „i“ schmaler. Die Formen fließen im selben ruhigen Takt wie bei vave.log zurück.</li>
                 <li><b>„pixi · notes“ mit der Animation aus vave.log (M555)</b> Die Buchstaben von „pixi“ sind für die Bewegung aus vave.log gezeichnet. Die Formen ziehen sich nacheinander zusammen, halten kurz inne und fließen zurück. Dazwischen steht der violette Punkt vor dem ruhigen „notes“.</li>
                 <li><b>Schmale Wortmarke mit fließender Tinte in Agency (M554)</b> „pixi · notes“ steht in schlanker Schrift, im hellen Design tiefschwarz. Bei „pixi“ sammelt sich die Tinte am Rand der Öffnung im „p“ und in den Winkeln des „x“. Die Wölbungen gleiten an den Buchstaben entlang.</li>
                 <li><b>Fließende Buchstaben in Agency (M553)</b> Bei „pixi“ wölbt sich erst die eine Seite eines Buchstabens, dann wandert die Verdickung zur anderen. Die Buchstaben setzen zeitversetzt ein. Der violette Punkt und „notes“ stehen still.</li>

@@ -18,6 +18,7 @@ export function NeuEn() {
             <section id="help-neu">
               <p>The latest releases in brief, newest first. Which version is currently running is shown at the bottom of the help.</p>
               <ul><NeuesteZuerst>
+                <li><b>A more pronounced wave in the Agency wordmark (M556)</b> The bowl of the “p” swells more visibly. The “x” and the final “i” grow slimmer as the wave passes through “pixi”. The shapes flow back at the same unhurried pace as vave.log.</li>
                 <li><b>“pixi · notes” with the vave.log animation (M555)</b> The “pixi” letters are drawn to move with the vave.log animation. Their shapes shift in sequence, pause briefly, and flow back. A purple dot leads into the still “notes”.</li>
                 <li><b>Slim wordmark with flowing ink in Agency (M554)</b> “pixi · notes” uses a lighter type weight and appears in deep black in the light theme. Ink pools around the opening in the “p” and in the corners of the “x”. The bulges glide along the letters.</li>
                 <li><b>Flowing letters in Agency (M553)</b> One side of each letter in “pixi” swells first, then the bulge rolls to the other side. The letters move in succession. The purple dot and “notes” stay still.</li>
