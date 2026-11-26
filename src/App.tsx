@@ -397,10 +397,10 @@ export default function App() {
       document.documentElement.dataset.accent = ui.accent;
       // M507: Design „pix·el" – eigener Token-Satz und Pixel-Kanten (styles/90-design-pixel.css). Klassisch trägt
       // KEIN Attribut: so bleibt jede Regel für Klassisch genau wie vorher.
-      // M547: dritte Wahl „vave.log" (styles/91-design-vave.css) — ebenso nur als Attribut
+      // M547: dritte Wahl „Agency" (nach vave.log, styles/91-design-agency.css) — ebenso nur als Attribut
       const pixel = ui.design === 'pixel';
-      const vave = ui.design === 'vave';
-      if (pixel || vave) document.documentElement.dataset.design = ui.design;
+      const agency = ui.design === 'agency';
+      if (pixel || agency) document.documentElement.dataset.design = ui.design;
       else delete document.documentElement.dataset.design;
       let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
       if (!meta) {
@@ -408,7 +408,7 @@ export default function App() {
         meta.name = 'theme-color';
         document.head.appendChild(meta);
       }
-      meta.content = pixel ? (dark ? '#0c170b' : '#f6f7ef') : vave ? (dark ? '#121311' : '#f8f9f6') : dark ? '#141618' : '#f3f4f6';
+      meta.content = pixel ? (dark ? '#0c170b' : '#f6f7ef') : agency ? (dark ? '#121311' : '#f8f9f6') : dark ? '#141618' : '#f3f4f6';
     };
     apply();
     mq.addEventListener('change', apply);

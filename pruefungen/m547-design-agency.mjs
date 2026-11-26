@@ -1,8 +1,8 @@
 /**
- * M547 — Design „vave.log" in den Einstellungen (Violett, Grün-Grau, Readex Pro, weiche Rundungen, atmende Wortmarke).
+ * M547 — Design „Agency" (nach vave.log) in den Einstellungen (Violett, Grün-Grau, Readex Pro, weiche Rundungen, atmende Wortmarke).
  *
- *   A  Einstellungen → Darstellung → Design: drei Wahlen; „vave.log" wirkt sofort (html[data-design], Grund #f8f9f6),
- *      steht in den Vorlieben, übersteht das Neuladen; Akzent-Tupfer weichen dem Satz „Violett (vave.log)", die gewählte
+ *   A  Einstellungen → Darstellung → Design: drei Wahlen; „Agency" wirkt sofort (html[data-design], Grund #f8f9f6),
+ *      steht in den Vorlieben, übersteht das Neuladen; Akzent-Tupfer weichen dem Satz „Violett (Agency)", die gewählte
  *      Akzentfarbe bleibt gemerkt; zurück auf Klassisch: Attribut weg, Akzent wieder da. pix·el bleibt wählbar.
  *   B  Schrift: Readex Pro aus dem eigenen Build, in Bedienung, Text und Titeln; in Klassisch und pix·el NICHT geladen;
  *      „Besser lesbar" gewinnt (Atkinson).
@@ -20,9 +20,9 @@
  *   G  Keine Seitenfehler.
  *
  * Bilder: M547_BILDER=<ordner> legt Bildschirmfotos ab (Board, Einstellungen, Menü; hell und dunkel; Wortmarke).
- * Klassisch und pix·el unverändert: `node werkzeug/bild-vergleich.mjs <dist-vorher> dist` (docs/meilensteine/M547-design-vave.md).
+ * Klassisch und pix·el unverändert: `node werkzeug/bild-vergleich.mjs <dist-vorher> dist` (docs/meilensteine/M547-design-agency.md).
  */
-// Läuft aus dem Repository: `node pruefungen/m547-design-vave.mjs` (braucht `npm run build`)
+// Läuft aus dem Repository: `node pruefungen/m547-design-agency.mjs` (braucht `npm run build`)
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { mkdirSync, readFileSync, existsSync } from 'node:fs';
@@ -71,8 +71,8 @@ const brett = (nodes) => ({ boards: [{ id: 'b0', name: 'Studio', edges: [], draw
   spaces: [{ id: 's1', name: 'Arbeit', projects: [{ id: 'p1', name: 'Einstieg', boardIds: ['b0'] }] }], activeId: 'b0', view: 'board', cardFocus: false, navLinks: false, clickZoom: false });
 const ALLE = () => KARTEN.map((k, i) => ({ ...k, position: { x: 40 + (i % 3) * 500, y: 40 + Math.floor(i / 3) * 480 } }));
 
-/** Neue Seite; `design` = 'vave' | 'pixel' | 'klassisch' | 'ohne' (Vorlieben ohne Design) */
-async function seite(nodes, { dunkel = false, design = 'vave', lesbar = false, anfragen = null, ruhig = false } = {}) {
+/** Neue Seite; `design` = 'agency' | 'pixel' | 'klassisch' | 'ohne' (Vorlieben ohne Design) */
+async function seite(nodes, { dunkel = false, design = 'agency', lesbar = false, anfragen = null, ruhig = false } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 980 }, deviceScaleFactor: 1, locale: 'de-DE', colorScheme: dunkel ? 'dark' : 'light', reducedMotion: ruhig ? 'reduce' : 'no-preference' });
   await ctx.addInitScript(([s, d, des, les]) => {
     if (localStorage.getItem('pixinotes-onboarded')) return;
@@ -101,7 +101,7 @@ const readex = (u) => /readex/i.test(u);
 const gewichteSammeln = (P, ms) => P.evaluate((ms) => new Promise((fertig) => {
   const liste = []; const ab = performance.now();
   const iv = setInterval(() => {
-    liste.push([...document.querySelectorAll('.vave-b')].map((b) => Math.round(parseFloat(getComputedStyle(b).fontWeight))));
+    liste.push([...document.querySelectorAll('.agency-b')].map((b) => Math.round(parseFloat(getComputedStyle(b).fontWeight))));
     if (performance.now() - ab > ms) { clearInterval(iv); fertig(liste); }
   }, 60);
 }), ms);
@@ -113,19 +113,19 @@ console.log('════ A: Umschalten in den Einstellungen ════');
   pruefe('A Vorlieben ohne Design = Klassisch (kein Attribut, kühler Grund)', (await attr(P)) === null && (await grund(P)) === 'rgb(243, 244, 246)', `${await attr(P)} ${await grund(P)}`);
   pruefe('B Klassisch lädt Readex Pro nicht', !anfragen.some(readex), anfragen.filter((u) => /woff/.test(u)).join(' '));
   await P.locator('[data-taste="einstellungen"]').first().click();
-  await P.waitForSelector('[data-design-wahl="vave"]');
+  await P.waitForSelector('[data-design-wahl="agency"]');
   const wahlen = await P.locator('[data-taste="design"] [data-design-wahl]').evaluateAll((l) => l.map((b) => `${b.dataset.designWahl}:${b.textContent}`));
-  pruefe('A drei Wahlen: Klassisch · pix·el · vave.log', wahlen.join(' ') === 'klassisch:Klassisch pixel:pix·el vave:vave.log', wahlen);
+  pruefe('A drei Wahlen: Klassisch · pix·el · Agency', wahlen.join(' ') === 'klassisch:Klassisch pixel:pix·el agency:Agency', wahlen);
   const tupfer = await P.locator('.accent-swatch').count();
-  await P.locator('[data-design-wahl="vave"]').click();
-  pruefe('A vave.log wirkt sofort (Attribut, Grund #f8f9f6)', (await warteBis(P, async () => (await attr(P)) === 'vave' && (await grund(P)) === 'rgb(248, 249, 246)')) !== null, `${await attr(P)} ${await grund(P)}`);
-  pruefe('A Knopf „vave.log" ist gedrückt', (await P.locator('[data-design-wahl="vave"]').getAttribute('aria-pressed')) === 'true');
-  pruefe('A Akzentfarbe: statt der Tupfer „Violett (vave.log)"', tupfer === 5 && (await P.locator('.accent-swatch').count()) === 0 && (await P.locator('.akzent-vave').textContent()) === 'Violett (vave.log)');
-  const gespeichert = await warteBis(P, async () => { const v = await vorlieben(P); return v.design === 'vave' ? v : null; });
-  pruefe('A Wahl steht in den Vorlieben, Akzent bleibt gemerkt', gespeichert?.design === 'vave' && gespeichert?.accent === 'orange', gespeichert);
+  await P.locator('[data-design-wahl="agency"]').click();
+  pruefe('A Agency wirkt sofort (Attribut, Grund #f8f9f6)', (await warteBis(P, async () => (await attr(P)) === 'agency' && (await grund(P)) === 'rgb(248, 249, 246)')) !== null, `${await attr(P)} ${await grund(P)}`);
+  pruefe('A Knopf „Agency" ist gedrückt', (await P.locator('[data-design-wahl="agency"]').getAttribute('aria-pressed')) === 'true');
+  pruefe('A Akzentfarbe: statt der Tupfer „Violett (Agency)"', tupfer === 5 && (await P.locator('.accent-swatch').count()) === 0 && (await P.locator('.akzent-agency').textContent()) === 'Violett (Agency)');
+  const gespeichert = await warteBis(P, async () => { const v = await vorlieben(P); return v.design === 'agency' ? v : null; });
+  pruefe('A Wahl steht in den Vorlieben, Akzent bleibt gemerkt', gespeichert?.design === 'agency' && gespeichert?.accent === 'orange', gespeichert);
   await P.keyboard.press('Escape');
   await P.reload({ waitUntil: 'networkidle' }); await P.waitForSelector('.react-flow__node'); await P.waitForTimeout(1200);
-  pruefe('A vave.log übersteht das Neuladen', (await attr(P)) === 'vave' && (await grund(P)) === 'rgb(248, 249, 246)', `${await attr(P)} ${await grund(P)}`);
+  pruefe('A Agency übersteht das Neuladen', (await attr(P)) === 'agency' && (await grund(P)) === 'rgb(248, 249, 246)', `${await attr(P)} ${await grund(P)}`);
   pruefe('B Readex Pro kommt aus dem eigenen Build, keine fremde Anfrage',
     anfragen.some((u) => u.startsWith(`http://localhost:${PORT}/`) && readex(u)) && anfragen.every((u) => u.startsWith(`http://localhost:${PORT}/`) || u.startsWith('data:') || u.startsWith('blob:')),
     anfragen.filter((u) => !u.startsWith(`http://localhost:${PORT}/`)).slice(0, 3).join(' '));
@@ -165,8 +165,8 @@ console.log('════ B/C: Schrift und Formen ════');
   const hover = await warteBis(P, async () => { const s = await stil(P, '.react-flow__node[data-id="k1"]', 'boxShadow'); return /rgb\(207, 181, 255\)/.test(s) ? s : null; }, 4000);
   pruefe('C unter der Maus: Kante violett (#cfb5ff) wie die Projektkarten in vave.log', hover !== null, await stil(P, '.react-flow__node[data-id="k1"]', 'boxShadow'));
   await P.mouse.move(1400, 960);
-  await foto(P, 'vave-hell-board');
-  await foto(P, 'vave-wortmarke', '.logo');
+  await foto(P, 'agency-hell-board');
+  await foto(P, 'agency-wortmarke', '.logo');
 
   // Einstellungen: Fenster, Etikett, Titel, Umschalter, Felder
   await P.locator('[data-taste="einstellungen"]').first().click(); await P.waitForSelector('.modal-head h2'); await P.waitForTimeout(400);
@@ -189,7 +189,7 @@ console.log('════ B/C: Schrift und Formen ════');
   }
   await P.locator('.modal-tabs button').first().click(); await P.waitForTimeout(250);
   pruefe(`C Felder 7 px rund (${felder.length} Felder in den Einstellungen)`, felder.length > 0 && felder.every((r) => r === '7px'), [...new Set(felder)]);
-  await foto(P, 'vave-hell-einstellungen');
+  await foto(P, 'agency-hell-einstellungen');
   // Fokusring per Tastatur
   await P.keyboard.press('Tab'); await P.keyboard.press('Tab');
   const fokus = await P.evaluate(() => { const e = document.activeElement; const s = getComputedStyle(e); return `${s.outlineWidth} ${s.outlineStyle} ${s.outlineColor}`; });
@@ -200,7 +200,7 @@ console.log('════ B/C: Schrift und Formen ════');
   await P.mouse.click(1400, 940, { button: 'right' });
   const menue = await warteBis(P, async () => P.evaluate(() => { const e = document.querySelector('.kontext-menue'); if (!e) return null; const s = getComputedStyle(e); return { r: s.borderRadius, sch: s.boxShadow, rand: s.borderColor }; }), 5000);
   pruefe('C Kontextmenü rund (16 px) mit weicher Wolke wie die Menüs in vave.log', menue?.r === '16px' && /60px/.test(menue?.sch ?? ''), menue);
-  await foto(P, 'vave-hell-menue');
+  await foto(P, 'agency-hell-menue');
   await P.keyboard.press('Escape'); await P.waitForTimeout(300);
 
   // Hinweis (Toast): Doppelklick auf die leere Fläche legt eine Notiz an und meldet es
@@ -212,7 +212,7 @@ console.log('════ B/C: Schrift und Formen ════');
 }
 {
   const { ctx, P } = await seite(ALLE(), { lesbar: true });
-  pruefe('B „Besser lesbar" gewinnt auch in vave.log (Atkinson)', /Atkinson/.test(await stil(P, 'body', 'fontFamily')) && /Atkinson/.test(await stil(P, '.logo', 'fontFamily')));
+  pruefe('B „Besser lesbar" gewinnt auch in Agency (Atkinson)', /Atkinson/.test(await stil(P, 'body', 'fontFamily')) && /Atkinson/.test(await stil(P, '.logo', 'fontFamily')));
   const g = await gewichteSammeln(P, 2500);
   pruefe('D „Besser lesbar": die Wortmarke steht still', new Set(g.map((x) => x.join())).size === 1, g.slice(0, 3));
   await ctx.close();
@@ -223,24 +223,24 @@ console.log('════ D: Wortmarke ════');
   const { ctx, P } = await seite([{ ...KARTEN[2], position: { x: 300, y: 300 } }]);
   const marke = await P.evaluate(() => {
     const l = document.querySelector('.logo');
-    return { b: [...l.querySelectorAll('.vave-b')].map((b) => b.textContent).join(''), zusatz: l.querySelector('.vave-zusatz')?.textContent,
-      punkt: l.querySelector('.vave-punkt') ? getComputedStyle(l.querySelector('.vave-punkt')).backgroundColor : null, label: l.getAttribute('aria-label'), versteckt: l.querySelector('.vave-marke')?.getAttribute('aria-hidden') };
+    return { b: [...l.querySelectorAll('.agency-b')].map((b) => b.textContent).join(''), zusatz: l.querySelector('.agency-zusatz')?.textContent,
+      punkt: l.querySelector('.agency-punkt') ? getComputedStyle(l.querySelector('.agency-punkt')).backgroundColor : null, label: l.getAttribute('aria-label'), versteckt: l.querySelector('.agency-marke')?.getAttribute('aria-hidden') };
   });
   pruefe('D Wortmarke „PIXI · NOTES" mit violettem Punkt, Name für Vorleser bleibt', marke.b === 'PIXI' && marke.zusatz === 'NOTES' && marke.punkt === 'rgb(100, 29, 255)' && marke.label === 'PixiNotes – zur Übersicht' && marke.versteckt === 'true', marke);
-  const breiten = await P.evaluate(() => [...document.querySelectorAll('.vave-b')].map((b) => b.style.width));
+  const breiten = await P.evaluate(() => [...document.querySelectorAll('.agency-b')].map((b) => b.style.width));
   pruefe('D jeder Buchstabe hat eine feste Breite (nichts verrutscht beim Atmen)', breiten.every((w) => /em$/.test(w)), breiten);
-  const bild1 = await P.locator('.vave-wort').screenshot();
+  const bild1 = await P.locator('.agency-wort').screenshot();
   const g = await gewichteSammeln(P, 7000);
   const alle = new Set(g.flat());
   const welle = g.some((x) => new Set(x).size > 1);
   pruefe(`D das Wort atmet: ${alle.size} verschiedene Gewichte zwischen ${Math.min(...alle)} und ${Math.max(...alle)}`, alle.size >= 6 && Math.min(...alle) >= 560 && Math.max(...alle) <= 700 && Math.max(...alle) - Math.min(...alle) >= 60, [...alle].slice(0, 12));
   pruefe('D als Welle: die Buchstaben sind zeitweise verschieden schwer', welle);
-  const bild2 = await P.locator('.vave-wort').screenshot();
+  const bild2 = await P.locator('.agency-wort').screenshot();
   pruefe('D die Pixel der Wortmarke ändern sich über die Zeit', !bild1.equals(bild2));
   const nachher = await P.evaluate(() => document.querySelector('.logo').getBoundingClientRect().width);
   await P.waitForTimeout(900);
   pruefe('D die Wortmarke behält ihre Breite', Math.abs(nachher - await P.evaluate(() => document.querySelector('.logo').getBoundingClientRect().width)) < 0.5);
-  if (BILDER) for (let i = 0; i < 3; i += 1) { await foto(P, `vave-wortmarke-${i + 1}`, '.logo'); await P.waitForTimeout(1300); }
+  if (BILDER) for (let i = 0; i < 3; i += 1) { await foto(P, `agency-wortmarke-${i + 1}`, '.logo'); await P.waitForTimeout(1300); }
 
   // Während eines Zugs steht die Marke: erst warten, bis sie sich bewegt, dann eine Karte ziehen
   await warteBis(P, async () => { const a = await gewichteSammeln(P, 300); return new Set(a.flat()).size > 1; }, 20000);
@@ -249,7 +249,7 @@ console.log('════ D: Wortmarke ════');
   await P.mouse.move(titel.x + 90, titel.y + 30, { steps: 4 });
   const imZug = P.evaluate(() => new Promise((fertig) => {
     const liste = []; const ab = performance.now();
-    const iv = setInterval(() => { liste.push([...document.querySelectorAll('.vave-b')].map((b) => getComputedStyle(b).fontWeight).join()); if (performance.now() - ab > 1500) { clearInterval(iv); fertig(liste); } }, 60);
+    const iv = setInterval(() => { liste.push([...document.querySelectorAll('.agency-b')].map((b) => getComputedStyle(b).fontWeight).join()); if (performance.now() - ab > 1500) { clearInterval(iv); fertig(liste); } }, 60);
   }));
   const ab = Date.now();
   while (Date.now() - ab < 1600) { const a = (Date.now() - ab) / 1600; await P.mouse.move(titel.x + 90 + 200 * a, titel.y + 30 + 80 * Math.sin(a * 6)); }
@@ -262,16 +262,16 @@ console.log('════ D: Wortmarke ════');
 }
 {
   const { ctx, P } = await seite([{ ...KARTEN[0], position: { x: 300, y: 300 } }], { ruhig: true });
-  const bild1 = await P.locator('.vave-wort').screenshot();
+  const bild1 = await P.locator('.agency-wort').screenshot();
   const g = await gewichteSammeln(P, 6000);
-  const bild2 = await P.locator('.vave-wort').screenshot();
+  const bild2 = await P.locator('.agency-wort').screenshot();
   pruefe('D reduzierte Bewegung: steht still in der Ruhelage (560), Pixel gleich', new Set(g.flat()).size === 1 && g[0][0] === 560 && bild1.equals(bild2), [...new Set(g.flat())]);
   await ctx.close();
 }
 
 for (const dunkel of [false, true]) {
   const name = dunkel ? 'dunkel' : 'hell';
-  console.log(`════ E: Kontrast-Scan vave.log ${name} – Kartentypen ════`);
+  console.log(`════ E: Kontrast-Scan Agency ${name} – Kartentypen ════`);
   for (const k of KARTEN) {
     const { ctx, P } = await seite([{ ...k, position: { x: 160, y: 120 } }], { dunkel });
     const node = P.locator(`.react-flow__node[data-id="${k.id}"]`);
@@ -287,11 +287,11 @@ for (const dunkel of [false, true]) {
     await ctx.close();
   }
 
-  console.log(`════ E: Fenster vave.log ${name} ════`);
+  console.log(`════ E: Fenster Agency ${name} ════`);
   const { ctx, P } = await seite(ALLE(), { dunkel });
   await P.waitForTimeout(800);
   if (dunkel) pruefe('E dunkel: eigener Grund (#121311), Akzent hell genug', (await grund(P)) === 'rgb(18, 19, 17)' && (await P.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim())) === '#9a6bff', await grund(P));
-  await foto(P, `vave-${name}-board`);
+  await foto(P, `agency-${name}-board`);
   const zu = async () => { await P.keyboard.press('Escape'); await P.waitForTimeout(350); await P.keyboard.press('Escape'); await P.waitForTimeout(300); };
   const fenster = async (titel, auf, sel = 'body', { rand = false } = {}) => {
     try { await auf(); await P.waitForTimeout(900); } catch (e) { pruefe(`E ${name} ${titel}: öffnet`, false, e.message.split('\n')[0]); return; }
@@ -304,7 +304,7 @@ for (const dunkel of [false, true]) {
       const f = await fokusScan(P, sel, { schritte: 18, alle: true });
       pruefe(`E ${name} ${titel}: ${f.length} Fokusringe ≥ 3:1`, f.length > 0 && !f.some((x) => x.v < 3), f.filter((x) => x.v < 3).slice(0, 4).map((x) => `${x.v} „${x.text}" ${x.pfad}`).join(' | '));
     }
-    await foto(P, `vave-${name}-${titel.toLowerCase()}`);
+    await foto(P, `agency-${name}-${titel.toLowerCase()}`);
     await zu();
   };
   await fenster('Board', async () => {});
@@ -322,7 +322,7 @@ console.log('════ F: Klassisch unverändert ════');
   const r = await P.evaluate(() => ({ html: document.querySelector('.logo').innerHTML, schrift: getComputedStyle(document.querySelector('.logo')).fontFamily, body: getComputedStyle(document.body).fontFamily, radius: getComputedStyle(document.querySelector('.react-flow__node')).borderRadius }));
   pruefe('F Klassisch: Wortmarke „Pixi<span>Notes</span>" in Newsreader, Text in Geist, Karten 4 px, kein data-design',
     r.html === 'Pixi<span>Notes</span>' && /Newsreader/.test(r.schrift) && /Geist/.test(r.body) && r.radius === '4px' && (await attr(P)) === null, r);
-  pruefe('F Klassisch: kein Readex, keine Bewegung der Wortmarke', !anfragen.some(readex) && (await P.locator('.vave-b').count()) === 0);
+  pruefe('F Klassisch: kein Readex, keine Bewegung der Wortmarke', !anfragen.some(readex) && (await P.locator('.agency-b').count()) === 0);
   await ctx.close();
 }
 

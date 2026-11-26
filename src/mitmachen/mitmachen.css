@@ -1,5 +1,5 @@
 /* M513: Mitmachen per QR — die Teilnehmer-Seite. Farben nur aus den Tokens der App (00-tokens.css: hell, dunkel,
-   pix·el, vave.log); Schrift wie in der App (Geist, eingebettet), Titel in pix·el in der Pixelschrift. */
+   pix·el, Agency); Schrift wie in der App (Geist, eingebettet), Titel in pix·el in der Pixelschrift. */
 @import '../styles/00-tokens.css';
 @font-face {
   font-family: 'PN Geist'; font-style: normal; font-display: swap; font-weight: 100 900;
@@ -10,7 +10,7 @@
   font-family: 'PN Jersey'; font-style: normal; font-weight: 400; font-display: swap;
   src: url('../assets/jersey-10.woff2') format('woff2');
 }
-/* M547: vave.log — Readex Pro (SIL OFL), lädt nur, wenn das Design gewählt ist */
+/* M547: Agency — Readex Pro (SIL OFL), lädt nur, wenn das Design gewählt ist */
 @font-face {
   font-family: 'PN Readex'; font-style: normal; font-display: swap; font-weight: 160 700;
   src: url('../assets/readex-pro-latin-wght.woff2') format('woff2-variations');
@@ -105,8 +105,8 @@ body {
 /* pix·el: eckig (die Tokens setzen die Radien auf 0), Titel in der Pixelschrift */
 :root[data-design='pixel'] .mit-titel, :root[data-design='pixel'] .mit-marke { font-family: var(--font-pixel); font-weight: 400; font-synthesis: none; font-size-adjust: ex-height 0.6; }
 :root[data-design='pixel'] .mit-platz { border-radius: 0; }
-/* vave.log (M547): Readex Pro, Titel 500 mit enger Laufweite wie in vave.log */
-:root[data-design='vave'] body { font-family: var(--font-vave); }
-:root[data-design='vave'] :is(.mit-titel, .mit-marke) { font-weight: 500; letter-spacing: -0.045em; }
+/* Agency (M547): Readex Pro, Titel 500 mit enger Laufweite wie in vave.log */
+:root[data-design='agency'] body { font-family: var(--font-agency); }
+:root[data-design='agency'] :is(.mit-titel, .mit-marke) { font-weight: 500; letter-spacing: -0.045em; }
 
 @media (prefers-reduced-motion: no-preference) { .mit-idee-zeile { transition: border-color .15s ease; } }

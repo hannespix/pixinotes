@@ -320,27 +320,27 @@
   --lauf-daumen-aktiv: rgba(212, 239, 120, 0.5);
 }
 
-/* ---------- M547: Design „vave.log" (Einstellungen → Darstellung → Design) ----------
+/* ---------- M547: Design „Agency" nach vave.log (Einstellungen → Darstellung → Design) ----------
    Die Tokens von vave.log (eigenes Werk des Nutzers, src/web/styles.css): helles Grün-Grau als Fläche (#f8f9f6),
    warmes Schwarz als Tinte, Violett #641dff als Akzent, Lime #e8ffb9 als Hervorhebung, Ränder #e7e8e3, weiche
    Rundungen (Felder 7, Knöpfe 8, Karten 14, Fenster 16–17 px), Karten flach mit 1-px-Kante, weiche Wolken nur an
-   Menüs und Fenstern. Wie pix·el bringt vave.log seinen Akzent mit (Spezifität 0,2,0 / 0,3,0 schlägt Akzent-, Dunkel-
-   und M417-Regeln); die gewählte Akzentfarbe bleibt gemerkt. Formen und Schrift (Readex Pro) in 91-design-vave.css.
+   Menüs und Fenstern. Wie pix·el bringt Agency seinen Akzent mit (Spezifität 0,2,0 / 0,3,0 schlägt Akzent-, Dunkel-
+   und M417-Regeln); die gewählte Akzentfarbe bleibt gemerkt. Formen und Schrift (Readex Pro) in 91-design-agency.css.
    vave.log hat kein Dunkel — das Dunkel hier ist aus denselben Tönen abgeleitet.
    Abweichung, gemessen (m547): Feldränder #dedfd9 aus vave.log hätten 1,3:1 — hier --feld-rand ≥ 3:1 (WCAG 1.4.11). */
-:root[data-design='vave'] {
-  --vave-lime: #e8ffb9;        /* Hervorhebung (Markierung, „Rückgängig" im Hinweis) — Schrift darauf ist Tinte */
-  --vave-fokus: #8951ff;       /* Fokusring wie in vave.log (3 px) */
-  --vave-hover: #f2f3ed;       /* Hover der Knöpfe und Einträge */
-  --vave-rand-hover: #cfb5ff;  /* Kante einer Karte unter der Maus (vave.log .project-card:hover) */
-  --vave-spalte: #f0f2eb;      /* Kanban-Spalte (vave.log .task-column) */
-  --vave-spalte-rand: #e8ebdf;
-  --vave-seg: #eff1e9;         /* Grund der Umschalter (vave.log .segmented) */
-  --vave-seg-rand: #e6e9df;
-  --vave-seg-schrift: #5b6251;
-  --vave-hinweis: #1b1b1b;     /* Hinweis (Toast) — Weiß darauf 17:1 */
-  --vave-abdunkler: rgba(32, 37, 24, 0.44);
-  --font-vave: 'PN Readex', 'Readex Pro Variable', 'Readex Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
+:root[data-design='agency'] {
+  --agency-lime: #e8ffb9;        /* Hervorhebung (Markierung, „Rückgängig" im Hinweis) — Schrift darauf ist Tinte */
+  --agency-fokus: #8951ff;       /* Fokusring wie in vave.log (3 px) */
+  --agency-hover: #f2f3ed;       /* Hover der Knöpfe und Einträge */
+  --agency-rand-hover: #cfb5ff;  /* Kante einer Karte unter der Maus (vave.log .project-card:hover) */
+  --agency-spalte: #f0f2eb;      /* Kanban-Spalte (vave.log .task-column) */
+  --agency-spalte-rand: #e8ebdf;
+  --agency-seg: #eff1e9;         /* Grund der Umschalter (vave.log .segmented) */
+  --agency-seg-rand: #e6e9df;
+  --agency-seg-schrift: #5b6251;
+  --agency-hinweis: #1b1b1b;     /* Hinweis (Toast) — Weiß darauf 17:1 */
+  --agency-abdunkler: rgba(32, 37, 24, 0.44);
+  --font-agency: 'PN Readex', 'Readex Pro Variable', 'Readex Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --bg: #f8f9f6;
   --ink: #1b1b1b;              /* 16,3:1 auf der Fläche */
   /* vave.log hat #686c65 — auf getönten Flächen (Zähler in der Kanban-Spalte, aktiver Suchtreffer) nur 4,1–4,3:1;
@@ -363,24 +363,24 @@
   --edge-head: #8c9085;
   --r-xs: 5px; --r-sm: 8px; --r: 10px; --r-lg: 16px; --r-pill: 99px;
   --card-shadow: 0 0 0 1px #e7e8e3;
-  --card-shadow-lift: 0 0 0 1px var(--vave-rand-hover), 0 5px 14px rgba(34, 38, 25, 0.07);
-  --zieh-schatten: 0 0 0 1px var(--vave-rand-hover), 0 22px 60px rgba(34, 38, 25, 0.15), 0 5px 14px rgba(34, 38, 25, 0.11);
+  --card-shadow-lift: 0 0 0 1px var(--agency-rand-hover), 0 5px 14px rgba(34, 38, 25, 0.07);
+  --zieh-schatten: 0 0 0 1px var(--agency-rand-hover), 0 22px 60px rgba(34, 38, 25, 0.15), 0 5px 14px rgba(34, 38, 25, 0.11);
   --chrome-shadow: 0 1px 4px rgba(27, 34, 18, 0.06);
   --pop-shadow: 0 5px 14px rgba(34, 38, 25, 0.11), 0 22px 60px rgba(34, 38, 25, 0.15);
-  --vave-fenster-schatten: 0 20px 100px rgba(34, 38, 25, 0.19);
+  --agency-fenster-schatten: 0 20px 100px rgba(34, 38, 25, 0.19);
 }
-:root[data-design='vave'][data-theme='dark'] {
-  --vave-lime: #e8ffb9;
-  --vave-fokus: #a47dff;       /* ≥ 3:1 auf allen dunklen Flächen */
-  --vave-hover: #262822;
-  --vave-rand-hover: #6b4fc8;
-  --vave-spalte: #191a17;
-  --vave-spalte-rand: #2a2c27;
-  --vave-seg: #161714;
-  --vave-seg-rand: #2d2f2a;
-  --vave-seg-schrift: #b4b8ad;
-  --vave-hinweis: #262822;
-  --vave-abdunkler: rgba(0, 0, 0, 0.55);
+:root[data-design='agency'][data-theme='dark'] {
+  --agency-lime: #e8ffb9;
+  --agency-fokus: #a47dff;       /* ≥ 3:1 auf allen dunklen Flächen */
+  --agency-hover: #262822;
+  --agency-rand-hover: #6b4fc8;
+  --agency-spalte: #191a17;
+  --agency-spalte-rand: #2a2c27;
+  --agency-seg: #161714;
+  --agency-seg-rand: #2d2f2a;
+  --agency-seg-schrift: #b4b8ad;
+  --agency-hinweis: #262822;
+  --agency-abdunkler: rgba(0, 0, 0, 0.55);
   --bg: #121311;
   --ink: #ecede8;              /* 16:1 */
   --muted: #a4a89e;            /* 7,6:1 auf der Fläche, 6:1 auf --surface-2 */
@@ -399,11 +399,11 @@
   --edge: #80847b;
   --edge-head: #80847b;
   --card-shadow: 0 0 0 1px #2d2f2a;
-  --card-shadow-lift: 0 0 0 1px var(--vave-rand-hover), 0 8px 20px rgba(0, 0, 0, 0.45);
-  --zieh-schatten: 0 0 0 1px var(--vave-rand-hover), 0 22px 60px rgba(0, 0, 0, 0.55), 0 5px 14px rgba(0, 0, 0, 0.4);
+  --card-shadow-lift: 0 0 0 1px var(--agency-rand-hover), 0 8px 20px rgba(0, 0, 0, 0.45);
+  --zieh-schatten: 0 0 0 1px var(--agency-rand-hover), 0 22px 60px rgba(0, 0, 0, 0.55), 0 5px 14px rgba(0, 0, 0, 0.4);
   --chrome-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
   --pop-shadow: 0 5px 14px rgba(0, 0, 0, 0.4), 0 22px 60px rgba(0, 0, 0, 0.5);
-  --vave-fenster-schatten: 0 20px 100px rgba(0, 0, 0, 0.6);
+  --agency-fenster-schatten: 0 20px 100px rgba(0, 0, 0, 0.6);
 }
 /* Haftnotizen & Prozess-Formen bleiben helles „Papier" — Text darauf dunkel (M515: eine Form mit dunkler eigener
    Füllung setzt --shape-schrift, auch auf der Folie) */

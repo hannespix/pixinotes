@@ -10,5 +10,5 @@ const abo = (melden: () => void): (() => void) => {
 };
 const lesen = (): string => document.documentElement.dataset.design ?? 'klassisch';
 
-/** 'klassisch' | 'pixel' | 'vave' — folgt dem Attribut live */
+/** 'klassisch' | 'pixel' | 'agency' — folgt dem Attribut live */
 export const useDesign = (): string => useSyncExternalStore(abo, lesen, () => 'klassisch');

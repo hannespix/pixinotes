@@ -1,4 +1,4 @@
-// M547: Die Wortmarke im Design „vave.log" atmet — in den Gesten des vave-Logos (vave.log src/web/Logo.tsx).
+// M547: Die Wortmarke im Design „Agency" (nach vave.log) atmet — in den Gesten des vave-Logos (vave.log src/web/Logo.tsx).
 //
 // vave.log spielt sein Logo mit Lottie: die Buchstaben schwellen an und ab (Formmorph), „gescrubbt" in drei Gesten —
 // langer, ruhiger Atem · Doppelwelle · kleine Wellen. Jede Geste beginnt und endet bei 0, die nächste ist nie dieselbe,
@@ -11,7 +11,7 @@
 // Leistung (M491/M525/M535): rechnet nur, wenn die Marke zu sehen ist — nicht im verdeckten Tab, nicht außerhalb des
 // Bildes (Fokus-Modus blendet sie aus), nicht während eines Zugs auf dem Board. In den Haltephasen der Gesten (bis
 // knapp 6 s) läuft kein Bild-Takt, sondern ein einziger Zeitgeber. `prefers-reduced-motion` und „Besser lesbar"
-// (Atkinson hat keine Zwischenstufen): steht still in der Ruhelage. Nachgeladen — nur im Design vave.log.
+// (Atkinson hat keine Zwischenstufen): steht still in der Ruhelage. Nachgeladen — nur im Design Agency.
 import { zugBeobachten, zugLaeuft } from './zugAnzeige';
 
 type Geste = readonly (readonly [lage: number, ms: number])[];
@@ -33,7 +33,7 @@ const VERSATZ = 170;
 const ENG = 0.06;
 
 export function logoBewegen(wort: HTMLElement): () => void {
-  const buchstaben = [...wort.querySelectorAll<HTMLElement>('.vave-b')];
+  const buchstaben = [...wort.querySelectorAll<HTMLElement>('.agency-b')];
   const reduziert = window.matchMedia('(prefers-reduced-motion: reduce)');
   const verzug = VERSATZ * Math.max(0, buchstaben.length - 1);
   let aus = false;
