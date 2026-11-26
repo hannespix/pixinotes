@@ -5,6 +5,7 @@ import { useBoard } from '../store';
 import { ablageVorab } from '../store/speicher';
 import { fensterDarueber } from '../lib/overlay';
 import { eigenerLook, eigenerLookSetzen, lookAusRoh, lookRohVon, lookWort } from '../lib/boardLook';
+import { sichtbaresBoardMuster } from '../lib/boardMuster';
 import {
   connectGoogle, connectMicrosoft, disconnect as disconnectCalAccount,
   invalidateAccountEvents, loadCalAccounts, msHasMail, msHasNotes, oauthAvailable, patchCalAccounts, type CalAccounts,
@@ -240,6 +241,8 @@ export function Settings() {
   // M490: Einrasten (Aus · Fanglinien · Raster) — Raster ist gridSnap, „Aus" schaltet auch die Fanglinien ab
   const gridSnap = useBoard((s) => s.gridSnap);
   const setGridSnap = useBoard((s) => s.setGridSnap);
+  const boardMuster = useBoard((s) => sichtbaresBoardMuster(s.boardMuster, s.gridSnap));
+  const setBoardMuster = useBoard((s) => s.setBoardMuster);
   const fangLinien = useBoard((s) => s.fangLinien);
   const setFangLinien = useBoard((s) => s.setFangLinien);
   const einrasten = gridSnap ? 'raster' : fangLinien ? 'fang' : 'aus';
@@ -752,6 +755,14 @@ export function Settings() {
               ))}
             </div>
           </div>
+          <div className="modal-row">
+            <span>Board-Hintergrund</span>
+            <div className="seg" role="group" aria-label="Board-Hintergrund" data-taste="board-muster">
+              {([['clean', 'Clean'], ['dots', 'Dots'], ['linien', 'Linien'], ['kreuze', 'Kreuze']] as const).map(([wert, label]) => (
+                <button key={wert} className={boardMuster === wert ? 'on' : ''} aria-pressed={boardMuster === wert} data-board-muster={wert} onClick={() => setBoardMuster(wert)}>{label}</button>
+              ))}
+            </div>
+          </div>
           {/* M434: Der weiche Pfeilschatten lässt sich abschalten */}
           <label className="modal-row modal-row-check">
             <span>Pfeilschatten</span>
@@ -843,7 +854,7 @@ export function Settings() {
               ))}
             </div>
           </div>
-          <p className="modal-hint">Fanglinien richten gezogene Karten an Kanten und Mitten anderer Karten aus, Raster am Gitter. Strg beim Ziehen legt frei ab, Alt+R schaltet das Raster.</p>
+          <p className="modal-hint">Fanglinien richten Karten an Kanten und Mitten aus, Raster an festen Punkten. Strg beim Ziehen legt frei ab und Alt+R schaltet den Raster-Fang.</p>
           <label className="modal-row modal-row-check">
             <span>Konfetti beim Erledigen</span>
             <input type="checkbox" checked={konfetti} onChange={(e) => setKonfetti(e.target.checked)} data-taste="konfetti" />

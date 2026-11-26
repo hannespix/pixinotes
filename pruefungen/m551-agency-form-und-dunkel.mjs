@@ -1,5 +1,5 @@
-// M551: Die sichtbaren Konturen verteilen Gewicht wie bei vave.log. Die
-// Zeitmessung liest die SVG-Uhr mit kontrolliertem Browser-Takt aus.
+// M551 prüft die SVG-Uhr mit kontrolliertem Browser-Takt und die dunkle
+// Palette. Den Tintenfluss innerhalb der Konturen prüft M553.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
@@ -57,31 +57,6 @@ try {
   const ruhe = werte.findIndex((t, i) => i > ruecklauf && t === 0);
   pruefe('Der sichtbare Hinweg dauert mindestens 3,25 Sekunden', anlauf >= 0 && gipfel - anlauf >= 13, { anlauf, gipfel });
   pruefe('Der sichtbare Rückweg dauert mindestens 4,75 Sekunden', ruecklauf > gipfel && ruhe - ruecklauf >= 19, { ruecklauf, ruhe });
-
-  const [grund, mitte, ende] = await svg.evaluate((element) => {
-    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
-    document.dispatchEvent(new Event('visibilitychange'));
-    const pfade = [...element.querySelectorAll('path')];
-    return [0, 0.41, 0.82].map((zeit) => {
-      element.setCurrentTime(zeit);
-      return pfade.map((pfad) => {
-        const b = pfad.getBBox();
-        const punkt = new DOMPoint();
-        let tinte = 0;
-        for (let y = b.y + 4; y < b.y + b.height; y += 8) {
-          punkt.y = y;
-          for (let x = b.x + 4; x < b.x + b.width; x += 8) {
-            punkt.x = x;
-            if (pfad.isPointInFill(punkt)) tinte++;
-          }
-        }
-        return tinte;
-      });
-    });
-  });
-  pruefe('Das p baut schon in der Mitte mindestens die Hälfte mehr Tinte auf', mitte[0] / grund[0] >= 1.5, { grund, mitte });
-  pruefe('Am Ende trägt p deutlich mehr Tinte, während x und das letzte i sichtbar schmaler werden',
-    ende[0] / grund[0] >= 1.65 && ende[2] / grund[2] <= 0.82 && ende[3] / grund[3] <= 0.73, { grund, ende });
 
   const flaechen = await seite.evaluate(() => ({
     leinwand: getComputedStyle(document.querySelector('.react-flow')).backgroundColor,

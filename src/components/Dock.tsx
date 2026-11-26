@@ -739,12 +739,12 @@ export function Dock() {
               onClick={() => {
                 setGridSnap(!gridSnap);
                 showToast(gridSnap
-                  ? '⊞ Gitter aus – Karten bewegen sich wieder frei.'
-                  : '⊞ Gitter an – Karten rasten beim Verschieben am Raster ein.');
+                  ? '⊞ Raster-Fang aus.'
+                  : '⊞ Raster-Fang an – Karten rasten beim Verschieben am Raster ein.');
               }}
-              title="Linien-Gitter anzeigen und Karten beim Verschieben am Raster einrasten lassen"
+              title="Karten beim Verschieben am Raster einrasten lassen"
             >
-              <IGridSnap size={15} /> Gitter &amp; Raster-Fang {gridSnap ? 'AUS' : 'AN'}
+              <IGridSnap size={15} /> Raster-Fang {gridSnap ? 'AUS' : 'AN'}
             </button>
             <div className="dock-menu-label">Board-Hintergrund</div>
             <div className="tab-bg-swatches">

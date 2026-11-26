@@ -53,6 +53,7 @@ const FELDER = [
   'handschriftAuto', 'handschriftKi', // M324: Vorschlag nach Schreibpause, KI-Korrektur
   'fingerGesten',    // M326: Finger-Gesten nach Procreate
   'gridSnap',
+  'boardMuster',
   'fangLinien',      // M490: Einrasten an Fanglinien (Aus · Fanglinien · Raster)
   'showArchived',
   'overviewMode',

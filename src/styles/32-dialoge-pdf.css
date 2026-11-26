@@ -89,6 +89,9 @@
 .seg button:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
 .seg button.on { background: var(--accent-soft); color: var(--accent-strong); font-weight: 650; }
 .seg button:disabled { opacity: .45; cursor: default; }
+/* M552: Vier Muster bleiben auch bei großer Anzeige auf schmalen Bildschirmen erreichbar. */
+.seg[data-taste='board-muster'] { flex-wrap: wrap; max-width: 100%; }
+.seg[data-taste='board-muster'] button { flex: 1 0 auto; }
 .modal-section h4 { font-size: 13px; margin: 14px 0 6px; }
 .psync-neu select { flex: 1 1 auto; min-width: 0; }
 .psync-neu button {
