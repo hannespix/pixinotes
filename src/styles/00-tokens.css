@@ -337,16 +337,12 @@
   --agency-spalte: #f0f2eb;      /* Kanban-Spalte (vave.log .task-column) */
   --agency-spalte-rand: #e8ebdf;
   --agency-seg: #eff1e9;         /* Grund der Umschalter (vave.log .segmented) */
-  --agency-seg-rand: #e6e9df;
-  --agency-seg-schrift: #5b6251;
+  --agency-seg-rand: color-mix(in srgb, var(--feld-rand) 42%, var(--agency-seg));
   --agency-hinweis: #1b1b1b;     /* Hinweis (Toast) — Weiß darauf 17:1 */
   --agency-abdunkler: rgba(32, 37, 24, 0.44);
   --font-agency: 'PN Readex', 'Readex Pro Variable', 'Readex Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --bg: #f8f9f6;
   --ink: #1b1b1b;              /* 16,3:1 auf der Fläche */
-  /* vave.log hat #686c65 — auf getönten Flächen (Zähler in der Kanban-Spalte, aktiver Suchtreffer) nur 4,1–4,3:1;
-     eine Stufe dunkler hält überall ≥ 4,5:1 (5,9:1 auf der Fläche) */
-  --muted: #5f635c;
   --accent: #641dff;           /* 7,9:1 auf Weiß — trägt auch Schrift */
   --accent-strong: #5412e3;    /* vave.log .primary:hover — 8,6:1 auf Weiß, 7,4:1 auf --accent-soft */
   --accent-soft: rgba(100, 29, 255, 0.1);
@@ -357,8 +353,6 @@
   --surface-card: #ffffff;
   --surface-glass: var(--surface);
   --surface-dim: rgba(27, 27, 27, 0.05);
-  --border: #cfd1c9;
-  --border-soft: #e7e8e3;
   --feld-rand: #80847b;        /* ≥ 3:1 auf Weiß, Fläche, --surface-2 und --surface-3 */
   --edge: #8c9085;             /* vave.log zeichnet Kanten in #b9bcb1 (1,9:1) — hier ≥ 3:1 zur Fläche */
   --edge-head: #8c9085;
@@ -379,13 +373,10 @@
   --agency-spalte: #2e3129;
   --agency-spalte-rand: #43473c;
   --agency-seg: var(--surface-3);
-  --agency-seg-rand: var(--border-soft);
-  --agency-seg-schrift: #b4b8ad;
   --agency-hinweis: var(--surface-2);
   --agency-abdunkler: rgba(20, 23, 18, 0.46);
   --bg: #282b25;
   --ink: #ecede8;              /* 12,2:1 auf der Leinwand */
-  --muted: #bec2b7;            /* ≥ 4,5:1 auch auf dem violett hinterlegten Suchtreffer */
   --accent: #9a6bff;           /* 3,6:1 auf --surface, für Punkt und Markierungen */
   --accent-strong: #c3aaff;    /* Linkschrift, 5,5:1 auf --surface-2 */
   --accent-soft: rgba(137, 81, 255, 0.2);
@@ -395,8 +386,6 @@
   --surface-3: #292c26;
   --surface-card: #33362f;
   --surface-dim: rgba(236, 237, 232, 0.07);
-  --border: rgba(236, 237, 232, 0.24);
-  --border-soft: #474b40;
   --feld-rand: #909486;        /* ≥ 3:1 auf Grund, Karte und --surface-2 */
   --edge: #909486;
   --edge-head: #909486;
@@ -407,6 +396,18 @@
   --pop-shadow: 0 5px 14px rgba(0, 0, 0, 0.3), 0 22px 60px rgba(0, 0, 0, 0.4);
   --agency-fenster-schatten: 0 20px 100px rgba(0, 0, 0, 0.48);
 }
+/* M557: Sekundärschrift mit mehr Kontrast, bei „Besser lesbar“ greifen die gemeinsamen Hochkontrast-Tokens. */
+:root[data-design='agency']:not([data-kontrast='hoch']) {
+  --muted: #4e544c;
+  --border: #cfd1c9;
+  --border-soft: #e7e8e3;
+}
+:root[data-design='agency'][data-theme='dark']:not([data-kontrast='hoch']) {
+  --muted: #cbd0c4;
+  --border: rgba(236, 237, 232, 0.24);
+  --border-soft: #474b40;
+}
+:root[data-design='agency'][data-kontrast='hoch'] { --agency-seg-rand: var(--border); }
 /* Haftnotizen & Prozess-Formen bleiben helles „Papier" — Text darauf dunkel (M515: eine Form mit dunkler eigener
    Füllung setzt --shape-schrift, auch auf der Folie) */
 [data-theme='dark'] .react-flow__node-note { color: #16191e; }

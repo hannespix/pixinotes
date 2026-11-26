@@ -4,7 +4,7 @@
    des Nutzers (src/web/styles.css, select-menu.css). Die Farben stehen als Token in 00-tokens.css
    (`:root[data-design='agency']`); hier steht, was vave.log sonst ausmacht:
      · Readex Pro (variabel, SIL OFL, wie in vave.log) für alles — Titel Gewicht 500 mit enger Laufweite (−0,045 em),
-       Etiketten als gesperrte Versalien (11 px, 0,16 em, 550) wie die „Eyebrows" in vave.log.
+       Etiketten als gesperrte Versalien (11 px) wie die „Eyebrows" in vave.log.
      · weiche Rundungen, Karten flach mit 1-px-Kante (unter der Maus violett umrissen), Menüs und Fenster mit weicher
        Wolke, Fenster 17 px rund mit violettem Etikett über dem Titel, Abdunkler mit leichter Unschärfe.
      · Umschalter als Segment auf hellem Grund (gewählt = weiße Pille mit violetter Schrift), Knöpfe mit Hub beim Zeigen,
@@ -42,8 +42,8 @@ html[data-design='agency'] :is(.bn-container, .notiz-ruhend, .presenter-slide, .
 html[data-design='agency'] .bn-block-content[data-content-type='heading'] > .bn-inline-content { font-weight: inherit; }
 /* Kartentitel wie die Spaltentitel in vave.log (500, leicht eng) */
 html[data-design='agency'] :is(.drag-title, .kanban-title, .minutes-title, .week-title, .time-title) { font-weight: 500; letter-spacing: -0.02em; }
-/* Etiketten (Abschnitte der Einstellungen) wie die „Eyebrows" in vave.log */
-html[data-design='agency']:not([data-lesbar='an']) .modal-section h3:not(.modal-danger h3) { font-size: 11px; font-weight: 550; letter-spacing: 0.16em; }
+/* M557: Kräftigere, etwas enger gesetzte Abschnittstitel sind bei 11 px leichter zu lesen. */
+html[data-design='agency']:not([data-lesbar='an']) .modal-section h3:not(.modal-danger h3) { font-size: 11px; font-weight: 620; letter-spacing: 0.12em; }
 /* Flüssige Schrift (M500): die Flüssigkeit formt Readex Pro */
 html[data-design='agency']:not([data-lesbar='an']) .fluessig-card canvas { font-family: var(--font-agency); }
 html[data-design='agency'] ::selection { background: var(--agency-lime); color: #1b1b1b; }
@@ -115,14 +115,19 @@ html[data-design='agency'] .kanban-item:hover { box-shadow: 0 0 0 1px var(--agen
 
 /* ---------- Leisten ---------- */
 html[data-design='agency'] :is(.dock button, .top-actions button):hover:not(:disabled) { background: var(--agency-hover); }
+html[data-design='agency'] .dock-menu-label { font-weight: 600; }
 /* aktiver Reiter wie der aktive Menüpunkt in vave.log: violette Schrift auf zartem Violett */
 html[data-design='agency'] .tab.active { color: var(--accent-strong); font-weight: 500; box-shadow: none; }
 
 /* ---------- Umschalter (vave.log .segmented) ---------- */
 html[data-design='agency'] .seg { background: var(--agency-seg); border-color: var(--agency-seg-rand); border-radius: 8px; padding: 3px; gap: 3px; }
-html[data-design='agency'] .seg button { border-left: none; border-radius: 5px; color: var(--agency-seg-schrift); }
-html[data-design='agency'] .seg button:hover:not(:disabled) { background: var(--agency-hover); color: var(--ink); }
-html[data-design='agency'] .seg button.on { background: var(--surface); color: var(--accent-strong); font-weight: 500; box-shadow: 0 1px 4px rgba(27, 34, 18, 0.1); }
+html[data-design='agency'] .seg button { border-left: none; border-radius: 5px; color: var(--muted); }
+html[data-design='agency'] .seg button:hover:not(.on, :disabled) { background: var(--agency-hover); color: var(--ink); }
+/* M557: Eine Innenkante markiert die Auswahl auch auf ähnlich hellen Flächen und unter dem Zeiger. */
+html[data-design='agency'] .seg button.on {
+  background: var(--surface); color: var(--accent-strong); font-weight: 550;
+  box-shadow: inset 0 0 0 1px var(--agency-fokus), 0 1px 4px rgba(27, 34, 18, 0.1);
+}
 /* Reiter der Einstellungen: violette Schrift, dünner Strich */
 html[data-design='agency'] .modal-tabs button.on { font-weight: 500; background: none; }
 
