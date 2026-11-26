@@ -47,7 +47,7 @@ function AgencyMarke() {
     return () => { aus = true; stop?.(); };
   }, []);
   return (
-    <span className="agency-wortmarke" aria-hidden="true">
+    <span className="agency-wortmarke" aria-hidden="true" data-sprache="aus" translate="no">
       <span className="agency-pixi" ref={marke}><span className="agency-wortmarke-text">pixi</span></span>
       <span className="agency-trennpunkt" />
       <span className="agency-notes">notes</span>
