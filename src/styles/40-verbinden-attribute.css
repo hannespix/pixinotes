@@ -32,6 +32,11 @@
 /* M527: … und liegt dabei ÜBER dem Karteninhalt. Vorher lag der Kartenkörper darüber: Losgelassen wurde nur, was nah
    genug an einem der vier Anschlusspunkte lag — mitten auf der Zielkarte entstand je nach Zoomstufe kein Pfeil. */
 .react-flow:has(.react-flow__connectionline) .pn-handle-body { pointer-events: all !important; z-index: 3; }
+/* M544: Beim Rahmen reicht das Ganzkarten-Ziel während des Verbindens auch über den Titel (er steht über dem Rahmen,
+   30 Bildschirmpunkte, M527) und liegt über ihm — so landet ein Pfeil auf dem Titel beim Rahmen */
+.react-flow:has(.react-flow__connectionline) .frame-wrap > .pn-handle-body {
+  z-index: 7; top: calc(-30px * var(--pn-inv, 1)) !important; height: calc(100% + 30px * var(--pn-inv, 1)) !important;
+}
 /* M464: React Flow setzt an Anschlüssen das System-Fadenkreuz — unter Windows kaum sichtbar */
 .react-flow__handle.connectionindicator { cursor: var(--zeiger-fadenkreuz); }
 .react-flow:has(.react-flow__connectionline) .pn-handle { opacity: 1; }

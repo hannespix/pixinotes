@@ -14,7 +14,8 @@
  * Gemessen wird Verhalten: Board mit einer Notiz und einer Karte der Art; Zeiger auf die Karte, zum rechten
  * Anschlusspunkt, kurz ruhen (150 ms, wie ein Mensch), drücken, zur Notiz ziehen, loslassen → eine Verbindung mehr im
  * gespeicherten Stand. „Ruhige" Karten (Bild, Pixi: Anschlusspunkte erst an der gewählten Karte, gewollt) werden vorher
- * gewählt. Dazu je Art die Gegenrichtung (Notiz → Karte; beim Rahmen auf den Titel, die Fläche ist durchklickbar).
+ * gewählt. Dazu je Art die Gegenrichtung (Notiz → Karte; beim Rahmen auch losgelassen auf seinem Titel).
+ *  3. Rahmen hatten kein Ganzkarten-Ziel: Ein Pfeil zu einem Rahmen zählte nur auf einem der vier Punkte.
  */
 // Läuft aus dem Repository: `node pruefungen/m544-pfeile-alle-karten.mjs` (braucht `npm run build`)
 import { fileURLToPath } from 'node:url';
@@ -50,7 +51,7 @@ const DATEN = {
 const TYPEN = (process.env.TYPEN ?? 'note,email,image,file,kanban,portal,shape,mermaid,gantt,calendar,frame,week,sheet,minutes,time,htmlapp,bubbles,kontakt,fluessig,pixi').split(',');
 const RUHIG = new Set(['image', 'pixi']);
 
-async function versuch(typ, richtung) {
+async function versuch(typ, richtung, aufTitel = false) {
   const nodes = [
     { id: 'q', type: 'note', width: 260, position: { x: 0, y: 0 }, data: DATEN.note },
     { id: 'z', type: typ, width: 320, height: 240, position: { x: 600, y: 0 }, data: DATEN[typ] ?? {} },
@@ -76,8 +77,8 @@ async function versuch(typ, richtung) {
   if (vonId === 'z' && RUHIG.has(typ)) { await P.mouse.click(vb.x + vb.width - 30, vb.y + vb.height - 20); await P.waitForTimeout(300); }
   await P.mouse.move(vb.x + vb.width / 2, vb.y + 20); await P.waitForTimeout(400);
   const hb = await von.locator('.react-flow__handle-right.pn-handle').first().boundingBox().catch(() => null);
-  // Rahmen: die Fläche ist durchklickbar (M150) — Pfeile zu einem Rahmen landen auf seinem Titel
-  const zielSel = nachId === 'z' && typ === 'frame' ? `.react-flow__node[data-id="z"] .frame-head` : `.react-flow__node[data-id="${nachId}"]`;
+  // Rahmen: losgelassen in der (sonst durchklickbaren) Fläche oder auf dem Titel über dem Rahmen
+  const zielSel = aufTitel ? `.react-flow__node[data-id="z"] .frame-head` : `.react-flow__node[data-id="${nachId}"]`;
   const zb = await P.locator(zielSel).first().boundingBox();
   const k0 = await kanten();
   if (hb && zb) {
@@ -100,6 +101,10 @@ for (const typ of TYPEN) {
   if (typ === 'note') continue;
   const hin = await versuch(typ, 'hin');
   pruefe(`${typ}: Pfeil zur Karte hin`, hin.neu === 1 && !hin.fehler.length, hin);
+  if (typ === 'frame') {
+    const titel = await versuch(typ, 'hin', true);
+    pruefe('frame: Pfeil zum Rahmen, losgelassen auf seinem Titel', titel.neu === 1 && !titel.fehler.length, titel);
+  }
 }
 
 await browser.close();

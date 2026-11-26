@@ -78,6 +78,10 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
       {[Position.Top, Position.Right, Position.Bottom, Position.Left].map((pos) => (
         <Handle key={pos} type="source" position={pos} id={pos} className="pn-handle frame-handle" />
       ))}
+      {/* M544: Ganzkarten-Ziel wie bei Karten — nur während des Verbindens aktiv (die Fläche bleibt sonst durchklickbar,
+          M150). Vorher zählte ein Pfeil zu einem Rahmen nur, wenn er genau einen der vier Punkte traf. Karten im Rahmen
+          liegen darüber und bleiben selbst Ziel. */}
+      <Handle id="body" type="source" position={Position.Left} className="pn-handle-body" isConnectableStart={false} />
       <div
         className="frame-head"
         title="Ziehen verschiebt den Rahmen samt Inhalt, Doppelklick präsentiert ab diesem Rahmen"
