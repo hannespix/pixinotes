@@ -52,18 +52,26 @@ try {
     const punkt = el.querySelector('.agency-trennpunkt');
     const notes = el.querySelector('.agency-notes');
     if (!punkt || !notes) return null;
+    const farbprobe = document.createElement('span');
+    farbprobe.hidden = true;
+    farbprobe.style.backgroundColor = 'var(--accent)';
+    el.append(farbprobe);
+    const akzent = getComputedStyle(farbprobe).backgroundColor;
+    farbprobe.remove();
     const form = punkt.getBoundingClientRect();
     return { pixi: el.querySelector('.agency-wortmarke-text').textContent, notes: notes.textContent,
-      farbe: getComputedStyle(punkt).backgroundColor, punkt: [form.x, form.y, form.width, form.height] };
+      farbe: getComputedStyle(punkt).backgroundColor, akzent, punkt: [form.x, form.y, form.width, form.height] };
   });
-  pruefe('Die Wortmarke zeigt pixi und notes mit violettem, rundem Trennpunkt',
-    anfang?.pixi === 'pixi' && anfang.notes === 'notes' && anfang.farbe === 'rgb(154, 107, 255)'
+  pruefe('Die Wortmarke zeigt pixi und notes mit rundem Trennpunkt in der Akzentfarbe',
+    anfang?.pixi === 'pixi' && anfang.notes === 'notes'
+    && anfang.farbe === anfang.akzent && anfang.farbe !== 'rgba(0, 0, 0, 0)'
     && anfang.punkt[2] > 2 && anfang.punkt[2] === anfang.punkt[3]);
   const uhr = () => svg.evaluate((el) => el.getCurrentTime());
   const box = await knopf.boundingBox();
   const notizBox = anfang && await knopf.locator('.agency-notes').boundingBox();
   const werte = [];
-  for (let i = 0; i < 31; i++) {
+  // Die zweite Bewegung beginnt nach 14,2 Sekunden.
+  for (let vergangen = 0; vergangen < 18_400; vergangen += 400) {
     await seite.clock.runFor(400);
     werte.push(await uhr());
   }

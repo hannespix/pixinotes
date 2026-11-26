@@ -1,4 +1,4 @@
-// M550: „pixi“ atmet in wechselnden Bewegungsfolgen wie bei vave.log. Während
+// M551: „pixi“ folgt den Bewegungsfolgen aus vave.log. Während
 // der Ruhephasen steht die SVG-Uhr und nur ein Zeitgeber wartet auf den nächsten Zug.
 import { WORTMARKE, WORTMARKE_SICHTFELD } from './agencyWortmarke';
 import { agencyZeigerEinrichten } from './agencyZeiger';
@@ -8,10 +8,12 @@ const NS = 'http://www.w3.org/2000/svg';
 const DAUER = 820;
 type Bewegung = readonly (readonly [ziel: number, ms: number])[];
 const BEWEGUNGEN: readonly Bewegung[] = [
-  [[0, 550], [1, 3050], [1, 800], [0, 3900], [0, 1650]],
-  [[0.62, 2500], [0.2, 1800], [1, 3000], [1, 650], [0, 4100], [0, 1700]],
-  [[0.44, 2100], [0.08, 1550], [0.8, 2900], [0.34, 2150], [0, 2700], [0, 1950]],
+  [[0, 1200], [1, 4200], [1, 900], [0, 5800], [0, 2100]],
+  [[0.66, 3600], [0.25, 2600], [1, 4600], [1, 700], [0, 5700], [0, 2200]],
+  [[0.42, 3400], [0.08, 2400], [0.78, 4300], [0.38, 2800], [0, 3900], [0, 2600]],
 ];
+// Anlauf und Ende folgen den vier versetzten Buchstaben aus der Referenz.
+const BUCHSTABEN_ZEITEN = [[0.001, 0.41, 0.601], [0.12, 0.47, 0.601], [0.28, 0.54, 0.721], [0.36, 0.63, 0.881]] as const;
 const glaetten = (t: number) => t * t * t * (t * (6 * t - 15) + 10);
 
 function wortmarkeBauen(): SVGSVGElement {
@@ -21,19 +23,19 @@ function wortmarkeBauen(): SVGSVGElement {
   svg.setAttribute('fill', 'currentColor');
   svg.setAttribute('focusable', 'false');
 
-  WORTMARKE.forEach(([grund, nass, ende], i) => {
+  WORTMARKE.forEach(([grund, mitte, ende], i) => {
     const buchstabe = document.createElementNS(NS, 'path');
-    // Readex zeichnet überlappende Teile etwa am x und t als gemeinsame Fläche.
+    // Readex zeichnet überlappende Teile am x als gemeinsame Fläche.
     buchstabe.setAttribute('d', grund);
     const zug = document.createElementNS(NS, 'animate');
-    const zeiten = [0, 0.04 + i * 0.095, 0.32 + i * 0.12, 0.56 + i * 0.12, 1];
+    const zeiten = [0, ...BUCHSTABEN_ZEITEN[i], 1];
     zug.setAttribute('attributeName', 'd');
     zug.setAttribute('dur', `${DAUER}ms`);
     zug.setAttribute('fill', 'freeze');
     zug.setAttribute('calcMode', 'spline');
     zug.setAttribute('keyTimes', zeiten.map((t) => t.toFixed(3)).join(';'));
     zug.setAttribute('keySplines', '0 0 1 1;0.33 0 0.40 1;0.46 0 0.52 1;0 0 1 1');
-    zug.setAttribute('values', [grund, grund, nass, ende, ende].join(';'));
+    zug.setAttribute('values', [grund, grund, mitte, ende, ende].join(';'));
     buchstabe.append(zug);
     svg.append(buchstabe);
   });
@@ -77,7 +79,7 @@ export function agencyBewegen(marke: HTMLElement): () => void {
     abschnitt += 1;
     if (abschnitt < folge.length) return;
     variante = (variante + 1 + Math.floor(Math.random() * (BEWEGUNGEN.length - 1))) % BEWEGUNGEN.length;
-    folge = BEWEGUNGEN[variante].map(([ziel, ms]) => [ziel, ms * (0.94 + Math.random() * 0.12)] as const);
+    folge = BEWEGUNGEN[variante].map(([ziel, ms]) => [ziel, ms * (0.9 + Math.random() * 0.3)] as const);
     abschnitt = 0;
   };
 

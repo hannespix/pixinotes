@@ -18,6 +18,7 @@ export function NeuEn() {
             <section id="help-neu">
               <p>The latest releases in brief, newest first. Which version is currently running is shown at the bottom of the help.</p>
               <ul><NeuesteZuerst>
+                <li><b>Slower wordmark and lighter Agency Dark (M551)</b> The “p” in “pixi” grows fuller as the “x” and final “i” slim down. The motion flows back more slowly. The canvas, cards and toolbar use a warm charcoal palette.</li>
                 <li><b>“pixi · notes” in Agency (M550)</b> “pixi” breathes on its own in alternating waves. The purple dot and the light “notes” stay still. “Reduce motion” and “Easier to read” show the resting wordmark.</li>
                 <li><b>New wordmark and pointer in Agency (M549)</b> PixiNotes is set in Readex Pro. Ink flows into the letters when you hover, then runs back when you move away. Over toolbar buttons the pointer grows into an inverted circle. “Reduce motion” and “Easier to read” keep the wordmark still and use the system pointer.</li>
                 <li><b>A mark of its own for Agency (M548)</b> Agency gained an animated PX and “NOTES” mark. M549 refined the shape and motion.</li>
