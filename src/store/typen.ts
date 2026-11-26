@@ -51,7 +51,7 @@ export interface Stroke {
 export interface BoardLook {
   aus?: boolean;
   theme?: 'system' | 'light' | 'dark';
-  design?: 'klassisch' | 'pixel';
+  design?: 'klassisch' | 'pixel' | 'agency';
   accent?: string;
 }
 
@@ -629,11 +629,11 @@ export interface BoardState {
   showArchived: boolean;
   setShowArchived: (on: boolean) => void;
 
-  /** Design: Hell/Dunkel/System + Akzentfarbe (persistiert); M507: `design` = Klassisch oder pix·el (fehlt = Klassisch) */
-  ui: { theme: 'system' | 'light' | 'dark'; accent: string; design?: 'klassisch' | 'pixel' };
+  /** Design: Hell/Dunkel/System + Akzentfarbe (persistiert); M507: `design` = Klassisch, pix·el oder (M547) Agency (fehlt = Klassisch) */
+  ui: { theme: 'system' | 'light' | 'dark'; accent: string; design?: 'klassisch' | 'pixel' | 'agency' };
   setUiTheme: (theme: 'system' | 'light' | 'dark') => void;
   setUiAccent: (accent: string) => void;
-  setUiDesign: (design: 'klassisch' | 'pixel') => void;
+  setUiDesign: (design: 'klassisch' | 'pixel' | 'agency') => void;
 }
 
 /**

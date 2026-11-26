@@ -746,7 +746,8 @@ export function Settings() {
           <div className="modal-row">
             <span>Design</span>
             <div className="seg" role="group" aria-label="Design" data-taste="design">
-              {([['klassisch', 'Klassisch'], ['pixel', 'pix·el']] as const).map(([v, label]) => (
+              {/* M547: dritte Wahl „Agency" nach vave.log (Violett, Readex Pro, weiche Rundungen, bewegte Wortmarke) */}
+              {([['klassisch', 'Klassisch'], ['pixel', 'pix·el'], ['agency', 'Agency']] as const).map(([v, label]) => (
                 <button key={v} className={(ui.design ?? 'klassisch') === v ? 'on' : ''} aria-pressed={(ui.design ?? 'klassisch') === v} data-design-wahl={v} onClick={() => setUiDesign(v)}>{label}</button>
               ))}
             </div>
@@ -759,7 +760,8 @@ export function Settings() {
           <div className="modal-row">
             <span>Akzentfarbe</span>
             {/* M507: pix·el bringt sein LCD-Grün mit — die gewählte Farbe bleibt gemerkt und gilt wieder in Klassisch */}
-            {ui.design === 'pixel' ? <span className="modal-hint akzent-pixel">LCD-Grün (pix·el)</span> : (
+            {ui.design === 'pixel' ? <span className="modal-hint akzent-pixel">LCD-Grün (pix·el)</span>
+              : ui.design === 'agency' ? <span className="modal-hint akzent-agency">Violett (Agency)</span> : (
             <div className="accent-swatches">
               {([
                 ['blau', '#4f7cff', 'Blau'],

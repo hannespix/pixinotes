@@ -104,7 +104,7 @@ const link = linkLesen(location.hash);
 const env = import.meta.env as Record<string, string | undefined>;
 const vorgabe: SupabaseKonfig = { url: (env.VITE_SUPABASE_URL ?? '').trim().replace(/\/+$/, ''), key: (env.VITE_SUPABASE_ANON_KEY ?? '').trim() };
 const server: SupabaseKonfig = link?.sb ?? vorgabe;
-if (link?.design === 'pixel') document.documentElement.dataset.design = 'pixel';
+if (link?.design) document.documentElement.dataset.design = link.design;   // pix·el (M507) oder Agency (M547)
 
 interface Gespeichert { jwk?: JsonWebKey; name?: string; n?: number; eigene?: Record<string, string> }
 const SPEICHER = link ? `pixinotes-mit:${link.token}` : '';
