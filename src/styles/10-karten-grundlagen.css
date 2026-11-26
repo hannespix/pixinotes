@@ -44,7 +44,13 @@ html[data-alles-zeigen] .card-shell[data-rollt] > .note-mehr.unten { opacity: 1;
   .react-flow__node:not(.selected):not(:hover) .color-dot { visibility: hidden; }
   /* beim Verbinden zeigen sich die Anschlusspunkte aller Karten (wie bisher) */
   .react-flow:has(.react-flow__connectionline) .react-flow__node .pn-handle { visibility: visible; }
+  /* M544: Rahmen und flüssige Schrift sind innen für den Zeiger durchlässig (Fläche bzw. nur der Text fängt). Wer vom
+     Inhalt zum Anschlusspunkt am Rand fuhr, verließ dabei die Karte — der Punkt verschwand (visibility) und war nicht
+     mehr zu greifen. Hier bleibt er unsichtbar, aber greifbar: Steht der Zeiger auf ihm, zählt die Karte als berührt
+     und er erscheint. */
+  :is(.react-flow__node-frame, .react-flow__node-fluessig):not(.selected):not(:hover) .pn-handle { visibility: visible; opacity: 0; }
 }
+.react-flow__node-fluessig .pn-handle { pointer-events: all; }
 .react-flow__node.selected { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r); }
 /* Prozess-Formen zeichnen sich selbst (Raute/Stadion/…) — der rechteckige
    Node-Container bleibt unsichtbar, sonst liegt eine Schatten-„Pille" um die Form */

@@ -10,6 +10,7 @@ import {
   ReactFlow,
   useReactFlow,
   useStoreApi,
+  useUpdateNodeInternals,
   type EdgeTypes,
   type Node,
   type NodeChange,
@@ -126,10 +127,23 @@ const KARTEN_LADER = {
   pixi: () => import('./nodes/PixiCard').then((m) => m.PixiCard),
 } satisfies Record<string, () => Promise<React.ComponentType<any>>>;
 
+/**
+ * M544: Nach dem Nachladen die Anschlusspunkte neu vermessen. React Flow merkt sich je Karte, wo ihre Anschlusspunkte
+ * liegen, und misst nur neu, wenn sich die Größe ändert. Der Platzhalter hat keine Anschlusspunkte und dieselbe Größe
+ * wie die fertige Karte (Breite/Höhe stehen fest) — von solchen Karten ließ sich darum kein Pfeil ziehen (Kanban,
+ * Diagramm, Tabelle, Gantt, Kalender, Form, HTML-Tool, flüssige Schrift …), Pfeile zu ihnen gingen. Steht im selben
+ * Suspense wie die Karte: er hängt sich erst ein, wenn sie da ist.
+ */
+function AnschluesseVermessen({ id }: { id: string }) {
+  const vermessen = useUpdateNodeInternals();
+  useEffect(() => { vermessen(id); }, [id, vermessen]);
+  return null;
+}
+
 const spaet = (laden: () => Promise<React.ComponentType<any>>): React.ComponentType<any> => {
   const Teil = nachLazy(() => laden().then((C) => ({ default: C })));
-  const Spaet = (props: object) => (
-    <Suspense fallback={<div className="karte-laedt" aria-hidden="true" />}><Teil {...props} /></Suspense>
+  const Spaet = (props: { id: string }) => (
+    <Suspense fallback={<div className="karte-laedt" aria-hidden="true" />}><Teil {...props} /><AnschluesseVermessen id={props.id} /></Suspense>
   );
   return Spaet;
 };
