@@ -40199,8 +40199,11 @@ var leereBubbles = () => ({
 });
 function bubblesDaten(d) {
   const a = d?.abstimmung;
+  const ki = kiVon(d?.ki);
+  const { ki: _ki, ...rest } = d ?? {};
   return {
-    ...d ?? {},
+    ...rest,
+    ...ki ? { ki } : {},
     title: typeof d?.title === "string" ? d.title : "Ideen",
     ideen: d?.ideen && typeof d.ideen === "object" ? d.ideen : {},
     stimmen: d?.stimmen && typeof d.stimmen === "object" ? d.stimmen : {},
@@ -40208,6 +40211,12 @@ function bubblesDaten(d) {
     abstimmung: a && (a.phase === "aus" || a.phase === "offen" || a.phase === "fertig") ? { phase: a.phase, punkte: Math.min(10, Math.max(1, Math.round(Number(a.punkte) || 3))), t: Number(a.t) || 0 } : { phase: "aus", punkte: 3, t: 0 },
     regeln: regelnVon(d?.regeln)
   };
+}
+function kiVon(k) {
+  if (!k || typeof k !== "object") return void 0;
+  const t2 = Number(k.t);
+  if (!Number.isFinite(t2) || t2 <= 0) return void 0;
+  return { an: k.an === true, t: t2, ...typeof k.von === "string" && k.von ? { von: k.von.slice(0, 80) } : {} };
 }
 function regelnVon(r) {
   return { ...r?.zu ? { zu: true } : {}, ...r?.anonym ? { anonym: true } : {}, ...r?.verdeckt ? { verdeckt: true } : {}, ...r?.still ? { still: true } : {}, t: Number(r?.t) || 0 };

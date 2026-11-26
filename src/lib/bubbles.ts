@@ -36,6 +36,14 @@ export interface BubbleAbstimmung { phase: 'aus' | 'offen' | 'fertig'; punkte: n
  */
 export interface BubbleRegeln { zu?: boolean; anonym?: boolean; verdeckt?: boolean; still?: boolean; t: number }
 export type BubbleSchritt = 'sammeln' | 'gruppieren' | 'abstimmen' | 'ergebnis';
+/**
+ * M543: Die KI gruppiert gerade — damit auch die anderen Geräte die Blasen kreisen sehen. Ein Eintrag mit Zeitstempel
+ * wie die Regeln (die jüngste Fassung gewinnt als Ganzes, bubblesMischen). `von` ist die Sitzung des rechnenden Geräts
+ * (nicht die Person: in einer Gruppe teilen sich alle eine Kennung). Wer den Eintrag sieht, zeigt den Wirbel höchstens
+ * KI_WIRBEL_MS lang — ein Gerät, das mitten im Rechnen abstürzt, hinterlässt so keinen ewigen Wirbel.
+ */
+export interface BubbleKi { an: boolean; t: number; von?: string }
+export const KI_WIRBEL_MS = 60_000;
 
 export interface BubblesData {
   title: string;
@@ -47,6 +55,7 @@ export interface BubblesData {
   gruppen: Record<string, BubbleGruppe>;
   abstimmung: BubbleAbstimmung;
   regeln?: BubbleRegeln;
+  ki?: BubbleKi;
   [key: string]: unknown;
 }
 
@@ -60,8 +69,11 @@ export const leereBubbles = (): Pick<BubblesData, 'ideen' | 'stimmen' | 'gruppen
 /** Unvollständige oder alte Daten auf die volle Form bringen (nie werfen — die Karte soll immer aufgehen) */
 export function bubblesDaten(d: Partial<BubblesData> | undefined): BubblesData {
   const a = d?.abstimmung;
+  const ki = kiVon(d?.ki);
+  const { ki: _ki, ...rest } = d ?? {};
   return {
-    ...(d ?? {}),
+    ...rest,
+    ...(ki ? { ki } : {}),
     title: typeof d?.title === 'string' ? d.title : 'Ideen',
     ideen: d?.ideen && typeof d.ideen === 'object' ? d.ideen : {},
     stimmen: d?.stimmen && typeof d.stimmen === 'object' ? d.stimmen : {},
@@ -71,6 +83,13 @@ export function bubblesDaten(d: Partial<BubblesData> | undefined): BubblesData {
       : { phase: 'aus', punkte: 3, t: 0 },
     regeln: regelnVon(d?.regeln),
   };
+}
+/** M543: der KI-Eintrag in fester Gestalt — oder nichts (fehlt, kaputt) */
+function kiVon(k: Partial<BubbleKi> | undefined): BubbleKi | undefined {
+  if (!k || typeof k !== 'object') return undefined;
+  const t = Number(k.t);
+  if (!Number.isFinite(t) || t <= 0) return undefined;
+  return { an: k.an === true, t, ...(typeof k.von === 'string' && k.von ? { von: k.von.slice(0, 80) } : {}) };
 }
 function regelnVon(r: Partial<BubbleRegeln> | undefined): BubbleRegeln {
   return { ...(r?.zu ? { zu: true } : {}), ...(r?.anonym ? { anonym: true } : {}), ...(r?.verdeckt ? { verdeckt: true } : {}), ...(r?.still ? { still: true } : {}), t: Number(r?.t) || 0 };
@@ -114,9 +133,10 @@ function tabelleMischen<T extends { t: number }>(a: Record<string, T> | undefine
  * Zwei Fassungen der Inhalte einer Bubbles-Karte verlustfrei vereinigen. Kommutativ, assoziativ, idempotent:
  * mischen(a, b) = mischen(b, a), und mischen(a, a) = a.
  */
-export function bubblesMischen(a0: Partial<BubblesData> | undefined, b0: Partial<BubblesData> | undefined): Pick<BubblesData, 'ideen' | 'stimmen' | 'gruppen' | 'abstimmung'> & { regeln?: BubbleRegeln } {
+export function bubblesMischen(a0: Partial<BubblesData> | undefined, b0: Partial<BubblesData> | undefined): Pick<BubblesData, 'ideen' | 'stimmen' | 'gruppen' | 'abstimmung'> & { regeln?: BubbleRegeln; ki?: BubbleKi } {
   const a = bubblesDaten(a0); const b = bubblesDaten(b0);
   const regeln = juenger(a.regeln, b.regeln)!;
+  const ki = juenger(a.ki, b.ki);
   return {
     ideen: tabelleMischen(a.ideen, b.ideen),
     stimmen: tabelleMischen(a.stimmen, b.stimmen),
@@ -124,6 +144,8 @@ export function bubblesMischen(a0: Partial<BubblesData> | undefined, b0: Partial
     abstimmung: juenger(a.abstimmung, b.abstimmung)!,
     // Regeln nur mitführen, wenn je welche gesetzt wurden (alte Karten bleiben, wie sie sind)
     ...(regeln.t > 0 ? { regeln } : {}),
+    // M543: „KI gruppiert" — jüngster Eintrag gewinnt (nur, wenn eine Seite je einen hatte)
+    ...(ki ? { ki } : {}),
   };
 }
 

@@ -159,3 +159,50 @@ export function fangen(k: Kasten, andere: Kasten[], schwelle: number): { dx: num
   const gesehen = new Set<string>();
   return { dx, dy, gx: tx.length > 0, gy: ty.length > 0, linien, abstaende: abstaende.filter((a) => { const s = `${a.art}${Math.round(a.von)}:${Math.round(a.bis)}:${Math.round(a.quer)}`; if (gesehen.has(s)) return false; gesehen.add(s); return true; }) };
 }
+
+/** M542: Welche Kanten bewegen sich beim Ändern der Größe? (Vergleich mit dem Kasten beim Greifen) */
+export interface Kanten { l: boolean; r: boolean; o: boolean; u: boolean }
+
+/**
+ * M542: Fangen beim Ändern der Größe. Nur die Kanten, die sich bewegen, rasten an Anfang, Mitte und Ende der anderen
+ * Karten ein — jede für sich, die gegenüberliegende Kante bleibt stehen. `min`: Das Einrasten macht den Kasten nie
+ * kleiner als die Mindestgröße der Karte (dann bleibt die Kante frei). Linien wie beim Ziehen.
+ */
+export function groesseFangen(k: Kasten, kanten: Kanten, andere: Kasten[], schwelle: number, min: { w: number; h: number }): { k: Kasten; linien: Fanglinie[] } {
+  const naechste = (wert: number, waagerecht: boolean): number | null => {
+    let beste: number | null = null; let d = schwelle + 1e-6;
+    for (const o of andere) {
+      for (const s of waagerecht ? stellen(o.x, o.w) : stellen(o.y, o.h)) {
+        const dd = Math.abs(s - wert);
+        if (dd < d) { d = dd; beste = s; }
+      }
+    }
+    return beste;
+  };
+  let { x, y, w, h } = k;
+  const gefangen: Array<['v' | 'h', number]> = [];
+  if (kanten.l) {
+    const z = naechste(x, true);
+    if (z !== null && x + w - z >= min.w) { w = x + w - z; x = z; gefangen.push(['v', z]); }
+  } else if (kanten.r) {
+    const z = naechste(x + w, true);
+    if (z !== null && z - x >= min.w) { w = z - x; gefangen.push(['v', z]); }
+  }
+  if (kanten.o) {
+    const z = naechste(y, false);
+    if (z !== null && y + h - z >= min.h) { h = y + h - z; y = z; gefangen.push(['h', z]); }
+  } else if (kanten.u) {
+    const z = naechste(y + h, false);
+    if (z !== null && z - y >= min.h) { h = z - y; gefangen.push(['h', z]); }
+  }
+  const linien: Fanglinie[] = gefangen.map(([art, pos]) => {
+    // die Linie reicht über den Kasten und alle Karten, die an derselben Stelle liegen
+    let von = art === 'v' ? y : x; let bis = art === 'v' ? y + h : x + w;
+    for (const a of andere) {
+      if (!(art === 'v' ? stellen(a.x, a.w) : stellen(a.y, a.h)).some((s) => Math.abs(s - pos) < 0.5)) continue;
+      von = Math.min(von, art === 'v' ? a.y : a.x); bis = Math.max(bis, art === 'v' ? a.y + a.h : a.x + a.w);
+    }
+    return { art, pos, von, bis };
+  });
+  return { k: { x, y, w, h }, linien };
+}
