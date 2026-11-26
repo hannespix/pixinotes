@@ -371,40 +371,41 @@
   --agency-fenster-schatten: 0 20px 100px rgba(34, 38, 25, 0.19);
 }
 :root[data-design='agency'][data-theme='dark'] {
+  /* M551: Warmes Anthrazit für Leinwand, aufgelegte Flächen und Karten. */
   --agency-lime: #e8ffb9;
   --agency-fokus: #a47dff;       /* ≥ 3:1 auf allen dunklen Flächen */
-  --agency-hover: #262822;
-  --agency-rand-hover: #6b4fc8;
-  --agency-spalte: #191a17;
-  --agency-spalte-rand: #2a2c27;
-  --agency-seg: #161714;
-  --agency-seg-rand: #2d2f2a;
+  --agency-hover: var(--surface-2);
+  --agency-rand-hover: #9377e0;
+  --agency-spalte: #2e3129;
+  --agency-spalte-rand: #43473c;
+  --agency-seg: var(--surface-3);
+  --agency-seg-rand: var(--border-soft);
   --agency-seg-schrift: #b4b8ad;
-  --agency-hinweis: #262822;
-  --agency-abdunkler: rgba(0, 0, 0, 0.55);
-  --bg: #121311;
-  --ink: #ecede8;              /* 16:1 */
-  --muted: #a4a89e;            /* 7,6:1 auf der Fläche, 6:1 auf --surface-2 */
-  --accent: #9a6bff;           /* 5:1 auf der Fläche */
-  --accent-strong: #c3aaff;    /* 9:1 auf der Fläche, 6,5:1 auf --accent-soft über der Karte */
+  --agency-hinweis: var(--surface-2);
+  --agency-abdunkler: rgba(20, 23, 18, 0.46);
+  --bg: #282b25;
+  --ink: #ecede8;              /* 12,2:1 auf der Leinwand */
+  --muted: #b4b8ad;            /* 7,1:1 auf der Leinwand, 5,4:1 auf --surface-2 */
+  --accent: #9a6bff;           /* 3,6:1 auf --surface, für Punkt und Markierungen */
+  --accent-strong: #c3aaff;    /* Linkschrift, 5,5:1 auf --surface-2 */
   --accent-soft: rgba(137, 81, 255, 0.2);
   --accent-fill: #641dff;      /* Weiß darauf 7,9:1 */
-  --surface: #1b1c19;
-  --surface-2: #262822;
-  --surface-3: #161714;
-  --surface-card: #1d1e1b;
+  --surface: #30332c;
+  --surface-2: #3b3e35;
+  --surface-3: #292c26;
+  --surface-card: #33362f;
   --surface-dim: rgba(236, 237, 232, 0.07);
   --border: rgba(236, 237, 232, 0.24);
-  --border-soft: #2d2f2a;
-  --feld-rand: #7b7f75;        /* ≥ 3:1 auf Grund, Karte und --surface-2 */
-  --edge: #80847b;
-  --edge-head: #80847b;
-  --card-shadow: 0 0 0 1px #2d2f2a;
-  --card-shadow-lift: 0 0 0 1px var(--agency-rand-hover), 0 8px 20px rgba(0, 0, 0, 0.45);
-  --zieh-schatten: 0 0 0 1px var(--agency-rand-hover), 0 22px 60px rgba(0, 0, 0, 0.55), 0 5px 14px rgba(0, 0, 0, 0.4);
-  --chrome-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
-  --pop-shadow: 0 5px 14px rgba(0, 0, 0, 0.4), 0 22px 60px rgba(0, 0, 0, 0.5);
-  --agency-fenster-schatten: 0 20px 100px rgba(0, 0, 0, 0.6);
+  --border-soft: #474b40;
+  --feld-rand: #909486;        /* ≥ 3:1 auf Grund, Karte und --surface-2 */
+  --edge: #909486;
+  --edge-head: #909486;
+  --card-shadow: 0 0 0 1px var(--border-soft);
+  --card-shadow-lift: 0 0 0 1px var(--agency-rand-hover), 0 8px 20px rgba(0, 0, 0, 0.35);
+  --zieh-schatten: 0 0 0 1px var(--agency-rand-hover), 0 22px 60px rgba(0, 0, 0, 0.42), 0 5px 14px rgba(0, 0, 0, 0.3);
+  --chrome-shadow: 0 1px 4px rgba(0, 0, 0, 0.28);
+  --pop-shadow: 0 5px 14px rgba(0, 0, 0, 0.3), 0 22px 60px rgba(0, 0, 0, 0.4);
+  --agency-fenster-schatten: 0 20px 100px rgba(0, 0, 0, 0.48);
 }
 /* Haftnotizen & Prozess-Formen bleiben helles „Papier" — Text darauf dunkel (M515: eine Form mit dunkler eigener
    Füllung setzt --shape-schrift, auch auf der Folie) */

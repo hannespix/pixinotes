@@ -175,6 +175,7 @@ export function HelpOverlay() {
             <section id="help-neu">
               <p>Die letzten Ausbaustufen in Kürze, neueste zuerst. Welche Fassung gerade läuft, steht am Fuß der Hilfe.</p>
               <ul><NeuesteZuerst>
+                <li><b>Langsamere Wortmarke und helleres Agency Dunkel (M551)</b> Das „p“ von „pixi“ wird deutlich voller, während das „x“ und das letzte „i“ schlanker werden. Die Bewegung fließt langsamer zurück. Leinwand, Karten und Kopfleiste stehen in warmem Anthrazit.</li>
                 <li><b>„pixi · notes“ in Agency (M550)</b> „pixi“ atmet von selbst in wechselnden Wellen. Der violette Punkt und das leichte „notes“ stehen still. Mit „Bewegung reduzieren“ oder „Besser lesbar“ siehst du die ruhende Wortmarke.</li>
                 <li><b>Neue Wortmarke und Mauszeiger in Agency (M549)</b> PixiNotes steht in Readex Pro. Beim Darüberfahren fließt mehr Tinte in die einzelnen Buchstaben. Beim Wegfahren läuft die Umformung zurück. In den Leisten wächst der Mauszeiger über Knöpfen zu einem kontrastreichen Kreis. Mit „Bewegung reduzieren“ oder „Besser lesbar“ steht die Wortmarke still und der Systemzeiger bleibt sichtbar.</li>
                 <li><b>Eigenes Zeichen für Agency (M548)</b> Agency bekam eine eigene Marke aus PX und „NOTES“ mit flüssiger Animation. M549 hat die Form und die Bewegung überarbeitet.</li>

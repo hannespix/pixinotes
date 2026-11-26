@@ -98,7 +98,7 @@ html[data-lesbar='an'] .agency-pixi > svg { display: none; }
 
 /* ---------- Fläche ---------- */
 html[data-design='agency'] .react-flow { --xy-background-pattern-color: #d9dbd3; }
-html[data-design='agency'][data-theme='dark'] .react-flow { --xy-background-pattern-color: #2c2e29; }
+html[data-design='agency'][data-theme='dark'] .react-flow { --xy-background-pattern-color: #41453b; }
 
 /* ---------- Karten ---------- */
 /* Auswahl: violetter Ring wie der Fokus in vave.log */

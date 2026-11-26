@@ -190,7 +190,7 @@ console.log('════ A: Die Konturen von pixi verformen sich ════')
       const buehne = document.createElement('div');
       buehne.id = 'logo-buehne';
       buehne.className = 'logo';
-      buehne.style.cssText = 'position:fixed;left:35px;top:120px;z-index:9999;padding:22px 38px;background:var(--surface);color:var(--ink)';
+      buehne.style.cssText = 'position:fixed;left:35px;top:120px;z-index:9999;height:auto;padding:22px 38px;background:var(--surface);color:var(--ink)';
       buehne.appendChild(e);
       document.body.appendChild(buehne);
     });

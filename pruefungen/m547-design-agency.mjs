@@ -266,7 +266,7 @@ for (const dunkel of [false, true]) {
   console.log(`════ E: Fenster Agency ${name} ════`);
   const { ctx, P } = await seite(ALLE(), { dunkel });
   await P.waitForTimeout(800);
-  if (dunkel) pruefe('E dunkel: eigener Grund (#121311), Akzent hell genug', (await grund(P)) === 'rgb(18, 19, 17)' && (await P.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim())) === '#9a6bff', await grund(P));
+  if (dunkel) pruefe('E dunkel: Anthrazit (#282b25), Akzent hell genug', (await grund(P)) === 'rgb(40, 43, 37)' && (await P.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim())) === '#9a6bff', await grund(P));
   await foto(P, `agency-${name}-board`);
   const zu = async () => { await P.keyboard.press('Escape'); await P.waitForTimeout(350); await P.keyboard.press('Escape'); await P.waitForTimeout(300); };
   const fenster = async (titel, auf, sel = 'body', { rand = false } = {}) => {
