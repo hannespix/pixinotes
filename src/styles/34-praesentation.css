@@ -110,12 +110,18 @@
 .slide-kanban .kanban-addcol, .slide-kanban .kanban-col-x { opacity: 1; }
 /* Mermaid: großes Diagramm, Code zuschaltbar */
 .slide-mermaid { width: 100%; height: 100%; display: flex; flex-direction: column; }
-.slide-mermaid .mermaid-head { font-size: 15px; }
+/* M545: Kopfzeile fest hoch — und unten ein gleich hoher, leerer Streifen (::after). So liegt die Mitte der
+   Diagramm-Fläche genau auf der Mitte der Folie, statt um die halbe Kopfzeile tiefer. */
+.slide-mermaid .mermaid-head { font-size: 15px; flex: none; height: 32px; margin: 0 0 6px; }
+.slide-mermaid::after { content: ''; flex: none; height: 38px; }
 .slide-mermaid-split { flex: 1; display: flex; gap: 12px; min-height: 0; }
 .slide-mermaid .mermaid-code { flex: 0 0 34%; font-size: 14px; min-height: 0; }
 .slide-mermaid .mermaid-preview { flex: 1; min-height: 0; overflow: auto; display: flex; align-items: center; justify-content: center; }
-.slide-mermaid .mermaid-svg { width: 100%; }
-.slide-mermaid .mermaid-svg svg { max-width: 100%; max-height: calc(62vh / var(--pn-anz, 1)); height: auto; }
+/* M545: Das Diagramm füllt die Fläche und steht in ihrer Mitte (die viewBox zentriert und hält das Seitenverhältnis,
+   wie auf der Karte, M389). Vorher setzte Mermaid ein eigenes `max-width` an das SVG – es blieb in seiner
+   natürlichen Größe am linken Rand eines folienbreiten Kastens hängen. */
+.slide-mermaid .mermaid-svg { width: 100%; height: 100%; min-height: 0; }
+.slide-mermaid .mermaid-svg svg { display: block; width: 100% !important; height: 100% !important; max-width: 100% !important; max-height: 100%; }
 
 /* Hinweis in der Zeichen-Palette — auf schmalen Screens ausblenden */
 

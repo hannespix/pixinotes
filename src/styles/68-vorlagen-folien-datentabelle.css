@@ -105,6 +105,10 @@
   .presenter-slide.editable > .slide-modul { height: min(calc(78vh / var(--pn-anz, 1)), 100%); }
   .slide-week .week-wrap, .slide-time .time-wrap { padding: 10px 10px 12px; }
   .presenter-slide.editable > .slide-modul.slide-sheet, .presenter-slide.editable > .slide-modul.slide-minutes { padding: 10px 10px 8px; }
+  /* M545: Die Zeiterfassung ist auf dem Board mindestens 380 Punkte breit – auf dem Telefon ragten Ansichtswahl und
+     Zeilen seitlich über die Folie hinaus (abgeschnitten, Folie rollte quer). Hier brechen sie um. */
+  .slide-time :is(.time-nav, .time-row) { flex-wrap: wrap; }
+  .slide-time .time-note { flex-basis: 100%; }
 }
 
 /* ---------- M381: englische Oberfläche ---------- */
@@ -290,6 +294,10 @@ html[data-alles-zeigen] .react-flow__node.selected > .card-shell[data-winkel] { 
    editierbaren Folien über Auto-Ränder, damit hoher Inhalt oben erreichbar bleibt */
 .presenter-slide:not(.editable):not(.app):not(.dokument) { display: flex; align-items: flex-start; justify-content: flex-start; }
 .presenter-slide:not(.editable):not(.app):not(.dokument) > * { margin: auto; min-width: 0; max-width: 100%; }
+/* M545: … und zwar der sichtbare Inhalt: Außenabstände des ersten und letzten Absatzes (Betreff, Absatz der Mail,
+   Zwischentitel eines Rahmens mit eigenem margin-top) zählten mit und schoben ihn bis zu 14 Punkte aus der Mitte */
+.presenter-slide:not(.editable):not(.app):not(.dokument) > div:not([class]) > :first-child { margin-top: 0 !important; }
+.presenter-slide:not(.editable):not(.app):not(.dokument) > div:not([class]) > :last-child { margin-bottom: 0 !important; }
 /* „Einpassen" und „Volle Breite": Der Platz des Rollbalkens bleibt frei (sonst änderte sein Erscheinen die Stufe) */
 /* Ein Bild ist nie breiter als die Folie (die Angabe am Bild selbst, 600 Punkte, gewann am Telefon und schob es seitlich hinaus) */
 .presenter-slide:not(.editable):not(.app):not(.dokument) > div > img { max-width: min(100%, 600px) !important; display: block; }
