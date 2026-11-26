@@ -23,8 +23,8 @@ import { hinweiseScheibe } from './store/hinweise';
  * selektoren sowie je eine Scheibe für ansicht, struktur, karten, kanten, zeichnen, kommentare, abgleich). Diese Datei
  * bleibt der eine Einstieg: Sie setzt den Speicher zusammen und exportiert dieselben Namen wie zuvor.
  */
-export { FOLIEN_SEITE, KOMMENTAR_LAGE } from './store/typen';
-export type { Stroke, BoardDoc, CommentThread, KommentarLage, Tool, CardTemplate, AiProvider, AiSettings, Project, BoardSortierung, EbeneLoeschen, Space } from './store/typen';
+export { FOLIEN_SEITE } from './store/typen';
+export type { Stroke, BoardDoc, CommentThread, Tool, CardTemplate, AiProvider, AiSettings, Project, BoardSortierung, EbeneLoeschen, Space } from './store/typen';
 export { anhaengeMitnehmen } from './store/karten';
 export { hinweisMitKnopf, hinweisKnopfDruecken } from './store/hinweise';
 export { selectActiveBoard, selectNurLesen, useNurLesen, useKarteFest } from './store/selektoren';
