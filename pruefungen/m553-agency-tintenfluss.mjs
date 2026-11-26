@@ -1,4 +1,4 @@
-// M553: Die Tinte wandert innerhalb des p von einer Seite zur anderen.
+// M553: Die Tinte wandert im p von links nach rechts, seit M554 über der festen Kontur.
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -16,42 +16,41 @@ try {
   const seite = await browser.newPage();
   await seite.setContent('<span id="marke">pixi</span>');
   await seite.addScriptTag({ content: modul.outputFiles[0].text });
-  const { grund, links, rechts } = await seite.evaluate(() => {
-    // Die echte SVG-Animation im Stand gezielt auf drei Phasen setzen.
+  const { frueh, spaet } = await seite.evaluate(() => {
     Object.defineProperty(document, 'hidden', { configurable: true, value: true });
     const marke = document.querySelector('#marke');
     const aufraeumen = window.AgencyLogo.agencyBewegen(marke);
     const svg = marke.querySelector('svg');
-    const p = svg.querySelector('path');
+    const kontur = svg.querySelector('g[data-grundschrift] path');
+    const p = svg.querySelector('g[data-tinte] path');
     const dauer = parseFloat(p.querySelector('animate').getAttribute('dur')) / 1000;
-    const { x, y, width, height } = p.getBBox();
+    const { x, y, width, height } = kontur.getBBox();
     const mitte = x + width / 2;
     const punkt = new DOMPoint();
 
-    function tinte(lage) {
+    function ueberschuss(lage) {
       svg.setCurrentTime(lage * dauer);
       let links = 0;
       let rechts = 0;
-      for (punkt.y = y + height * 0.15; punkt.y < y + height * 0.72; punkt.y += 5) {
-        for (punkt.x = x - 100; punkt.x < x + width + 100; punkt.x += 5) {
-          if (p.isPointInFill(punkt)) {
-            if (punkt.x < mitte) links++;
-            else rechts++;
-          }
+      for (punkt.y = y; punkt.y < y + height; punkt.y += 5) {
+        for (punkt.x = x; punkt.x < x + width; punkt.x += 5) {
+          if (!p.isPointInFill(punkt) || kontur.isPointInFill(punkt)) continue;
+          if (punkt.x < mitte) links++;
+          else rechts++;
         }
       }
       return { links, rechts };
     }
 
-    const messung = { grund: tinte(0), links: tinte(0.18), rechts: tinte(0.49) };
+    const messung = { frueh: ueberschuss(0.17), spaet: ueberschuss(0.5) };
     aufraeumen();
     return messung;
   });
 
-  assert.ok(links.links > grund.links * 1.18 && links.rechts < grund.rechts * 0.94,
-    `Das p sammelt zuerst links Tinte. ${JSON.stringify({ grund, links })}`);
-  assert.ok(rechts.rechts > grund.rechts * 1.24 && rechts.links < links.links * 0.95,
-    `Die Tinte wandert danach auf die rechte Seite des p. ${JSON.stringify({ links, rechts })}`);
+  assert.ok(frueh.links > frueh.rechts * 1.5 && frueh.links > 80,
+    `Das p sammelt zuerst links zusätzliche Tinte. ${JSON.stringify(frueh)}`);
+  assert.ok(spaet.rechts > spaet.links * 1.5 && spaet.rechts > 80 && spaet.links < frueh.links,
+    `Die zusätzliche Tinte wandert anschließend nach rechts. ${JSON.stringify({ frueh, spaet })}`);
   console.log('M553: Die Tinte im p wandert sichtbar von links nach rechts.');
 } finally {
   await browser.close();
