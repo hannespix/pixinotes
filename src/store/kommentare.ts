@@ -7,6 +7,7 @@ import { uid } from '../types';
 import { offeneSeite } from '../lib/pdfSeiten';
 import type { BoardState, Setzen, Holen, AufsOffene } from './typen';
 import { selectActiveBoard } from './selektoren';
+import { lageSetzen, lageVon } from './verlauf';
 
 
 /** M480: Teil des Board-Speichers – Kommentar-Pins (M148) und Nachschlagen. */
@@ -75,6 +76,28 @@ export function kommentareScheibe(set: Setzen, get: Holen, patchActive: AufsOffe
       patchActive((b) => ({
         comments: (b.comments ?? []).map((c) => (c.id === threadId ? { ...c, resolved: !c.resolved } : c)),
       })),
+
+    /**
+     * M546: Pin bzw. Blase eines Gesprächs verschieben. Ein Rückgängig-Schritt je Verschieben — der Schritt merkt sich
+     * die Lage davor (`kommentarOrte`), weil Gespräche sonst nicht zum Verlauf gehören (M388). Zahlen auf Zehntel
+     * (Seitenpunkte) bzw. Tausendstel (Anteile an der Karte) gerundet, wie beim Setzen eines Pins (FileCard).
+     */
+    setCommentLage: (threadId, lage) => {
+      const alt = (selectActiveBoard(get()).comments ?? []).find((c) => c.id === threadId);
+      if (!alt) return;
+      const rund: typeof lage = {};
+      for (const [k, v] of Object.entries(lage) as [keyof typeof lage, number | null | undefined][]) {
+        if (v === null || v === undefined) rund[k] = null;
+        else if (Number.isFinite(v)) rund[k] = k === 'kx' || k === 'ky' ? Math.round(v * 1000) / 1000 : Math.round(v * 10) / 10;
+      }
+      const neu = lageSetzen(alt, rund);
+      if (neu === alt) return;
+      const vorher = get().past;
+      get().pushHistory();
+      const past = get().past;
+      if (past !== vorher && past.length) set({ past: [...past.slice(0, -1), { ...past[past.length - 1], kommentarOrte: { [threadId]: lageVon(alt) } }] });
+      patchActive((b) => ({ comments: (b.comments ?? []).map((c) => (c.id === threadId ? lageSetzen(c, rund) : c)) }));
+    },
 
     removeCommentThread: (threadId) => {
       patchActive((b) => ({ comments: (b.comments ?? []).filter((c) => c.id !== threadId) }));

@@ -177,8 +177,15 @@ export function strichVonAussen(s: Strich): Strich {
 /** M522: Gespräch von außen — Beiträge mit Verfasser, Text und Zeitpunkt als Text; dasselbe Gespräch, wenn alles stimmt */
 export function gespraechVonAussen(c: Gespraech): Gespraech {
   const gut = (m: unknown): boolean => istSatz(m) && textFeld(m.author) && textFeld(m.text) && textFeld(m.at);
-  return (c.msgs as unknown[]).every(gut) ? c : { ...c, msgs: (c.msgs as unknown[]).filter(gut) as Gespraech['msgs'] };
+  let aus = (c.msgs as unknown[]).every(gut) ? c : { ...c, msgs: (c.msgs as unknown[]).filter(gut) as Gespraech['msgs'] };
+  // M546: Lage von Pin und Blase (Seite, Seitenpunkte, Versatz, Anteile an der Karte) nur als endliche Zahlen
+  for (const k of LAGE) {
+    const v: unknown = aus[k];
+    if (v !== undefined && !endlich(v)) { if (aus === c) aus = { ...c }; delete aus[k]; }
+  }
+  return aus;
 }
+const LAGE = ['seite', 'px', 'py', 'bx', 'by', 'kx', 'ky'] as const;
 
 /**
  * M522: Ein ganzes Board prüfen und — wenn alles stimmt — GENAU dieses Objekt zurückgeben (Reihenfolge der Felder
