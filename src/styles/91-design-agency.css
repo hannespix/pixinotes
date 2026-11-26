@@ -9,7 +9,7 @@
        Wolke, Fenster 17 px rund mit violettem Etikett über dem Titel, Abdunkler mit leichter Unschärfe.
      · Umschalter als Segment auf hellem Grund (gewählt = weiße Pille mit violetter Schrift), Knöpfe mit Hub beim Zeigen,
        Fokusring 3 px #8951ff, Markierung in Lime, Hinweise warm-schwarz mit „Rückgängig" in Lime.
-     · die Wortmarke „PIXI · NOTES" wie „VAVE · LOG", das kräftige Wort atmet (lib/agencyLogo.ts).
+     · die Marke: Zeichen „PX" mit zwei i-Punkten, über das schwarzes Wasser läuft (M548, lib/agencyLogo.ts).
    Alles hängt an `html[data-design='agency']`; ohne das Attribut greift keine Regel und die Schrift wird nie geladen.
    Leistung (M491): keine :has()-Selektoren, keine neuen Animationen auf dem Board; der Hub der Knöpfe ist ein
    transform beim Zeigen (wie in vave.log, nicht auf Karten). */
@@ -48,17 +48,17 @@ html[data-design='agency']:not([data-lesbar='an']) .modal-section h3:not(.modal-
 html[data-design='agency']:not([data-lesbar='an']) .fluessig-card canvas { font-family: var(--font-agency); }
 html[data-design='agency'] ::selection { background: var(--agency-lime); color: #1b1b1b; }
 
-/* ---------- Wortmarke „PIXI · NOTES" (wie „VAVE · LOG") ---------- */
+/* ---------- Marke: Zeichen „PX" mit zwei i-Punkten + „NOTES" (M548, lib/agencyLogo.ts) ---------- */
 html[data-design='agency'] .logo { gap: 0; letter-spacing: 0; color: var(--ink); }
-.agency-marke { display: inline-flex; align-items: center; line-height: 1; }
-/* das kräftige Wort: Gewicht kommt je Buchstabe aus lib/agencyLogo.ts (500…700), Breite fest */
-.agency-wort { display: inline-flex; font-size: 22px; font-weight: 560; }
-.agency-b { display: inline-block; text-align: center; }
-.agency-punkt { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex: none; margin: 0 4px 0 5px; }
-.agency-zusatz { font-size: 16px; font-weight: 400; letter-spacing: -0.055em; }
+/* Grundlinie des Zeichens (Unterkante des SVG) auf der Grundlinie von „NOTES" */
+.agency-marke { display: inline-flex; align-items: baseline; line-height: 1; gap: 8px; }
+/* Platz in Zeichengröße, solange das Modul lädt; Versalhöhe 22 px, Breite 171/100 davon */
+.agency-zeichen { display: inline-block; width: 37.6px; height: 22px; flex: none; }
+.agency-px { display: block; width: 100%; height: 100%; overflow: visible; }
+.agency-zusatz { font-size: 14px; font-weight: 400; letter-spacing: 0.04em; }
 @media (max-width: 640px) {
-  .agency-wort { font-size: 20px; }
-  .agency-zusatz { font-size: 14px; }
+  .agency-zeichen { width: 34.2px; height: 20px; }
+  .agency-zusatz { font-size: 13px; }
 }
 
 /* ---------- Fläche ---------- */

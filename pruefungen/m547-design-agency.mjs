@@ -10,9 +10,8 @@
  *      der Maus violett umrissen; Kanban-Spalte 13 px auf #f0f2eb, Ticket 9 px; Umschalter als Segment (8/5 px, gewählt
  *      weiß mit violetter Schrift); Fenster 17 px mit Etikett „PIXINOTES" über dem Titel (500, −0,045 em); Felder 7 px;
  *      Kontextmenü mit weicher Wolke; Hinweis (Toast) warm-schwarz, 8 px; Fokusring 3 px #8951ff.
- *   D  Wortmarke „PIXI · NOTES": das kräftige Wort bewegt sich (Gewichte und Pixel ändern sich über die Zeit, als Welle:
- *      die Buchstaben sind zeitweise verschieden schwer); steht still bei reduzierter Bewegung, bei „Besser lesbar" und
- *      während eines Zugs auf dem Board; danach geht es weiter.
+ *   D  Marke (seit M548 das Zeichen „PX" mit Wasser, Einzelheiten in m548-agency-logo.mjs): steht mit „NOTES", das
+ *      Wasser bewegt sich; steht still bei „Besser lesbar".
  *   E  Kontrast-Scan (werkzeug/kontrast-pruefen.mjs) hell und dunkel: Karten (Notiz mit allen Editor-Farben, Kanban,
  *      Protokoll, Tabelle) ruhend/ausgewählt/Fokus, Board, Einstellungen (dazu Ränder und Fokusringe ≥ 3:1), Hilfe,
  *      Suche, Kontextmenü — keine Schrift unter 4,5:1. Dunkel: eigener Grund.
@@ -97,11 +96,11 @@ const grund = (P) => P.evaluate(() => getComputedStyle(document.querySelector('.
 const vorlieben = (P) => P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-einstellungen') || '{}').ui ?? {});
 const stil = (P, sel, prop, pseudo = null) => P.evaluate(([sel, prop, pseudo]) => { const e = document.querySelector(sel); return e ? getComputedStyle(e, pseudo)[prop] : null; }, [sel, prop, pseudo]);
 const readex = (u) => /readex/i.test(u);
-/** Gewichte der vier Buchstaben der Wortmarke, in der Seite über `ms` gesammelt (alle 60 ms) */
-const gewichteSammeln = (P, ms) => P.evaluate((ms) => new Promise((fertig) => {
+/** M548: Form des Wassers über dem Zeichen (ein Pfad), in der Seite über `ms` gesammelt (alle 60 ms) */
+const wasserSammeln = (P, ms) => P.evaluate((ms) => new Promise((fertig) => {
   const liste = []; const ab = performance.now();
   const iv = setInterval(() => {
-    liste.push([...document.querySelectorAll('.agency-b')].map((b) => Math.round(parseFloat(getComputedStyle(b).fontWeight))));
+    liste.push(document.querySelector('.agency-px .agency-wasser')?.getAttribute('d') ?? null);
     if (performance.now() - ab > ms) { clearInterval(iv); fertig(liste); }
   }, 60);
 }), ms);
@@ -213,59 +212,25 @@ console.log('════ B/C: Schrift und Formen ════');
 {
   const { ctx, P } = await seite(ALLE(), { lesbar: true });
   pruefe('B „Besser lesbar" gewinnt auch in Agency (Atkinson)', /Atkinson/.test(await stil(P, 'body', 'fontFamily')) && /Atkinson/.test(await stil(P, '.logo', 'fontFamily')));
-  const g = await gewichteSammeln(P, 2500);
-  pruefe('D „Besser lesbar": die Wortmarke steht still', new Set(g.map((x) => x.join())).size === 1, g.slice(0, 3));
+  await P.waitForSelector('.agency-px');
+  const g = await wasserSammeln(P, 2500);
+  pruefe('D „Besser lesbar": das Zeichen steht trocken still (M548)', g.every((d) => d === ''), g.slice(0, 2));
   await ctx.close();
 }
 
-console.log('════ D: Wortmarke ════');
+console.log('════ D: Marke ════');
 {
+  // M548: Statt „PIXI · NOTES" steht in Agency das Zeichen „PX" mit zwei i-Punkten, über das Wasser läuft —
+  // Form, Bewegung und Ruhe prüft pruefungen/m548-agency-logo.mjs; hier nur, dass die Marke steht und sich bewegt
   const { ctx, P } = await seite([{ ...KARTEN[2], position: { x: 300, y: 300 } }]);
+  await P.waitForSelector('.agency-zeichen svg.agency-px');
   const marke = await P.evaluate(() => {
     const l = document.querySelector('.logo');
-    return { b: [...l.querySelectorAll('.agency-b')].map((b) => b.textContent).join(''), zusatz: l.querySelector('.agency-zusatz')?.textContent,
-      punkt: l.querySelector('.agency-punkt') ? getComputedStyle(l.querySelector('.agency-punkt')).backgroundColor : null, label: l.getAttribute('aria-label'), versteckt: l.querySelector('.agency-marke')?.getAttribute('aria-hidden') };
+    return { zusatz: l.querySelector('.agency-zusatz')?.textContent, label: l.getAttribute('aria-label'), versteckt: l.querySelector('.agency-marke')?.getAttribute('aria-hidden') };
   });
-  pruefe('D Wortmarke „PIXI · NOTES" mit violettem Punkt, Name für Vorleser bleibt', marke.b === 'PIXI' && marke.zusatz === 'NOTES' && marke.punkt === 'rgb(100, 29, 255)' && marke.label === 'PixiNotes – zur Übersicht' && marke.versteckt === 'true', marke);
-  const breiten = await P.evaluate(() => [...document.querySelectorAll('.agency-b')].map((b) => b.style.width));
-  pruefe('D jeder Buchstabe hat eine feste Breite (nichts verrutscht beim Atmen)', breiten.every((w) => /em$/.test(w)), breiten);
-  const bild1 = await P.locator('.agency-wort').screenshot();
-  const g = await gewichteSammeln(P, 7000);
-  const alle = new Set(g.flat());
-  const welle = g.some((x) => new Set(x).size > 1);
-  pruefe(`D das Wort atmet: ${alle.size} verschiedene Gewichte zwischen ${Math.min(...alle)} und ${Math.max(...alle)}`, alle.size >= 6 && Math.min(...alle) >= 560 && Math.max(...alle) <= 700 && Math.max(...alle) - Math.min(...alle) >= 60, [...alle].slice(0, 12));
-  pruefe('D als Welle: die Buchstaben sind zeitweise verschieden schwer', welle);
-  const bild2 = await P.locator('.agency-wort').screenshot();
-  pruefe('D die Pixel der Wortmarke ändern sich über die Zeit', !bild1.equals(bild2));
-  const nachher = await P.evaluate(() => document.querySelector('.logo').getBoundingClientRect().width);
-  await P.waitForTimeout(900);
-  pruefe('D die Wortmarke behält ihre Breite', Math.abs(nachher - await P.evaluate(() => document.querySelector('.logo').getBoundingClientRect().width)) < 0.5);
-  if (BILDER) for (let i = 0; i < 3; i += 1) { await foto(P, `agency-wortmarke-${i + 1}`, '.logo'); await P.waitForTimeout(1300); }
-
-  // Während eines Zugs steht die Marke: erst warten, bis sie sich bewegt, dann eine Karte ziehen
-  await warteBis(P, async () => { const a = await gewichteSammeln(P, 300); return new Set(a.flat()).size > 1; }, 20000);
-  const titel = await P.locator('.react-flow__node[data-id="k1"] .kanban-title').boundingBox();
-  await P.mouse.move(titel.x + 60, titel.y + 4); await P.mouse.down();
-  await P.mouse.move(titel.x + 90, titel.y + 30, { steps: 4 });
-  const imZug = P.evaluate(() => new Promise((fertig) => {
-    const liste = []; const ab = performance.now();
-    const iv = setInterval(() => { liste.push([...document.querySelectorAll('.agency-b')].map((b) => getComputedStyle(b).fontWeight).join()); if (performance.now() - ab > 1500) { clearInterval(iv); fertig(liste); } }, 60);
-  }));
-  const ab = Date.now();
-  while (Date.now() - ab < 1600) { const a = (Date.now() - ab) / 1600; await P.mouse.move(titel.x + 90 + 200 * a, titel.y + 30 + 80 * Math.sin(a * 6)); }
-  const zugListe = await imZug;
-  pruefe('D während eines Zugs steht die Wortmarke still', new Set(zugListe.slice(2)).size === 1, [...new Set(zugListe)].slice(0, 4));
-  await P.mouse.up();
-  const weiter = await warteBis(P, async () => { const a = await gewichteSammeln(P, 400); return new Set(a.map((x) => x.join())).size > 1; }, 20000);
-  pruefe('D nach dem Zug bewegt sie sich weiter', weiter !== null);
-  await ctx.close();
-}
-{
-  const { ctx, P } = await seite([{ ...KARTEN[0], position: { x: 300, y: 300 } }], { ruhig: true });
-  const bild1 = await P.locator('.agency-wort').screenshot();
-  const g = await gewichteSammeln(P, 6000);
-  const bild2 = await P.locator('.agency-wort').screenshot();
-  pruefe('D reduzierte Bewegung: steht still in der Ruhelage (560), Pixel gleich', new Set(g.flat()).size === 1 && g[0][0] === 560 && bild1.equals(bild2), [...new Set(g.flat())]);
+  pruefe('D Marke: Zeichen „PX" + „NOTES", Name für Vorleser bleibt', marke.zusatz === 'NOTES' && marke.label === 'PixiNotes – zur Übersicht' && marke.versteckt === 'true', marke);
+  const g = await wasserSammeln(P, 4000);
+  pruefe('D über das Zeichen läuft Wasser (die Form ändert sich über die Zeit)', new Set(g).size > 3, new Set(g).size);
   await ctx.close();
 }
 
@@ -322,7 +287,7 @@ console.log('════ F: Klassisch unverändert ════');
   const r = await P.evaluate(() => ({ html: document.querySelector('.logo').innerHTML, schrift: getComputedStyle(document.querySelector('.logo')).fontFamily, body: getComputedStyle(document.body).fontFamily, radius: getComputedStyle(document.querySelector('.react-flow__node')).borderRadius }));
   pruefe('F Klassisch: Wortmarke „Pixi<span>Notes</span>" in Newsreader, Text in Geist, Karten 4 px, kein data-design',
     r.html === 'Pixi<span>Notes</span>' && /Newsreader/.test(r.schrift) && /Geist/.test(r.body) && r.radius === '4px' && (await attr(P)) === null, r);
-  pruefe('F Klassisch: kein Readex, keine Bewegung der Wortmarke', !anfragen.some(readex) && (await P.locator('.agency-b').count()) === 0);
+  pruefe('F Klassisch: kein Readex, kein Agency-Zeichen', !anfragen.some(readex) && (await P.locator('.agency-zeichen').count()) === 0);
   await ctx.close();
 }
 
