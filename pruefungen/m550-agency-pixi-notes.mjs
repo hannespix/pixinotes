@@ -2,12 +2,14 @@
 // und Klickfläche stehen fest. Am Ende der Pause folgt der nächste Zug.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
+import path from 'node:path';
 import http from 'node:http';
 import { chromium } from 'playwright-core';
 
 const PORT = 5550;
 const HOST = '127.0.0.1';
-const dist = new URL('../dist/', import.meta.url);
+const dist = process.env.PN_DIST ? pathToFileURL(path.resolve(process.env.PN_DIST) + path.sep) : new URL('../dist/', import.meta.url);
 const mime = { html: 'text/html', js: 'text/javascript', css: 'text/css', woff2: 'font/woff2' };
 const server = http.createServer(async (req, res) => {
   try {
@@ -45,8 +47,8 @@ try {
   });
   await seite.goto(`http://${HOST}:${PORT}/`, { waitUntil: 'networkidle' });
   const knopf = seite.locator('.logo');
-  const svg = knopf.locator('.agency-wortmarke svg');
-  await svg.waitFor();
+  const wortmarke = knopf.locator('.agency-pixi[data-agency-frame]');
+  await wortmarke.locator('svg path[d]').first().waitFor();
   await seite.evaluate(() => document.fonts.ready);
   const anfang = await knopf.evaluate((el) => {
     const punkt = el.querySelector('.agency-trennpunkt');
@@ -66,20 +68,19 @@ try {
     anfang?.pixi === 'pixi' && anfang.notes === 'notes'
     && anfang.farbe === anfang.akzent && anfang.farbe !== 'rgba(0, 0, 0, 0)'
     && anfang.punkt[2] > 2 && anfang.punkt[2] === anfang.punkt[3]);
-  const uhr = () => svg.evaluate((el) => el.getCurrentTime());
   const box = await knopf.boundingBox();
   const notizBox = anfang && await knopf.locator('.agency-notes').boundingBox();
   const werte = [];
-  // Die zweite Bewegung beginnt nach 14,2 Sekunden.
-  for (let vergangen = 0; vergangen < 18_400; vergangen += 400) {
+  // Der erste Zug dauert mit Ruhephasen und Timing-Variation bis zu 17,04 Sekunden.
+  for (let vergangen = 0; vergangen < 21_600; vergangen += 400) {
     await seite.clock.runFor(400);
-    werte.push(await uhr());
+    werte.push(await wortmarke.evaluate((el) => Number(el.dataset.agencyFrame) / 25));
   }
-  const hoch = werte.findIndex((t) => t > 0.64);
+  const hoch = werte.findIndex((t) => t > 0.78);
   const ruhend = hoch < 0 ? -1 : werte.findIndex((t, i) => i > hoch && t === 0 && werte[i + 1] === 0);
   pruefe('Touch: Die Wortmarke verändert sich ohne Zeiger und kehrt in ihre Ruheform zurück', hoch >= 0 && ruhend > hoch);
   pruefe('Nach der Ruhephase beginnt selbstständig eine weitere Bewegung',
-    ruhend >= 0 && werte.slice(ruhend + 2).some((t) => t > 0.025));
+    ruhend >= 0 && werte.slice(ruhend + 2).some((t) => t > 0.03));
   pruefe('Punkt, notes und Klickfläche stehen beim Atmen fest', !!anfang
     && JSON.stringify(box) === JSON.stringify(await knopf.boundingBox())
     && JSON.stringify(notizBox) === JSON.stringify(await knopf.locator('.agency-notes').boundingBox())

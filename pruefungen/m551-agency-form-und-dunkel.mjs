@@ -1,5 +1,5 @@
-// M551 prüft die SVG-Uhr mit kontrolliertem Browser-Takt und die dunkle
-// Palette. Den Tintenfluss innerhalb der Konturen prüft M553.
+// M551 prüft die Geschwindigkeit der Lottie-Bewegung mit kontrolliertem
+// Browser-Takt und die dunkle Palette. Die Bildfolge prüft M554.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
@@ -35,6 +35,8 @@ try {
   const seite = await browser.newPage({ viewport: { width: 1280, height: 800 }, colorScheme: 'dark', serviceWorkers: 'block' });
   await seite.clock.install();
   await seite.addInitScript(() => {
+    // Die Tests messen die Grundzeiten ohne die Variation von Faktor 0,9 bis 1,2.
+    Math.random = () => 1 / 3;
     localStorage.setItem('pixinotes-onboarded', '1');
     sessionStorage.setItem('pixinotes-hint-shown', '1');
     localStorage.setItem('pixinotes-einstellungen', JSON.stringify({ ui: { design: 'agency', theme: 'dark' }, navLinks: false }));
@@ -44,16 +46,16 @@ try {
     } }));
   });
   await seite.goto(`http://${HOST}:${PORT}/`, { waitUntil: 'networkidle' });
-  const svg = seite.locator('.agency-pixi svg');
-  await svg.waitFor();
+  const wortmarke = seite.locator('.agency-pixi[data-agency-frame]');
+  await wortmarke.locator('svg path[d]').first().waitFor();
   const werte = [];
   for (let i = 0; i < 58; i++) {
     await seite.clock.runFor(250);
-    werte.push(await svg.evaluate((element) => element.getCurrentTime()));
+    werte.push(await wortmarke.evaluate((element) => Number(element.dataset.agencyFrame) / 25));
   }
-  const anlauf = werte.findIndex((t) => t > 0.002);
-  const gipfel = werte.findIndex((t) => t > 0.8199);
-  const ruecklauf = werte.findIndex((t, i) => i > gipfel && t < 0.814);
+  const anlauf = werte.findIndex((t) => t > 0.0025);
+  const gipfel = werte.findIndex((t) => t === 1);
+  const ruecklauf = werte.findIndex((t, i) => i > gipfel && t < 0.993);
   const ruhe = werte.findIndex((t, i) => i > ruecklauf && t === 0);
   pruefe('Der sichtbare Hinweg dauert mindestens 3,25 Sekunden', anlauf >= 0 && gipfel - anlauf >= 13, { anlauf, gipfel });
   pruefe('Der sichtbare Rückweg dauert mindestens 4,75 Sekunden', ruecklauf > gipfel && ruhe - ruecklauf >= 19, { ruecklauf, ruhe });

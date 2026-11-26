@@ -96,13 +96,13 @@ const grund = (P) => P.evaluate(() => getComputedStyle(document.querySelector('.
 const vorlieben = (P) => P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-einstellungen') || '{}').ui ?? {});
 const stil = (P, sel, prop, pseudo = null) => P.evaluate(([sel, prop, pseudo]) => { const e = document.querySelector(sel); return e ? getComputedStyle(e, pseudo)[prop] : null; }, [sel, prop, pseudo]);
 const readex = (u) => /readex/i.test(u);
-/** Die sichtbaren Buchstabenkonturen werden vom SVG-Zeitgeber geformt. */
-const wasserSammeln = (P, ms) => P.evaluate((ms) => new Promise((fertig) => {
+/** Die Buchstabenkonturen ändern sich in den gerenderten Lottie-Frames. */
+const konturenSammeln = (P, ms) => P.evaluate((ms) => new Promise((fertig) => {
   const liste = []; const ab = performance.now();
   const iv = setInterval(() => {
-    const form = document.querySelector('.agency-wortmarke svg');
-    liste.push(!form || getComputedStyle(form).display === 'none' ? '' : [...form.querySelectorAll('path')]
-      .map((pfad) => pfad.getTotalLength().toFixed(2)).join('/'));
+    const form = document.querySelector('.agency-pixi svg');
+    liste.push(!form?.getClientRects().length || getComputedStyle(form).visibility !== 'visible' ? ''
+      : [...form.querySelectorAll('path[d]')].map((pfad) => pfad.getAttribute('d')).join('/'));
     if (performance.now() - ab > ms) { clearInterval(iv); fertig(liste); }
   }, 60);
 }), ms);
@@ -214,17 +214,17 @@ console.log('════ B/C: Schrift und Formen ════');
 {
   const { ctx, P } = await seite(ALLE(), { lesbar: true });
   pruefe('B „Besser lesbar" gewinnt auch in Agency (Atkinson)', /Atkinson/.test(await stil(P, 'body', 'fontFamily')) && /Atkinson/.test(await stil(P, '.logo', 'fontFamily')));
-  await P.waitForSelector('.agency-wortmarke svg', { state: 'attached' });
-  const g = await wasserSammeln(P, 550);
-  pruefe('D „Besser lesbar": das Zeichen steht trocken still (M548)', g.every((d) => d === ''), g.slice(0, 2));
+  const text = P.locator('.agency-wortmarke-text');
+  const g = await konturenSammeln(P, 550);
+  pruefe('D „Besser lesbar": sichtbarer Schriftzug ohne Bewegung (M548)', await text.isVisible() && g.every((d) => d === ''));
   await ctx.close();
 }
 
 console.log('════ D: Marke ════');
 {
-  // m548-agency-logo.mjs misst den Fluss in Bildpunkten und prüft die Pausen.
+  // M554 prüft die Bewegungsformen in Bildpunkten. M548 prüft die Pausen in der App.
   const { ctx, P } = await seite([{ ...KARTEN[2], position: { x: 300, y: 300 } }]);
-  await P.waitForSelector('.agency-wortmarke svg');
+  await P.waitForSelector('.agency-pixi[data-agency-frame] svg');
   const marke = await P.evaluate(() => {
     const l = document.querySelector('.logo');
     return {
@@ -237,11 +237,12 @@ console.log('════ D: Marke ════');
   pruefe('D Wortmarke pixi · notes, Name für Vorleser bleibt',
     marke.pixi === 'pixi' && marke.notes === 'notes' && marke.label === 'PixiNotes – zur Übersicht' && marke.versteckt === 'true', marke);
   await P.waitForFunction(() => {
-    const zeit = document.querySelector('.agency-wortmarke svg').getCurrentTime();
-    return zeit > 0.1 && zeit < 0.6;
+    const frame = Number(document.querySelector('.agency-pixi')?.dataset.agencyFrame);
+    return frame > 3 && frame < 18;
   });
-  const g = await wasserSammeln(P, 700);
-  pruefe('D die Kontur von pixi verändert sich von selbst', new Set(g).size > 3, new Set(g).size);
+  const g = new Set(await konturenSammeln(P, 700));
+  g.delete('');
+  pruefe('D die Kontur von pixi verändert sich von selbst', g.size > 3, g.size);
   await ctx.close();
 }
 
