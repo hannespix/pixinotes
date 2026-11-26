@@ -11,7 +11,7 @@ import { useDesign } from '../lib/designAttr';
  * der Reiter-Leiste entfällt: zwei Wege zum selben Ziel nebeneinander waren einer zu viel.
  *
  * M547: Im Design „Agency" (nach vave.log, eigenes Werk des Besitzers) eine eigene Marke statt der Wortmarke.
- * M549: In Agency besteht die Wortmarke aus PixiNotes in Readex Pro. Ihre Bewegung lädt separat.
+ * M550: In Agency atmet „pixi“ neben dem violetten Punkt und dem ruhig gesetzten „notes“.
  */
 export function AboutMenu() {
   const view = useBoard((s) => s.view);
@@ -47,8 +47,10 @@ function AgencyMarke() {
     return () => { aus = true; stop?.(); };
   }, []);
   return (
-    <span className="agency-wortmarke" ref={marke} aria-hidden="true">
-      <span className="agency-wortmarke-text">PixiNotes</span>
+    <span className="agency-wortmarke" aria-hidden="true">
+      <span className="agency-pixi" ref={marke}><span className="agency-wortmarke-text">pixi</span></span>
+      <span className="agency-trennpunkt" />
+      <span className="agency-notes">notes</span>
     </span>
   );
 }

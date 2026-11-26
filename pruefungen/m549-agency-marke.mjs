@@ -50,13 +50,22 @@ try {
     await knopf.waitFor();
 
     const marke = await knopf.evaluate((el) => {
-      const schrift = el.querySelector('.agency-wortmarke-text');
-      if (!schrift) return null;
-      const stil = getComputedStyle(schrift);
-      return { text: schrift.textContent, sichtbar: stil.visibility, schrift: stil.fontFamily, breite: el.offsetWidth };
+      const pixi = el.querySelector('.agency-wortmarke-text');
+      const notes = el.querySelector('.agency-notes');
+      const punkt = el.querySelector('.agency-trennpunkt');
+      if (!pixi || !notes || !punkt) return null;
+      const stil = getComputedStyle(pixi);
+      const { width, height } = punkt.getBoundingClientRect();
+      return {
+        pixi: pixi.textContent, notes: notes.textContent,
+        sichtbar: stil.visibility === 'visible' && getComputedStyle(notes).visibility === 'visible',
+        punkt: width > 0 && height > 0 ? getComputedStyle(punkt).backgroundColor : '',
+        schrift: stil.fontFamily, breite: el.offsetWidth,
+      };
     });
-    pruefe(`${breite}px: PixiNotes steht auch bei ausgefallenem Animationsmodul`,
-      blockiert && marke?.text === 'PixiNotes' && marke.sichtbar === 'visible');
+    const violett = thema === 'dark' ? 'rgb(154, 107, 255)' : 'rgb(100, 29, 255)';
+    pruefe(`${breite}px: pixi · notes mit violettem Punkt steht auch bei ausgefallenem Animationsmodul`,
+      blockiert && marke?.pixi === 'pixi' && marke.notes === 'notes' && marke.sichtbar && marke.punkt === violett);
     pruefe(`${breite}px: Die Wortmarke steht in Readex Pro und passt in die Kopfleiste`,
       marke?.schrift.includes('PN Readex') && marke.breite < 135);
 

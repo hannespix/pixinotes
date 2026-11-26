@@ -1,11 +1,18 @@
-// M549: Die Flüssigkeit ist Teil der Buchstaben. Der Browser interpoliert ihre Konturen;
-// JavaScript bewegt die gemeinsame SVG-Uhr nur während eines Ein- oder Auslaufs.
+// M550: „pixi“ atmet in wechselnden Bewegungsfolgen wie bei vave.log. Während
+// der Ruhephasen steht die SVG-Uhr und nur ein Zeitgeber wartet auf den nächsten Zug.
 import { WORTMARKE, WORTMARKE_SICHTFELD } from './agencyWortmarke';
 import { agencyZeigerEinrichten } from './agencyZeiger';
 import { zugBeobachten, zugLaeuft } from './zugAnzeige';
 
 const NS = 'http://www.w3.org/2000/svg';
 const DAUER = 820;
+type Bewegung = readonly (readonly [ziel: number, ms: number])[];
+const BEWEGUNGEN: readonly Bewegung[] = [
+  [[0, 550], [1, 3050], [1, 800], [0, 3900], [0, 1650]],
+  [[0.62, 2500], [0.2, 1800], [1, 3000], [1, 650], [0, 4100], [0, 1700]],
+  [[0.44, 2100], [0.08, 1550], [0.8, 2900], [0.34, 2150], [0, 2700], [0, 1950]],
+];
+const glaetten = (t: number) => t * t * t * (t * (6 * t - 15) + 10);
 
 function wortmarkeBauen(): SVGSVGElement {
   const svg = document.createElementNS(NS, 'svg');
@@ -19,7 +26,7 @@ function wortmarkeBauen(): SVGSVGElement {
     // Readex zeichnet überlappende Teile etwa am x und t als gemeinsame Fläche.
     buchstabe.setAttribute('d', grund);
     const zug = document.createElementNS(NS, 'animate');
-    const zeiten = [0, 0.025 + i * 0.058, 0.22 + i * 0.065, 0.48 + i * 0.06, 1];
+    const zeiten = [0, 0.04 + i * 0.095, 0.32 + i * 0.12, 0.56 + i * 0.12, 1];
     zug.setAttribute('attributeName', 'd');
     zug.setAttribute('dur', `${DAUER}ms`);
     zug.setAttribute('fill', 'freeze');
@@ -34,8 +41,6 @@ function wortmarkeBauen(): SVGSVGElement {
 }
 
 export function agencyBewegen(marke: HTMLElement): () => void {
-  const knopf = marke.closest('button');
-  if (!knopf) return () => {};
   const wegZeiger = agencyZeigerEinrichten();
   const svg = wortmarkeBauen();
   marke.append(svg);
@@ -46,50 +51,84 @@ export function agencyBewegen(marke: HTMLElement): () => void {
   const bewegung = window.matchMedia('(prefers-reduced-motion: reduce)');
   const wurzel = document.documentElement;
   let imBild = !('IntersectionObserver' in window);
-  let maus = false;
-  let einlauf = true;
-  let fortschritt = 0;
+  let beendet = false;
+  let variante = 0;
+  let folge = BEWEGUNGEN[0];
+  let abschnitt = 0;
+  let vergangen = 0;
+  let von = 0;
+  let gezeichnet = 0;
   let bild: number | undefined;
+  let pause: number | undefined;
+  let pausiertSeit: number | undefined;
   let zuletzt: number | undefined;
   const still = () => bewegung.matches || wurzel.dataset.lesbar === 'an';
-  const darf = () => !still() && imBild && !document.hidden && !zugLaeuft();
-  const ziel = () => maus || knopf.matches(':focus-visible') || einlauf ? 1 : 0;
+  const darf = () => !beendet && !still() && imBild && !document.hidden && !zugLaeuft();
+
+  const zeichnen = (lage: number) => {
+    if (lage === gezeichnet) return;
+    svg.setCurrentTime(lage * DAUER / 1000);
+    gezeichnet = lage;
+  };
+  const naechsterAbschnitt = () => {
+    von = folge[abschnitt][0];
+    vergangen = 0;
+    zuletzt = undefined;
+    abschnitt += 1;
+    if (abschnitt < folge.length) return;
+    variante = (variante + 1 + Math.floor(Math.random() * (BEWEGUNGEN.length - 1))) % BEWEGUNGEN.length;
+    folge = BEWEGUNGEN[variante].map(([ziel, ms]) => [ziel, ms * (0.94 + Math.random() * 0.12)] as const);
+    abschnitt = 0;
+  };
 
   const anhalten = () => {
     if (bild !== undefined) cancelAnimationFrame(bild);
+    if (pause !== undefined) clearTimeout(pause);
+    if (pausiertSeit !== undefined) {
+      vergangen = Math.min(folge[abschnitt][1], vergangen + performance.now() - pausiertSeit);
+    }
     bild = undefined;
+    pause = undefined;
+    pausiertSeit = undefined;
     zuletzt = undefined;
   };
   const weiter = () => {
-    if (bild === undefined && darf() && fortschritt !== ziel()) bild = requestAnimationFrame(takt);
+    if (!darf() || bild !== undefined || pause !== undefined) return;
+    const [nach, dauer] = folge[abschnitt];
+    if (nach !== von) {
+      bild = requestAnimationFrame(takt);
+      return;
+    }
+    pausiertSeit = performance.now();
+    pause = window.setTimeout(() => {
+      pause = undefined;
+      pausiertSeit = undefined;
+      if (!darf()) return;
+      naechsterAbschnitt();
+      weiter();
+    }, dauer - vergangen);
   };
   function takt(jetzt: number) {
     bild = undefined;
     if (!darf()) { anhalten(); return; }
-    const ende = ziel();
-    const schritt = Math.min(jetzt - (zuletzt ?? jetzt), 45) / DAUER;
-    fortschritt = ende === 1 ? Math.min(1, fortschritt + schritt) : Math.max(0, fortschritt - schritt * 1.24);
-    svg.setCurrentTime(fortschritt * DAUER / 1000);
-    if (fortschritt === 1) einlauf = false;
-    zuletzt = fortschritt === ziel() ? undefined : jetzt;
+    const [nach, dauer] = folge[abschnitt];
+    // Nach einem verdeckten Tab oder einem hängenden Bild an der sichtbaren Stelle fortsetzen.
+    vergangen = Math.min(dauer, vergangen + Math.min(jetzt - (zuletzt ?? jetzt), 80));
+    zuletzt = jetzt;
+    zeichnen(von + (nach - von) * glaetten(vergangen / dauer));
+    if (vergangen === dauer) naechsterAbschnitt();
     weiter();
   }
   const abgleichen = () => {
     if (!darf()) anhalten();
-    if (still() && (einlauf || fortschritt !== 0)) {
-      einlauf = false;
-      fortschritt = 0;
-      svg.setCurrentTime(0);
+    if (still()) {
+      variante = 0;
+      folge = BEWEGUNGEN[0];
+      abschnitt = 0;
+      vergangen = 0;
+      von = 0;
+      zeichnen(0);
     }
-    weiter();
-  };
-  const hinein = (e: PointerEvent) => {
-    if (e.pointerType !== 'mouse') return;
-    maus = true;
-    weiter();
-  };
-  const hinaus = () => {
-    maus = false;
     weiter();
   };
   const sichtbar = 'IntersectionObserver' in window
@@ -102,24 +141,17 @@ export function agencyBewegen(marke: HTMLElement): () => void {
   const lesbarkeit = new MutationObserver(abgleichen);
   lesbarkeit.observe(wurzel, { attributes: true, attributeFilter: ['data-lesbar'] });
   const wegZug = zugBeobachten(abgleichen);
-  knopf.addEventListener('pointerenter', hinein);
-  knopf.addEventListener('pointerleave', hinaus);
-  knopf.addEventListener('focus', weiter);
-  knopf.addEventListener('blur', weiter);
   document.addEventListener('visibilitychange', abgleichen);
   bewegung.addEventListener('change', abgleichen);
   abgleichen();
 
   return () => {
+    beendet = true;
     anhalten();
     wegZeiger();
     wegZug();
     sichtbar?.disconnect();
     lesbarkeit.disconnect();
-    knopf.removeEventListener('pointerenter', hinein);
-    knopf.removeEventListener('pointerleave', hinaus);
-    knopf.removeEventListener('focus', weiter);
-    knopf.removeEventListener('blur', weiter);
     document.removeEventListener('visibilitychange', abgleichen);
     bewegung.removeEventListener('change', abgleichen);
     delete marke.dataset.animiert;
