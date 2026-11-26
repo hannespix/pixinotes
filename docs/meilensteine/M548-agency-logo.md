@@ -1,5 +1,5 @@
 # M548 — Zeichen „PX" mit zwei i-Punkten, über das schwarzes Wasser läuft (Design Agency)
-PR: #… · Prüfreihe: `pruefungen/m548-agency-logo.mjs` (Port 5548) · Datum: 2026-11-26
+PR: #247 · Prüfreihe: `pruefungen/m548-agency-logo.mjs` (Port 5548) · Datum: 2026-11-26
 
 ## Warum
 Wunsch des Besitzers zur Marke aus M547 („PIXI · NOTES", atmend über Strichstärke): „das agency logo soll schöner und
@@ -71,7 +71,8 @@ abgetrennt, gelber Grund — im Logo ohne Grund).
   hell/dunkel Kontrast; Klassisch und pix·el: altes Markup, Modul nicht geladen.
 - Vorher (erster Entwurf mit 27 Kreis-Attributen und 60 Bildern/s): ~56 ms je Sekunde netto. Ein Pfad statt Kreisen und
   30 Bilder/s halbierten das.
-- Bildvergleich Klassisch/pix·el gegen den Stand vor M548: siehe PR.
+- Bildvergleich (`werkzeug/bild-vergleich.mjs`, Stand vor M548 gegen M548, dazu dieselbe Messung mit gewähltem pix·el):
+  Klassisch 11/11 und pix·el 11/11 Ansichten pixelgleich.
 
 ## Grenzen / offen
 - Kein Lottie: Lottie morpht vorgezeichnete Formen; Verschmelzen, Brücke und Abreißen wären Handarbeit je Bild, dazu
