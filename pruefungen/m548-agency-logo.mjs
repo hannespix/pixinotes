@@ -1,11 +1,11 @@
 /**
- * Agency-Marke (M548, überarbeitet in M550): echte Bildpunkte beim Verformen von
- * pixi, selbsttätiger Rücklauf, Pausen, Kontrast und die beiden anderen Designs.
- * M548_BILDER=<ordner> legt eine groß gerenderte Folge und die Kopfleisten ab.
+ * Agency-Marke: selbsttätiger Rücklauf, Pausen, Kontrast und die beiden anderen
+ * Designs. Die Bildfolge der Lottie-Formen prüft M554.
+ * M548_BILDER=<ordner> legt die Kopfleiste in Hell und Dunkel ab.
  */
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { mkdirSync, readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, existsSync } from 'node:fs';
 import http from 'node:http';
 import { chromium } from 'playwright-core';
 
@@ -13,7 +13,7 @@ const __repo = fileURLToPath(new URL('..', import.meta.url));
 const CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
 const DIST = process.env.PN_DIST ?? path.join(__repo, 'dist');
 const BILDER = process.env.M548_BILDER ?? '';
-const DAUER = 0.82;
+const LETZTES_BILD = 25;
 if (BILDER) mkdirSync(BILDER, { recursive: true });
 const PORT = 5548;
 const TYP = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.json': 'application/json', '.woff2': 'font/woff2' };
@@ -36,8 +36,8 @@ const brett = (nodes) => ({ boards: [{ id: 'b0', name: 'Studio', edges: [], draw
   spaces: [{ id: 's1', name: 'Arbeit', projects: [{ id: 'p1', name: 'Einstieg', boardIds: ['b0'] }] }], activeId: 'b0', view: 'board', cardFocus: false, navLinks: false, clickZoom: false });
 
 /** Neue Seite; `design` = 'agency' | 'pixel' | 'klassisch' */
-async function seite({ dunkel = false, design = 'agency', lesbar = false, anfragen = null, ruhig = false, dpr = 2 } = {}) {
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 }, deviceScaleFactor: dpr, locale: 'de-DE', colorScheme: dunkel ? 'dark' : 'light', reducedMotion: ruhig ? 'reduce' : 'no-preference' });
+async function seite({ dunkel = false, design = 'agency', lesbar = false, anfragen = null, ruhig = false } = {}) {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 }, deviceScaleFactor: 2, locale: 'de-DE', colorScheme: dunkel ? 'dark' : 'light', reducedMotion: ruhig ? 'reduce' : 'no-preference' });
   await ctx.addInitScript(([s, d, des, les]) => {
     if (localStorage.getItem('pixinotes-onboarded')) return;
     localStorage.setItem('pixinotes-onboarded', '1');
@@ -57,78 +57,33 @@ async function seite({ dunkel = false, design = 'agency', lesbar = false, anfrag
   if (anfragen) P.on('request', (q) => anfragen.push(q.url()));
   await P.goto(`http://localhost:${PORT}/`, { waitUntil: 'networkidle' });
   await P.waitForSelector('.react-flow__node', { timeout: 30000 });
-  if (design === 'agency') await P.waitForSelector('.agency-wortmarke svg', { state: 'attached' });
+  if (design === 'agency' && !lesbar && !ruhig) {
+    await P.waitForSelector('.agency-pixi[data-agency-frame] svg path[d]', { state: 'attached' });
+  }
   await P.evaluate(() => document.fonts.ready);
   return { ctx, P };
 }
 
-const ausschnitt = async (P) => {
-  const r = await P.locator('.agency-wortmarke svg').boundingBox();
-  return { x: r.x - 2, y: r.y - 3, width: r.width + 4, height: r.height + 6 };
-};
-/**
- * Bildpunkte eines Fotos als Tinten-Maske (in der Seite dekodiert): 1 = Tinte, 0 = Fläche; dazu der Anteil der
- * Zwischentöne (Kantenglättung) unter allen Punkten, die nicht reine Fläche sind.
- */
-const maske = (P, png) => P.evaluate(async (b64) => {
-  const bild = await createImageBitmap(await (await fetch(`data:image/png;base64,${b64}`)).blob());
-  const c = new OffscreenCanvas(bild.width, bild.height); const g = c.getContext('2d'); g.drawImage(bild, 0, 0);
-  const d = g.getImageData(0, 0, bild.width, bild.height).data;
-  const lum = (i) => 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
-  const grund = lum(0); const tinte = []; let w = 0; let n = 0; let halb = 0;
-  // Tinte = mehr als halb so weit vom Grund wie die dunkelste/hellste Stelle
-  let fern = 0; for (let i = 0; i < d.length; i += 4) fern = Math.max(fern, Math.abs(lum(i) - grund));
-  for (let i = 0; i < d.length; i += 4) {
-    const a = Math.abs(lum(i) - grund) / Math.max(1, fern);
-    tinte.push(a > 0.5 ? 1 : 0);
-    if (a > 0.08) { n += 1; if (a < 0.92) halb += 1; }
-    if (a > 0.5) w += 1;
-  }
-  return { b: bild.width, h: bild.height, m: tinte, tinte: w, zwischen: n ? halb / n : 0 };
-}, png.toString('base64'));
-const foto = async (P, clip) => P.screenshot({ clip: { x: clip.x, y: clip.y, width: clip.width, height: clip.height } });
-
-/** Vier Buchstaben und zwei i-Punkte. Überhängende Konturen dürfen sich in einer Spalte kreuzen. */
-function zusammenhaengendeFlaechen({ b, h, m }) {
-  const offen = Uint8Array.from(m);
-  let anzahl = 0;
-  for (let i = 0; i < offen.length; i++) {
-    if (!offen[i]) continue;
-    const flaeche = [i];
-    offen[i] = 0;
-    for (let j = 0; j < flaeche.length; j++) {
-      const p = flaeche[j];
-      const x = p % b;
-      const y = Math.floor(p / b);
-      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-        const u = x + dx;
-        const v = y + dy;
-        const nachbar = v * b + u;
-        if (u < 0 || u >= b || v < 0 || v >= h || !offen[nachbar]) continue;
-        offen[nachbar] = 0;
-        flaeche.push(nachbar);
-      }
-    }
-    if (flaeche.length >= 3) anzahl += 1;
-  }
-  return anzahl;
-}
-/** Pausieren darf die Flüssigkeit nicht zum Anfang des Zugs zurücksetzen. */
-const zeit = (P) => P.locator('.agency-wortmarke svg').evaluate((svg) => svg.getCurrentTime());
+const bildstand = (P) => P.locator('.agency-pixi').evaluate((e) => ({
+  frame: e.dataset.agencyFrame === undefined ? null : Number(e.dataset.agencyFrame),
+  konturen: [...e.querySelectorAll('svg path[d]')].map((pfad) => pfad.getAttribute('d')).join('/'),
+}));
 const pausePruefen = async (P, dauer = 1100) => {
-  const stand = await zeit(P);
+  const stand = await bildstand(P);
   const bilder = await P.evaluate(() => window.__bilder);
   await P.waitForTimeout(dauer);
-  // Ein fast erreichtes Ende und der folgende Halt können sich um wenige SVG-Mikrosekunden unterscheiden.
-  return { stand, gleich: Math.abs(await zeit(P) - stand) < 0.00001, bilder: (await P.evaluate(() => window.__bilder)) - bilder };
+  const nachher = await bildstand(P);
+  return { stand: stand.frame, gleich: nachher.frame === stand.frame && nachher.konturen === stand.konturen,
+    bilder: (await P.evaluate(() => window.__bilder)) - bilder };
 };
-const wartenAufZeit = (P, min, max) => P.waitForFunction(([a, b]) => {
-  const t = document.querySelector('.agency-wortmarke svg').getCurrentTime();
-  return t >= a && t <= b;
+const wartenAufBild = (P, min, max) => P.waitForFunction(([a, b]) => {
+  const frame = Number(document.querySelector('.agency-pixi')?.dataset.agencyFrame);
+  return frame >= a && frame <= b;
 }, [min, max]);
-const wartenAufWeiterlauf = (P, stand) => P.waitForFunction((vorher) => {
-  return Math.abs(document.querySelector('.agency-wortmarke svg').getCurrentTime() - vorher) > 0.005;
-}, stand);
+const weiterBei = async (P, stand) => P.waitForFunction((vorher) => {
+  const frame = Number(document.querySelector('.agency-pixi')?.dataset.agencyFrame);
+  return Math.abs(frame - vorher) > 0.15 ? { frame } : false;
+}, stand).then(async (h) => (await h.jsonValue()).frame);
 const tabVerdeckt = (P, an) => P.evaluate((verdeckt) => {
   if (verdeckt) Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
   else delete document.hidden;
@@ -142,90 +97,30 @@ const kontrast = (a, b) => {
 };
 const rgb = (s) => s.match(/[\d.]+/g).slice(0, 3).map(Number);
 
-console.log('════ A: Die Konturen von pixi verformen sich ════');
-{
-  const { ctx, P } = await seite({ dpr: 4 });
-  await tabVerdeckt(P, true);
-  const svg = P.locator('.agency-wortmarke svg');
-  const zumBild = (anteil) => svg.evaluate((e, t) => e.setCurrentTime(t), anteil * DAUER);
-  const clip = await ausschnitt(P);
-  await zumBild(0);
-  const standbild = await foto(P, clip);
-  const trocken = await maske(P, standbild);
-  const film = [];
-  for (const s of [0.11, 0.22, 0.34, 0.47, 0.59, 0.71, 0.84, 1]) {
-    await zumBild(s);
-    const m = await maske(P, await foto(P, clip));
-    let links = 0; let rechts = 0;
-    for (let x = 0; x < m.b; x++) {
-      for (let y = 0; y < m.h; y++) {
-        const i = y * m.b + x;
-        if (m.m[i] === trocken.m[i]) continue;
-        if (x < m.b / 3) links += 1;
-        if (x > 2 * m.b / 3) rechts += 1;
-      }
-    }
-    film.push({ s, links, rechts, flaechen: zusammenhaengendeFlaechen(m), klar: m.zwischen < 0.4 });
-  }
-  pruefe('A Die Flüssigkeit beginnt links sichtbar in der Schrift',
-    film.some(({ s, links, rechts }) => s < 0.3 && links >= 20 && rechts === 0), film);
-  pruefe('A Die Flüssigkeit erreicht später den rechten Teil von pixi',
-    film.some(({ s, rechts }) => s >= 0.34 && rechts >= 20), film);
-  pruefe('A Vier lesbare Buchstaben mit zwei i-Punkten und scharfen Kanten',
-    film.every(({ flaechen, klar }) => flaechen === 6 && klar), film);
-  await zumBild(0);
-  pruefe('A Die Grundform bleibt beim Rücklauf pixelgleich', standbild.equals(await foto(P, clip)));
-
-  if (BILDER) {
-    const marke = P.locator('.agency-wortmarke');
-    await marke.evaluate((e) => {
-      const skalierung = 600 / e.getBoundingClientRect().width;
-      const stil = getComputedStyle(e);
-      const punkt = e.querySelector('.agency-trennpunkt');
-      const { width, height } = punkt.getBoundingClientRect();
-      e.style.fontSize = `${parseFloat(stil.fontSize) * skalierung}px`;
-      e.style.gap = `${parseFloat(stil.columnGap) * skalierung}px`;
-      punkt.style.width = `${width * skalierung}px`;
-      punkt.style.height = `${height * skalierung}px`;
-      const buehne = document.createElement('div');
-      buehne.id = 'logo-buehne';
-      buehne.className = 'logo';
-      buehne.style.cssText = 'position:fixed;left:35px;top:120px;z-index:9999;height:auto;padding:22px 38px;background:var(--surface);color:var(--ink)';
-      buehne.appendChild(e);
-      document.body.appendChild(buehne);
-    });
-    for (const [i, s] of [0, 0.22, 0.4, 0.55, 0.74, 1].entries()) {
-      await zumBild(s);
-      await P.locator('#logo-buehne').screenshot({ path: path.join(BILDER, `folge-${i + 1}.png`) });
-    }
-  }
-  await ctx.close();
-}
-
 console.log('════ B: Atmen, Rücklauf und Ruhe ════');
 {
   const { ctx, P } = await seite();
-  await wartenAufZeit(P, 0.12, 0.74);
-  pruefe('B Die Kontur kommt ohne Zeigergeste in Bewegung', await zeit(P) > 0);
+  await wartenAufBild(P, 4, 22);
+  pruefe('B Die Kontur kommt ohne Zeigergeste in Bewegung', (await bildstand(P)).frame > 0);
 
   await tabVerdeckt(P, true);
   const verdeckt = await pausePruefen(P);
-  pruefe('B Im verdeckten Tab stehen SVG-Zeit und Bild-Takt', verdeckt.gleich && verdeckt.bilder < 2, verdeckt);
+  pruefe('B Im verdeckten Tab bleiben die laufende Form und der Bild-Takt stehen',
+    verdeckt.stand > 0 && verdeckt.gleich && verdeckt.bilder < 2, verdeckt);
   await tabVerdeckt(P, false);
-  await wartenAufWeiterlauf(P, verdeckt.stand);
-  await wartenAufZeit(P, DAUER - 0.00001, DAUER + 0.00001);
-  // Die SVG-Uhr liegt bei fast voller Form schon im Toleranzfenster. Zuerst den Übergang auf den Halt abwarten.
-  await P.waitForTimeout(100);
+  pruefe('B Nach dem Tab-Wechsel setzt die Bewegung an derselben Stelle fort',
+    Math.abs(await weiterBei(P, verdeckt.stand) - verdeckt.stand) < 2, verdeckt);
+  await wartenAufBild(P, LETZTES_BILD, LETZTES_BILD);
   const gipfel = await pausePruefen(P, 400);
   pruefe('B Die Kontur hält auf dem Gipfel ohne Bild-Takt inne', gipfel.gleich && gipfel.bilder <= 2, gipfel);
-  await wartenAufZeit(P, 0.12, 0.7);
-  pruefe('B Nach dem Gipfel läuft die Form von selbst zurück', await zeit(P) < gipfel.stand);
-  await wartenAufZeit(P, 0, 0);
+  await wartenAufBild(P, 4, 21);
+  pruefe('B Nach dem Gipfel läuft die Form von selbst zurück', (await bildstand(P)).frame < gipfel.stand);
+  await wartenAufBild(P, 0, 0);
   const ruhe = await pausePruefen(P, 850);
   // Die App darf dazwischen vereinzelt ein Bild anfordern. Das Logo hat in der Pause keinen Bild-Takt.
   pruefe('B Zwischen den Gesten ruht die Grundform ohne Bild-Takt', ruhe.gleich && ruhe.bilder <= 2, ruhe);
 
-  await wartenAufZeit(P, 0.1, 0.68);
+  await wartenAufBild(P, 3, 21);
   const kopfleiste = P.locator('.logo-wrap');
   await kopfleiste.evaluate((e) => new Promise((fertig) => {
     const beobachter = new IntersectionObserver(([eintrag]) => {
@@ -235,41 +130,44 @@ console.log('════ B: Atmen, Rücklauf und Ruhe ════');
     e.style.display = 'none';
   }));
   const weg = await pausePruefen(P);
-  pruefe('B Bei unsichtbarer Kopfleiste steht die Animation', weg.gleich && weg.bilder < 2, weg);
+  pruefe('B Bei unsichtbarer Kopfleiste steht die Animation', weg.stand > 0 && weg.gleich && weg.bilder < 2, weg);
   await kopfleiste.evaluate((e) => { e.style.display = ''; });
-  await wartenAufWeiterlauf(P, weg.stand);
+  pruefe('B Bei sichtbarer Kopfleiste setzt die Bewegung an derselben Stelle fort',
+    Math.abs(await weiterBei(P, weg.stand) - weg.stand) < 2, weg);
 
   const titel = await P.locator('.react-flow__node[data-id="k1"] .kanban-title').boundingBox();
-  await wartenAufZeit(P, 0.1, 0.68);
+  await wartenAufBild(P, 3, 21);
   await P.mouse.move(titel.x + 60, titel.y + 4);
   await P.mouse.down();
   await P.mouse.move(titel.x + 125, titel.y + 50, { steps: 3 });
   const zug = await pausePruefen(P);
   await P.mouse.up();
-  pruefe('B Beim Ziehen bleibt die laufende Form stehen', zug.gleich, zug);
-  await wartenAufWeiterlauf(P, zug.stand);
-  pruefe('B Nach dem Ablegen läuft die Form an ihrer Position weiter', await zeit(P) > 0);
+  pruefe('B Beim Ziehen bleibt die laufende Form stehen', zug.stand > 0 && zug.gleich, zug);
+  pruefe('B Nach dem Ablegen läuft die Form an ihrer Position weiter',
+    Math.abs(await weiterBei(P, zug.stand) - zug.stand) < 2, zug);
   await ctx.close();
 }
 
 console.log('════ C: Lesbarkeit und Kontrast ════');
 for (const [name, opt] of [['reduzierte Bewegung', { ruhig: true }], ['„Besser lesbar"', { lesbar: true }]]) {
   const { ctx, P } = await seite(opt);
-  const sicht = await P.locator('.agency-wortmarke-text').evaluate((e) => getComputedStyle(e).visibility);
   await P.locator('.logo').hover();
   const ruhe = await pausePruefen(P);
-  pruefe(`C ${name}: Text sichtbar und auch beim Zeigen statisch`, sicht === 'visible' && ruhe.gleich && await zeit(P) === 0);
+  pruefe(`C ${name}: Text sichtbar und auch beim Zeigen statisch`, ruhe.gleich && (ruhe.stand === 0 || ruhe.stand === null)
+    && await P.locator('.agency-wortmarke-text').isVisible() && !(await P.locator('.agency-pixi svg').isVisible()));
   pruefe(`C ${name}: Systemzeiger bleibt sichtbar`, !(await P.locator('.agency-zeiger').isVisible()));
   await ctx.close();
 }
 for (const dunkel of [false, true]) {
-  const { ctx, P } = await seite({ dunkel, ruhig: true, dpr: 2 });
+  const { ctx, P } = await seite({ dunkel });
   const f = await P.locator('.logo').evaluate((e) => {
-    const s = getComputedStyle(e);
-    return { tinte: s.color, flaeche: s.backgroundColor };
+    const pfade = e.querySelectorAll('.agency-pixi svg path[d][fill]');
+    const tinte = [...new Set(Array.from(pfade, (p) => getComputedStyle(p).fill))];
+    const notes = getComputedStyle(e.querySelector('.agency-notes')).color;
+    return { tinte, notes, flaeche: getComputedStyle(e).backgroundColor };
   });
-  const v = kontrast(rgb(f.tinte), rgb(f.flaeche));
-  pruefe(`C ${dunkel ? 'Dunkel' : 'Hell'}: ${v.toFixed(1)}:1 Kontrast der Wortmarke`, v >= 4.5, f);
+  const v = Math.min(...[...f.tinte, f.notes].map((farbe) => kontrast(rgb(farbe), rgb(f.flaeche))));
+  pruefe(`C ${dunkel ? 'Dunkel' : 'Hell'}: ${v.toFixed(1)}:1 Kontrast der Wortmarke`, f.tinte.length > 0 && v >= 4.5, f);
   if (BILDER) {
     const r = await P.locator('.topbar').boundingBox();
     const clip = { x: 0, y: 0, width: r.x + r.width + 12, height: r.y + r.height + 12 };
@@ -288,7 +186,6 @@ for (const design of ['klassisch', 'pixel']) {
   await ctx.close();
 }
 pruefe('D Keine Seitenfehler', fehler.length === 0, fehler.slice(0, 3).join(' | '));
-if (BILDER) writeFileSync(path.join(BILDER, 'LIESMICH.txt'), 'M550: Konturen als Bildfolge und Kopfleiste (Hell/Dunkel).\n');
 await browser.close(); app.close();
 console.log(`\nM548: ${ok} bestanden, ${bad} fehlgeschlagen`);
 process.exit(bad ? 1 : 0);
