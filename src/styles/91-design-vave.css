@@ -1,0 +1,118 @@
+/* ================= M547: Design „vave.log" — Formen und Schrift =================
+   Wunsch: „in vave.log repo das design genau übernehmen und als weitere layoutauswahl das vave-log design in
+   pixinotes anbieten (ohne das vave logo, dafür pixinotes logo entsprechend animieren)". vave.log ist ein eigenes Werk
+   des Nutzers (src/web/styles.css, select-menu.css). Die Farben stehen als Token in 00-tokens.css
+   (`:root[data-design='vave']`); hier steht, was vave.log sonst ausmacht:
+     · Readex Pro (variabel, SIL OFL, wie in vave.log) für alles — Titel Gewicht 500 mit enger Laufweite (−0,045 em),
+       Etiketten als gesperrte Versalien (11 px, 0,16 em, 550) wie die „Eyebrows" in vave.log.
+     · weiche Rundungen, Karten flach mit 1-px-Kante (unter der Maus violett umrissen), Menüs und Fenster mit weicher
+       Wolke, Fenster 17 px rund mit violettem Etikett über dem Titel, Abdunkler mit leichter Unschärfe.
+     · Umschalter als Segment auf hellem Grund (gewählt = weiße Pille mit violetter Schrift), Knöpfe mit Hub beim Zeigen,
+       Fokusring 3 px #8951ff, Markierung in Lime, Hinweise warm-schwarz mit „Rückgängig" in Lime.
+     · die Wortmarke „PIXI · NOTES" wie „VAVE · LOG", das kräftige Wort atmet (lib/vaveLogo.ts).
+   Alles hängt an `html[data-design='vave']`; ohne das Attribut greift keine Regel und die Schrift wird nie geladen.
+   Leistung (M491): keine :has()-Selektoren, keine neuen Animationen auf dem Board; der Hub der Knöpfe ist ein
+   transform beim Zeigen (wie in vave.log, nicht auf Karten). */
+@font-face {
+  font-family: 'PN Readex'; font-style: normal; font-display: swap; font-weight: 160 700;
+  src: url('../assets/readex-pro-latin-wght.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+@font-face {
+  font-family: 'PN Readex'; font-style: normal; font-display: swap; font-weight: 160 700;
+  src: url('../assets/readex-pro-latin-ext-wght.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+
+/* ---------- Schrift ---------- */
+/* Eine Schrift für Bedienung, Text und Titel (vave.log kennt keine Serife). „Besser lesbar" setzt Atkinson direkt an
+   body/Knöpfe/Titel und gewinnt darum weiter (56-fokus-gliederung.css, 70-kopfleiste-schrift-netz.css). */
+html[data-design='vave'] { --font-ui: var(--font-vave); --font-display: var(--font-vave); accent-color: var(--accent); }
+html[data-design='vave'] body { font-synthesis: none; }
+/* Titel wie die h1/h2 in vave.log: Gewicht 500, eng gesetzt */
+html[data-design='vave']:not([data-lesbar='an']) :is(
+  .modal-head h2, .help-body h3, .ovc-space-name, .focus-title b, .bub-leer b, .presenter-slide h3, .slide-bubbles-titel,
+  .bn-block-content[data-content-type='heading']
+) { font-weight: 500; letter-spacing: -0.045em; font-optical-sizing: auto; }
+/* BlockNote setzt das Gewicht der Überschriften mit langer Regel — gleich lang halten */
+html[data-design='vave'] :is(.bn-container, .notiz-ruhend, .presenter-slide, .react-flow__node) .bn-block-outer .bn-block > .bn-block-content[data-content-type='heading'] {
+  font-weight: 500;
+}
+/* … und die Überschrift darin (h1–h3) ist sonst fett vom Browser */
+html[data-design='vave'] .bn-block-content[data-content-type='heading'] > .bn-inline-content { font-weight: inherit; }
+/* Kartentitel wie die Spaltentitel in vave.log (500, leicht eng) */
+html[data-design='vave'] :is(.drag-title, .kanban-title, .minutes-title, .week-title, .time-title) { font-weight: 500; letter-spacing: -0.02em; }
+/* Etiketten (Abschnitte der Einstellungen) wie die „Eyebrows" in vave.log */
+html[data-design='vave']:not([data-lesbar='an']) .modal-section h3:not(.modal-danger h3) { font-size: 11px; font-weight: 550; letter-spacing: 0.16em; }
+/* Flüssige Schrift (M500): die Flüssigkeit formt Readex Pro */
+html[data-design='vave']:not([data-lesbar='an']) .fluessig-card canvas { font-family: var(--font-vave); }
+html[data-design='vave'] ::selection { background: var(--vave-lime); color: #1b1b1b; }
+
+/* ---------- Wortmarke „PIXI · NOTES" (wie „VAVE · LOG") ---------- */
+html[data-design='vave'] .logo { gap: 0; letter-spacing: 0; color: var(--ink); }
+.vave-marke { display: inline-flex; align-items: center; line-height: 1; }
+/* das kräftige Wort: Gewicht kommt je Buchstabe aus lib/vaveLogo.ts (500…700), Breite fest */
+.vave-wort { display: inline-flex; font-size: 22px; font-weight: 560; }
+.vave-b { display: inline-block; text-align: center; }
+.vave-punkt { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex: none; margin: 0 4px 0 5px; }
+.vave-zusatz { font-size: 16px; font-weight: 400; letter-spacing: -0.055em; }
+@media (max-width: 640px) {
+  .vave-wort { font-size: 20px; }
+  .vave-zusatz { font-size: 14px; }
+}
+
+/* ---------- Fläche ---------- */
+html[data-design='vave'] .react-flow { --xy-background-pattern-color: #d9dbd3; }
+html[data-design='vave'][data-theme='dark'] .react-flow { --xy-background-pattern-color: #2c2e29; }
+
+/* ---------- Karten ---------- */
+/* Auswahl: violetter Ring wie der Fokus in vave.log */
+html[data-design='vave'] .react-flow__node.selected { outline-color: var(--vave-fokus); }
+/* Kanban wie die Aufgaben in vave.log: Spalten auf hellem Grün-Grau mit Kante, Tickets weiß mit Kante */
+html[data-design='vave'] .kanban-col { background: var(--vave-spalte); box-shadow: inset 0 0 0 1px var(--vave-spalte-rand); border-radius: 13px; }
+html[data-design='vave'] .kanban-item { border-radius: 9px; box-shadow: 0 0 0 1px var(--vave-spalte-rand); border-left: none; padding-left: 10px; }
+html[data-design='vave'] .kanban-item:hover { box-shadow: 0 0 0 1px var(--vave-rand-hover); }
+
+/* ---------- Leisten ---------- */
+html[data-design='vave'] :is(.dock button, .top-actions button):hover:not(:disabled) { background: var(--vave-hover); }
+/* aktiver Reiter wie der aktive Menüpunkt in vave.log: violette Schrift auf zartem Violett */
+html[data-design='vave'] .tab.active { color: var(--accent-strong); font-weight: 500; box-shadow: none; }
+
+/* ---------- Umschalter (vave.log .segmented) ---------- */
+html[data-design='vave'] .seg { background: var(--vave-seg); border-color: var(--vave-seg-rand); border-radius: 8px; padding: 3px; gap: 3px; }
+html[data-design='vave'] .seg button { border-left: none; border-radius: 5px; color: var(--vave-seg-schrift); }
+html[data-design='vave'] .seg button:hover:not(:disabled) { background: var(--vave-hover); color: var(--ink); }
+html[data-design='vave'] .seg button.on { background: var(--surface); color: var(--accent-strong); font-weight: 500; box-shadow: 0 1px 4px rgba(27, 34, 18, 0.1); }
+/* Reiter der Einstellungen: violette Schrift, dünner Strich */
+html[data-design='vave'] .modal-tabs button.on { font-weight: 500; background: none; }
+
+/* ---------- Fenster (vave.log .dialog) ---------- */
+html[data-design='vave'] .modal-backdrop { background: var(--vave-abdunkler); backdrop-filter: blur(3px); }
+html[data-design='vave'] .modal { border-radius: 17px; box-shadow: var(--vave-fenster-schatten); }
+html[data-design='vave'] .modal-head { border-radius: 17px 17px 0 0; padding: 20px 24px 16px; }
+html[data-design='vave']:not([data-lesbar='an']) .modal-head h2 { font-size: 22px; line-height: 1.15; }
+/* das violette Etikett über dem Titel („VAVE.LOG" dort) — nur Bild, kein Text für Vorleser */
+html[data-design='vave']:not([data-lesbar='an']) .modal-head h2::before {
+  content: 'PIXINOTES' / ''; display: block; margin-bottom: 7px;
+  font-size: 11px; font-weight: 550; letter-spacing: 0.16em; line-height: 1.4; color: var(--accent-strong);
+}
+html[data-design='vave'] .modal-section { padding-left: 24px; padding-right: 24px; }
+/* Felder: 7 px rund wie in vave.log (Rand ≥ 3:1, siehe 00-tokens.css) */
+html[data-design='vave'] .modal :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']), select, textarea) { border-radius: 7px; }
+/* Knöpfe wie „secondary" in vave.log: weiß, Kante, 8 px, beim Zeigen ein Pixel Hub */
+html[data-design='vave'] .modal-buttons button { background: var(--surface); border-color: var(--border-soft); border-radius: 8px; transition: background .15s, transform .15s; }
+html[data-design='vave'] .modal-buttons button:hover:not(:disabled) { background: var(--vave-hover); border-color: var(--border-soft); transform: translateY(-1px); }
+
+/* ---------- Bedienung ---------- */
+/* Fokusring wie in vave.log: 3 px Violett */
+html[data-design='vave'] :is(button, [role='button'], a, input, select, textarea):focus-visible { outline: 3px solid var(--vave-fokus); }
+/* Hinweise (Toast) warm-schwarz wie die Schrift in vave.log, „Rückgängig" in Lime */
+html[data-design='vave'] :is(.toast, .tipbox) { background: var(--vave-hinweis); border-color: transparent; border-radius: 8px; }
+html[data-design='vave'] .toast-undo { color: var(--vave-lime); }
+/* Einstellungen: statt der Farbtupfer ein Satz — vave.log bringt sein Violett mit */
+.akzent-vave { margin: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-design='vave'] .modal-buttons button { transition: none; }
+  html[data-design='vave'] .modal-buttons button:hover:not(:disabled) { transform: none; }
+}

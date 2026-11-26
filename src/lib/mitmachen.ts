@@ -76,12 +76,14 @@ function lookFuerLink(boardId: string | undefined): Pick<MitLink, 'design' | 'th
   const look = boardId ? useBoard.getState().boards.find((b) => b.id === boardId)?.look : undefined;
   if (lookAktiv(look)) {
     return {
-      ...(look.design === 'pixel' ? { design: 'pixel' as const } : {}),
+      ...(look.design === 'pixel' || look.design === 'vave' ? { design: look.design } : {}),
       ...(look.theme === 'light' || look.theme === 'dark' ? { thema: look.theme } : {}),
-      ...(look.design !== 'pixel' && look.accent && look.accent !== 'blau' ? { akzent: look.accent } : {}),
+      ...((look.design ?? 'klassisch') === 'klassisch' && look.accent && look.accent !== 'blau' ? { akzent: look.accent } : {}),
     };
   }
-  return document.documentElement.dataset.design === 'pixel' ? { design: 'pixel' } : {};
+  // M547: auch vave.log reist mit (pix·el seit M507)
+  const d = document.documentElement.dataset.design;
+  return d === 'pixel' || d === 'vave' ? { design: d } : {};
 }
 
 // ───── Teilnehmerzahl (vom Gastgeber gefüllt) ─────

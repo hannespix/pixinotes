@@ -1,7 +1,7 @@
 // M509: Der Look des Boards reist beim Teilen mit.
 //
 // Wer ein Board teilt (Einladungslink, QR-Code, Freigabe per E-Mail), gibt seinen Look mit: Erscheinungsbild
-// (System/Hell/Dunkel), Design (Klassisch/pix·el) und Akzentfarbe. Der Look ist ein Feld des Boards (`look`) und
+// (System/Hell/Dunkel), Design (Klassisch/pix·el/vave.log) und Akzentfarbe. Der Look ist ein Feld des Boards (`look`) und
 // reist darum mit jedem Abgleich — Konto, Gast-Link, Live-Kanal — ohne neues Server-Feld. Bei Gästen gilt er nur,
 // solange dieses Board offen ist; ihre eigenen Geräte-Einstellungen bleiben unberührt (es wird nie `ui` geschrieben).
 // Lesbarkeit (Anzeigegröße, „Besser lesbar", weniger Bewegung) gehört immer dem Gast — sie steckt nicht im Look.
@@ -10,10 +10,10 @@
 import type { BoardDoc, BoardLook } from '../store/typen';
 import { t } from './sprache';
 
-type Ui = { theme: 'system' | 'light' | 'dark'; accent: string; design?: 'klassisch' | 'pixel' };
+type Ui = { theme: 'system' | 'light' | 'dark'; accent: string; design?: 'klassisch' | 'pixel' | 'vave' };
 
 const THEMEN = ['system', 'light', 'dark'] as const;
-const DESIGNS = ['klassisch', 'pixel'] as const;
+const DESIGNS = ['klassisch', 'pixel', 'vave'] as const;
 export const AKZENTE = ['blau', 'gruen', 'violett', 'orange', 'rosa'] as const;
 
 /** Look aus den eigenen Einstellungen — alle drei Werte ausdrücklich (fehlendes Design = Klassisch) */
@@ -36,12 +36,13 @@ export const lookAktiv = (l: BoardLook | undefined): l is BoardLook => !!l && !l
 
 const WORT_THEMA = { system: 'System', light: 'Hell', dark: 'Dunkel' } as const;
 const WORT_AKZENT: Record<string, string> = { blau: 'Blau', gruen: 'Grün', violett: 'Violett', orange: 'Orange', rosa: 'Rosa' };
-/** „Dunkel · pix·el" bzw. „Hell · Klassisch · Grün" — pix·el bringt sein LCD-Grün mit (M507), der Akzent zählt dort nicht */
+/** „Dunkel · pix·el" bzw. „Hell · Klassisch · Grün" — pix·el (M507) und vave.log (M547) bringen ihren Akzent mit, der
+ *  gewählte zählt dort nicht */
 export function lookWort(l: BoardLook): string {
   const teile: string[] = [WORT_THEMA[l.theme ?? 'system']];
-  const pixel = l.design === 'pixel';
-  teile.push(pixel ? 'pix·el' : 'Klassisch');
-  if (!pixel && l.accent) teile.push(WORT_AKZENT[l.accent] ?? l.accent);
+  const eigen = l.design === 'pixel' || l.design === 'vave';
+  teile.push(l.design === 'pixel' ? 'pix·el' : l.design === 'vave' ? 'vave.log' : 'Klassisch');
+  if (!eigen && l.accent) teile.push(WORT_AKZENT[l.accent] ?? l.accent);
   return teile.map((w) => t(w)).join(' · ');   // englische Oberfläche: Wort für Wort (M381)
 }
 
@@ -93,7 +94,7 @@ export function lookAusRoh(roh: string): { id: string; look: BoardLook } | null 
 }
 /** Unterscheidet sich der Look sichtbar von meinem? (sonst kein Hinweis) */
 export const lookAnders = (a: Ui, b: Ui): boolean => a.theme !== b.theme || (a.design ?? 'klassisch') !== (b.design ?? 'klassisch')
-  || ((a.design ?? 'klassisch') !== 'pixel' && a.accent !== b.accent);
+  || ((a.design ?? 'klassisch') === 'klassisch' && a.accent !== b.accent);
 
 /** M509: Teilender ändert seinen Look → die Boards, die seinen Look mitgeben, ziehen nach (für die Gäste live) */
 export function lookNachziehen(boards: BoardDoc[], ui: Ui): BoardDoc[] | null {

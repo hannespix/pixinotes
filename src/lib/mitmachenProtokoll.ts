@@ -54,8 +54,8 @@ export interface MitLink {
   token: string;
   /** Abdruck des öffentlichen Schlüssels des Gastgebers (SHA-256 des rohen P-256-Schlüssels, 16 Byte, base64url) */
   schluessel: string;
-  /** Look des Boards (M507/M509): Design, Hell/Dunkel (fehlt: wie das Gerät), Akzent */
-  design?: 'pixel';
+  /** Look des Boards (M507/M509/M547): Design, Hell/Dunkel (fehlt: wie das Gerät), Akzent */
+  design?: 'pixel' | 'vave';
   thema?: 'light' | 'dark';
   akzent?: string;
   /** Server, falls er nicht der vorgegebene dieser Fassung ist */
@@ -101,7 +101,7 @@ export function linkLesen(hash: string): MitLink | null {
     const sb = u && a && /^https?:\/\//.test(u) ? { url: u.replace(/\/+$/, ''), key: a } : undefined;
     const t = q.get('t'); const f = q.get('f') ?? '';
     return {
-      token, schluessel, ...(q.get('d') === 'pixel' ? { design: 'pixel' as const } : {}),
+      token, schluessel, ...(q.get('d') === 'pixel' || q.get('d') === 'vave' ? { design: q.get('d') as 'pixel' | 'vave' } : {}),
       ...(t === 'light' || t === 'dark' ? { thema: t } : {}), ...(/^(gruen|violett|orange|rosa)$/.test(f) ? { akzent: f } : {}),
       ...(sb ? { sb } : {}),
     };
