@@ -300,3 +300,9 @@ Kalam: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com). SIL 
 
 Jersey 10 (Pixelschrift des Designs „pix·el“, M507, unverändert aus pix-el.de übernommen):
 Copyright 2023 The Soft Type Project Authors (https://github.com/scfried/soft-type-jersey). SIL Open Font License 1.1 (Text wie oben).
+
+----------------------------------------------------------------------
+
+Readex Pro (Schrift des Designs „Agency“, M547 – unverändert aus @fontsource-variable/readex-pro 5.3.0,
+nur die Teile Latein und Latein-Erweitert, variabel 160–700):
+Copyright 2019 The Readex Pro Project Authors (https://github.com/ThomasJockin/readexpro). SIL Open Font License 1.1 (Text wie oben).
