@@ -25,6 +25,9 @@ const kanban = (id, title, x, y, width, height) => ({ id, type: 'kanban', positi
   data: { title, items: [{ id: `${id}-1`, text: 'Erster Schritt', col: 0 }] } });
 const form = (id, text, x, y, width, height) => ({ id, type: 'shape', position: { x, y }, width, height,
   data: { shape: 'process', text, color: '#eef2ff' } });
+const notiz = (id, text, x, y, width, height) => ({ id, type: 'note', position: { x, y }, width, height,
+  data: { color: 'yellow', blocks: [{ id: `${id}-text`, type: 'paragraph', props: {},
+    content: [{ type: 'text', text, styles: {} }], children: [] }] } });
 const bretter = {
   boards: [
     { id: 'a', name: 'Planung', edges: [], drawings: [], comments: [], nodes: [
@@ -33,8 +36,8 @@ const bretter = {
       kanban('gross', 'Großer Arbeitsplan', -3700, 460, 2000, 980),
     ] },
     { id: 'b', name: 'Abnahme', edges: [], drawings: [], comments: [], nodes: [
-      kanban('anderes', 'Abnahmeübersicht', 2450, -1800, 530, 300),
-      form('wechsel', 'Kontrollpunkt', -780, -120, 160, 90),
+      notiz('anderes', 'Abnahmeübersicht', 2450, -1800, 530, 300),
+      notiz('wechsel', 'Kontrollpunkt', -780, -120, 160, 90),
     ] },
   ],
   spaces: [{ id: 's', name: 'Räume', projects: [{ id: 'p', name: 'Projekt', boardIds: ['a', 'b'] }] }],
@@ -127,7 +130,7 @@ try {
   const flug = await P.evaluate(() => window.flugMessung());
   pruefe('Die Kamera fährt in sichtbaren Zwischenschritten zur Karte', flug.schritte >= 3);
   pruefe('Die Karte wird erst mit richtig bemessenen Griffen an der Landung ausgewählt',
-    Math.abs(flug.ersteAuswahl.zoom - normal.zoom) < 0.001
+    flug.ersteAuswahl && Math.abs(flug.ersteAuswahl.zoom - normal.zoom) < 0.001
       && Math.abs(flug.ersteAuswahl.griffmass - 1 / normal.zoom) <= 0.04, flug.ersteAuswahl);
 
   await knopf(P, 'Kleine Markierung').click();
@@ -137,9 +140,29 @@ try {
   pruefe('Ein übergroßes Modul beginnt rechts neben der Spalte mit lesbarem Titel', !!await landung(P, 'gross', { min: 0.89, zuGross: true }));
 
   await P.locator('.side-board', { has: P.getByRole('button', { name: 'Abnahme', exact: true }) }).locator('.side-board-arrow').click();
+  // Die Größen des neuen Boards kommen absichtlich erst nach dem gezielten Flug.
+  await P.evaluate(() => {
+    const original = ResizeObserver.prototype.observe;
+    const spaeteMessungen = [];
+    ResizeObserver.prototype.observe = function (element, ...optionen) {
+      if (element.matches('.react-flow__node[data-id="anderes"], .react-flow__node[data-id="wechsel"]')) {
+        spaeteMessungen.push(() => original.call(this, element, ...optionen));
+      } else original.call(this, element, ...optionen);
+    };
+    window.modulMasseMessen = async () => {
+      ResizeObserver.prototype.observe = original;
+      spaeteMessungen.forEach((messen) => messen());
+      await new Promise((fertig) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(fertig))));
+      return spaeteMessungen.length;
+    };
+  });
   await knopf(P, 'Abnahmeübersicht').click();
   await knopf(P, 'Kontrollpunkt').click();
   pruefe('Beim Board-Wechsel landet die Kamera beim zuletzt gewählten Modul', !!await landung(P, 'wechsel', { min: 1.2 }));
+  const transform = () => P.locator('.react-flow__viewport').evaluate((e) => e.style.transform);
+  const ausschnitt = await transform();
+  pruefe('Verspätetes Vermessen ändert die gelandete Kamera nicht',
+    await P.evaluate(() => window.modulMasseMessen()) === 2 && await transform() === ausschnitt);
   await knopf(P, 'Abnahmeübersicht').click();
   pruefe('Ein weiterer Klick führt erneut zum gewünschten Modul', !!await landung(P, 'anderes', { min: 1.15 }));
 
