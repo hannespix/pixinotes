@@ -18,6 +18,7 @@ export function NeuEn() {
             <section id="help-neu">
               <p>The latest releases in brief, newest first. Which version is currently running is shown at the bottom of the help.</p>
               <ul><NeuesteZuerst>
+                <li><b>A flowing wave in the Agency wordmark (M560)</b> The left stem of the “p” stays fixed. The wave builds to the left of the opening, then flows to the right edge. Both “i” stems have gently rounded contours. Their dots, the violet separator, and “notes” stay still.</li>
                 <li><b>Shared timer with the interface hidden (M559)</b> The timer stays visible and keeps counting down when you hide the interface. You can drag it, minimize it, and tap the remaining time to expand it again.</li>
                 <li><b>Move and minimize the timer (M558)</b> Drag the shared timer out of the way by its handle or minimize it to a small button showing the time left. Press the button to restore the full display. Everyone can move or minimize their own timer display while sharing the same countdown.</li>
                 <li><b>Softer letterforms and clearer contrast in Agency (M557)</b> The opening in the “p” moves diagonally upward as ink gathers along its stem. The inner corners of the “x” round out. Hints and small labels are easier to read in both themes. A thin violet line marks the selected option in segmented controls.</li>
