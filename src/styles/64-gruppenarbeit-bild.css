@@ -213,21 +213,39 @@ html[data-alles-zeigen] .punkte-leiste { display: none !important; }
 /* Die laufende Uhr — oben in der Mitte, bei allen */
 .gruppen-timer {
   position: fixed; top: calc(58px + var(--safe-top) + var(--app-rand)); left: 50%; transform: translateX(-50%); z-index: 96;
-  display: flex; align-items: center; gap: 8px; overflow: hidden;
+  display: flex; align-items: center; gap: 4px; overflow: hidden; box-sizing: border-box;
+  width: max-content; max-width: calc(100vw / var(--pn-anz, 1) - var(--safe-left) - var(--safe-right) - 12px);
   background: var(--surface-card); color: var(--ink); border: 1px solid var(--border); border-radius: 999px; box-shadow: var(--pop-shadow);
-  padding: 6px 8px 6px 12px; font-size: 12.5px; white-space: nowrap;
+  padding: 3px 5px; font-size: 12.5px; white-space: nowrap;
 }
 .gruppen-timer::after {
-  content: ''; position: absolute; left: 0; bottom: 0; height: 3px; width: var(--anteil, 0%); background: var(--accent); transition: width 1s linear;   /* M512: die Uhr springt einmal je Sekunde */
+  content: ''; position: absolute; left: 0; bottom: 0; height: 3px; pointer-events: none; width: var(--anteil, 0%); background: var(--accent); transition: width 1s linear;   /* M512: die Uhr springt einmal je Sekunde */
 }
 .gruppen-timer.im-vortrag { top: calc(10px + var(--safe-top)); }
 .gruppen-timer-zeit { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 2.6em; }
 .gruppen-timer-von { color: var(--muted); max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
 .gruppen-timer button {
-  width: 22px; height: 22px; flex: none; border: none; border-radius: 50%; background: var(--surface-3); color: var(--muted);
+  width: 28px; height: 28px; flex: none; border: none; border-radius: 50%; background: var(--surface-3); color: var(--muted);
   display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
 }
 .gruppen-timer button:hover { color: var(--ink); }
+.gruppen-timer button:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: -2px; }
+.gruppen-timer .timer-griff { background: transparent; cursor: grab; touch-action: none; user-select: none; }
+.gruppen-timer .timer-griff:active { cursor: grabbing; }
+.gruppen-timer.klein { gap: 0; }
+.gruppen-timer.klein .timer-klapp { width: auto; gap: 5px; padding: 0 6px; border-radius: 999px; background: transparent; color: var(--ink); }
+@media (pointer: coarse) {
+  .gruppen-timer button { width: max(28px, calc(44px / var(--pn-anz, 1))); height: max(28px, calc(44px / var(--pn-anz, 1))); }
+}
+/* M558: Prozent in translate bezieht sich auf die Uhr selbst. Auch nach Aufklappen, Drehen oder
+   einer anderen Anzeigegröße passt ihr ganzer Kasten zwischen die sicheren Bildschirmränder. */
+.gruppen-timer.frei {
+  position: fixed; left: 0; top: 0; z-index: 96;
+  transform: translate(
+    clamp(calc(var(--safe-left) + 6px), var(--timer-x), calc(100vw / var(--pn-anz, 1) - 100% - var(--safe-right) - 6px)),
+    clamp(calc(var(--safe-top) + 6px), var(--timer-y), calc(100dvh / var(--pn-anz, 1) - 100% - var(--safe-bottom) - var(--kb, 0px) - 6px))
+  );
+}
 .gruppen-timer.knapp .gruppen-timer-zeit { color: #e8590c; }
 .gruppen-timer.knapp::after { background: #e8590c; }
 .gruppen-timer.um { border-color: #e03131; animation: timer-um 1s ease-in-out infinite; }
@@ -322,10 +340,15 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
     width: calc(calc(100vw / var(--pn-anz, 1)) - 2 * var(--app-rand)); padding: 0 calc(8px + var(--safe-right)) 0 calc(8px + var(--safe-left)); box-sizing: border-box;
     z-index: var(--ebene-dauerband); pointer-events: none;
   }
-  .app:not(.focus-mode) .dauerbaender:not(.im-vortrag) > * {
+  .app:not(.focus-mode) .dauerbaender:not(.im-vortrag) > :not(.gruppen-timer.frei) {
     position: relative; top: auto; right: auto; bottom: auto; left: auto; transform: none; z-index: auto;
     max-width: 100%; pointer-events: auto;
   }
+  /* Nur die frei verschobene Uhr darf auch über der Bedienleiste liegen. Die übrigen Bänder
+     behalten ihre Ebene. Ein absoluter Stapel ohne eigenen Stapelkontext erlaubt beides. */
+  .app:not(.focus-mode) .dauerbaender:not(.im-vortrag):has(> .gruppen-timer.frei) { position: absolute; z-index: auto; }
+  .app:not(.focus-mode) .dauerbaender:not(.im-vortrag):has(> .gruppen-timer.frei) > :not(.gruppen-timer) { z-index: var(--ebene-dauerband); }
+  .dauerbaender > .gruppen-timer.frei { pointer-events: auto; }
   /* „Nur lesen" schrumpft nach ein paar Sekunden auf sein Kurzwort; antippen zeigt es wieder ganz */
   .lese-band { min-height: 40px; }
   .lese-band .band-klapp {

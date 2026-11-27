@@ -11,7 +11,8 @@ import {
   type Reaktion,
 } from '../lib/gruppenraum';
 import { ich } from '../lib/liveStand';
-import { ITimer, IX, ILaecheln } from './Icons';
+import { ITimer, ILaecheln } from './Icons';
+import { GruppenTimerAnzeige } from './GruppenTimerAnzeige';
 import { zahlWort } from '../lib/sprache';
 import { timerDauerLesen } from '../lib/timerDauer';
 
@@ -185,16 +186,7 @@ export function GruppenTimer() {
     return () => { window.clearTimeout(wecker); document.removeEventListener('visibilitychange', sicht); };
   }, [t?.lauf, t?.ende, boardId]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const rest = timerRest(t);
-  const um = !!t && rest <= 0;
   if (!t) return null;
-  return (
-    <div className={`gruppen-timer${um ? ' um' : ''}${rest > 0 && rest <= 10_000 ? ' knapp' : ''}${imVortrag ? ' im-vortrag' : ''}`} role="timer" aria-live="off" data-taste="timer-chip"
-      style={{ '--anteil': `${Math.max(0, Math.min(1, rest / Math.max(1, t.dauer))) * 100}%` } as CSSProperties}>
-      <ITimer size={14} />
-      <span className="gruppen-timer-zeit" data-taste="timer-zeit">{um ? 'Zeit ist um' : timerText(rest)}</span>
-      <span className="gruppen-timer-von" translate="no">{t.von === ich().id ? 'von dir' : `von ${t.name}`}</span>
-      <button onClick={() => timerStopp(boardId)} title={um ? 'Schließen' : 'Timer für alle anhalten'} aria-label={um ? 'Schließen' : 'Timer anhalten'} data-taste="timer-zu"><IX size={12} /></button>
-    </div>
-  );
+  return <GruppenTimerAnzeige key={JSON.stringify([boardId, t.von, t.lauf])} timer={t} rest={timerRest(t)}
+    imVortrag={imVortrag} stoppen={() => timerStopp(boardId)} />;
 }

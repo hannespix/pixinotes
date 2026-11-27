@@ -175,6 +175,7 @@ export function HelpOverlay() {
             <section id="help-neu">
               <p>Die letzten Ausbaustufen in Kürze, neueste zuerst. Welche Fassung gerade läuft, steht am Fuß der Hilfe.</p>
               <ul><NeuesteZuerst>
+                <li><b>Timer verschieben und minimieren (M558)</b> Zieh den „Timer für alle“ am Griff aus dem Weg oder lass ihn als kleinen Knopf mit Restzeit anzeigen. Ein Klick auf die Restzeit öffnet die ganze Uhr wieder. Jede Person wählt ihre eigene Anzeige und sieht dieselbe Restzeit.</li>
                 <li><b>Weichere Innenkonturen und mehr Kontrast in Agency (M557)</b> Die Öffnung im „p“ wandert schräg nach oben, während sich am Stamm Tinte sammelt. Die Innenwinkel des „x“ runden sich. Hinweise und kleine Beschriftungen sind in Hell und Dunkel besser lesbar. Eine feine violette Linie zeigt die Auswahl in Umschaltern.</li>
                 <li><b>Deutlichere Welle in der Agency-Wortmarke (M556)</b> Der Bauch des „p“ wölbt sich stärker. Während die Bewegung durch „pixi“ läuft, werden das „x“ und das letzte „i“ schmaler. Die Formen fließen im selben ruhigen Takt wie bei vave.log zurück.</li>
                 <li><b>„pixi · notes“ mit der Animation aus vave.log (M555)</b> Die Buchstaben von „pixi“ sind für die Bewegung aus vave.log gezeichnet. Die Formen ziehen sich nacheinander zusammen, halten kurz inne und fließen zurück. Dazwischen steht der violette Punkt vor dem ruhigen „notes“.</li>
@@ -667,7 +668,8 @@ export function HelpOverlay() {
                 <li><b>iPad / iPhone:</b> „Stand sichern → Dateien-App" und „Stand laden…" tauschen dieselbe <code>pixinotes-daten.json</code> wie der Sync-Ordner. Zum Home-Bildschirm installieren, sonst löscht Safari nach 7 Tagen.</li>
                 <li><b>Team-Sync:</b> ein Projekt in einen eigenen Ordner spiegeln (Einstellungen → Daten → Synchronisation). „Einladen…" mailt die Anleitung, „Projekt beitreten…" nimmt sie an; die Ordner-Freigabe regelt den Zugang.</li>
                 <li><b>Kommentare</b> (⋯ → Kommentar): Pins an der Karte mit Initialen, das Gespräch als Blase daneben; wandern im Team mit. Pin und Textblase lassen sich ziehen (Pin = an eine andere Stelle, Blase = nur aus dem Weg; Doppelklick legt sie zurück).</li>
-                <li><b>Gemeinsam im Board:</b> Die Leiste oben rechts zeigt, wer da ist; antippen öffnet die Liste mit Einladen, Vorführen und dem <b>Timer für alle</b> – Schnellwahl oder eigene Dauer („90“, „1h30“, „45s“, bis 12 Stunden). Alle sehen die Uhr oben ablaufen, anhalten kann jeder.</li>
+                <li><b>Gemeinsam im Board</b> Die Leiste oben rechts zeigt, wer da ist. Tippe darauf, um einzuladen, vorzuführen oder den <b>Timer für alle</b> zu stellen. Wähle eine Dauer oder gib sie ein, etwa „90“, „1h30“ oder „45s“ (bis 12 Stunden).</li>
+                <li><b>Anzeige des Timers</b> Zieh die Uhr am Griff mit Maus oder Finger. Wenn der Griff den Tastaturfokus hat, verschiebst du die Uhr mit den Pfeiltasten. <b>Timer minimieren</b> zeigt einen kleinen Knopf mit der Restzeit. Drück ihn, um die ganze Anzeige wiederherzustellen. Jede Person wählt ihre eigene Anzeige. Die Restzeit ist für alle gleich und jede Person kann den Timer für alle anhalten.</li>
               </ul>
               <h4>Teilen &amp; Export</h4>
               <ul>

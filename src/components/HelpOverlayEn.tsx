@@ -18,6 +18,7 @@ export function NeuEn() {
             <section id="help-neu">
               <p>The latest releases in brief, newest first. Which version is currently running is shown at the bottom of the help.</p>
               <ul><NeuesteZuerst>
+                <li><b>Move and minimize the timer (M558)</b> Drag the shared timer out of the way by its handle or minimize it to a small button showing the time left. Press the button to restore the full display. Everyone can move or minimize their own timer display while sharing the same countdown.</li>
                 <li><b>Softer letterforms and clearer contrast in Agency (M557)</b> The opening in the “p” moves diagonally upward as ink gathers along its stem. The inner corners of the “x” round out. Hints and small labels are easier to read in both themes. A thin violet line marks the selected option in segmented controls.</li>
                 <li><b>A more pronounced wave in the Agency wordmark (M556)</b> The bowl of the “p” swells more visibly. The “x” and the final “i” grow slimmer as the wave passes through “pixi”. The shapes flow back at the same unhurried pace as vave.log.</li>
                 <li><b>“pixi · notes” with the vave.log animation (M555)</b> The “pixi” letters are drawn to move with the vave.log animation. Their shapes shift in sequence, pause briefly, and flow back. A purple dot leads into the still “notes”.</li>
@@ -466,7 +467,8 @@ export function HilfeEn() {
                 <li><b>iPad / iPhone:</b> “Back up → Files app” and “Load backup…” exchange the same <code>pixinotes-daten.json</code> as the sync folder. Install it to the Home Screen, otherwise Safari deletes the data after 7 days.</li>
                 <li><b>Team sync:</b> mirror a project into its own folder (Settings → Data → Sync). “Invite…” emails the instructions, “Join project…” accepts them; the folder sharing controls access.</li>
                 <li><b>Comments</b> (⋯ → Comment): pins on the card with initials, the conversation as a bubble next to it; they travel along within the team. Pin and text bubble can be dragged (pin = to another spot, bubble = just out of the way; double-click puts it back).</li>
-                <li><b>Together in a board:</b> The bar at the top right shows who is here; tap it for the list with invite, present and the <b>timer for everyone</b> – a quick choice or your own duration (“90”, “1h30”, “45s”, up to 12 hours). Everyone sees the clock run down at the top, anyone can stop it.</li>
+                <li><b>Together on a board</b> The bar at the top right shows who is here. Tap it to invite people, present, or set the <b>timer for everyone</b>. Choose a preset or enter a duration such as “90”, “1h30”, or “45s” (up to 12 hours).</li>
+                <li><b>Timer display</b> Drag the timer by its handle with a mouse or finger. When the handle has keyboard focus, use the arrow keys to move it. <b>Minimize timer</b> leaves a small button showing the time left. Press it to restore the full display. Each person can move or minimize their own display. Everyone shares the same countdown and anyone can stop it for the group.</li>
               </ul>
               <h4>Sharing &amp; export</h4>
               <ul>
