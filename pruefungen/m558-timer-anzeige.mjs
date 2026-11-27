@@ -1,73 +1,7 @@
 // M558: Zwei Gäste im selben Board, mit je eigener Timeranzeige.
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import http from 'node:http';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { chromium } from 'playwright-core';
+import { mitTimerTeam, taste } from './geteiltes-timer-board.mjs';
 
-const PORT = 5558;
-const HOST = '127.0.0.1';
-const APP_URL = new URL(process.env.PN_URL ?? `http://${HOST}:${PORT}/`);
-const DIST = path.resolve(process.env.PN_DIST ?? fileURLToPath(new URL('../dist', import.meta.url)));
-const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2' };
-const server = process.env.PN_URL ? null : http.createServer(async (req, res) => {
-  const datei = path.resolve(DIST, `.${new URL(req.url, 'http://localhost').pathname}`);
-  const ziel = datei === DIST ? path.join(DIST, 'index.html') : datei;
-  if (!ziel.startsWith(`${DIST}${path.sep}`)) { res.writeHead(404).end(); return; }
-  try {
-    const inhalt = await readFile(ziel);
-    res.writeHead(200, { 'Content-Type': mime[path.extname(ziel)] ?? 'application/octet-stream' }).end(inhalt);
-  } catch { res.writeHead(404).end(); }
-});
-if (server) await new Promise((fertig) => server.listen(PORT, HOST, fertig));
-
-const SB_URL = 'https://m558-supabase.test';
-const TOKEN = 'praesentation-m558';
-APP_URL.hash = `e=${TOKEN}`;
-const kanal = 'm558';
-const board = {
-  id: 'b558', name: 'Präsentationsprobe', edges: [], drawings: [], comments: [],
-  nodes: [{ id: 'notiz', type: 'note', width: 280, position: { x: 140, y: 160 },
-    data: { color: 'yellow', blocks: [{ type: 'paragraph', content: 'Die erste Folie' }] } }],
-};
-const teilnehmer = new Set();
-
-async function teamDienst(ctx) {
-  await ctx.route(`${SB_URL}/rest/v1/rpc/*`, (route) => {
-    const name = new URL(route.request().url()).pathname.split('/').at(-1);
-    if (route.request().postDataJSON()?.p_token !== TOKEN) return route.fulfill({ status: 200, json: null });
-    const stand = { version: 1, rolle: 'bearbeiten', optionen: {} };
-    if (name === 'gast_lesen') return route.fulfill({ json: { ...stand, board_id: board.id, kanal,
-      besitzer: 'leiter', inhalt: JSON.stringify(board), dateien: [] } });
-    if (name === 'gast_stand') return route.fulfill({ json: stand });
-    return route.fulfill({ status: 404, json: { message: name } });
-  });
-  await ctx.routeWebSocket(`${SB_URL.replace('https', 'wss')}/realtime/v1/websocket?*`, (ws) => {
-    const t = { ws, name: '', meta: null, topic: '' };
-    const senden = (empfaenger, event, payload, ref = null) => empfaenger.ws.send(JSON.stringify({ topic: t.topic, event, payload, ref }));
-    ws.onMessage((roh) => {
-      const { topic, event, payload, ref } = JSON.parse(String(roh));
-      if (event === 'phx_join') {
-        t.topic = topic;
-        t.name = payload.config.presence.key;
-        teilnehmer.add(t);
-        senden(t, 'phx_reply', { status: 'ok', response: {} }, ref);
-      } else if (topic === t.topic && event === 'presence') {
-        t.meta = payload.payload;
-        const state = Object.fromEntries([...teilnehmer].filter((p) => p.topic === topic && p.meta)
-          .map((p) => [p.name, { metas: [p.meta] }]));
-        for (const p of teilnehmer) if (p.topic === topic) senden(p, 'presence_state', state);
-      } else if (topic === t.topic && event === 'broadcast') {
-        for (const p of teilnehmer) if (p !== t && p.topic === topic) senden(p, 'broadcast', payload);
-      }
-    });
-    ws.onClose(() => { teilnehmer.delete(t); });
-  });
-}
-
-const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium' });
-const taste = (P, name) => P.locator(`[data-taste="${name}"]`);
 const chip = (P) => taste(P, 'timer-chip');
 const griff = (P) => taste(P, 'timer-griff');
 const klapp = (P) => taste(P, 'timer-klapp');
@@ -76,26 +10,6 @@ const offen = (P) => klapp(P).getAttribute('aria-expanded', { timeout: 3000 });
 const warteKlapp = (P, wert) => P.locator(`[data-taste="timer-klapp"][aria-expanded="${wert}"]`).waitFor();
 const rest = async (P) => (await zeit(P).textContent()).split(':').reduce((n, s) => 60 * n + Number(s), 0);
 const mitte = ({ x, y, width, height }) => ({ x: x + width / 2, y: y + height / 2 });
-
-async function seite(name, mobil = false) {
-  const ctx = await browser.newContext({ viewport: mobil ? { width: 390, height: 844 } : { width: 1280, height: 820 },
-    isMobile: mobil, hasTouch: mobil, locale: 'de-DE', serviceWorkers: 'block' });
-  // Auch gegen PN_URL lädt nur die App selbst vom Netz. Der Team-Dienst läuft im Testprozess.
-  await ctx.route('**/*', (route) => new URL(route.request().url()).origin === APP_URL.origin ? route.continue() : route.abort());
-  await ctx.routeWebSocket((url) => url.origin !== SB_URL.replace('https', 'wss'), (ws) => ws.close());
-  await teamDienst(ctx);
-  await ctx.addInitScript(({ url }) => {
-    localStorage.setItem('pixinotes-onboarded', '1');
-    sessionStorage.setItem('pixinotes-hint-shown', '1');
-    localStorage.setItem('pixinotes-supabase', JSON.stringify({ url, key: 'anon-test-key' }));
-  }, { url: SB_URL });
-  const P = await ctx.newPage();
-  P.setDefaultTimeout(8000);
-  await P.goto(APP_URL.href);
-  await taste(P, 'gast-name').fill(name);
-  await taste(P, 'gast-name-ok').click();
-  return P;
-}
 
 async function starten(P, minuten) {
   await taste(P, 'live-auf').click();
@@ -136,10 +50,7 @@ function pruefe(name, erfuellt) {
   console.log(`  ✓ ${name}`);
 }
 
-try {
-  const [A, B] = await Promise.all([seite('Ada'), seite('Ben', true)]);
-  await A.locator('[data-taste="live-chip"][data-name="Ben"]').waitFor();
-  await B.locator('[data-taste="live-chip"][data-name="Ada"]').waitFor();
+await mitTimerTeam(5558, async (A, B) => {
   await starten(A, 5);
   await Promise.all([chip(A).waitFor(), chip(B).waitFor()]);
   pruefe('Beide sehen denselben frisch gestarteten Lauf', await rest(A) >= 297 && Math.abs(await rest(A) - await rest(B)) <= 2);
@@ -219,8 +130,5 @@ try {
   await taste(B, 'timer-zu').tap();
   await Promise.all([chip(A).waitFor({ state: 'detached' }), chip(B).waitFor({ state: 'detached' })]);
   pruefe('Anhalten über den separaten Knopf beendet den Timer auf beiden Geräten', await chip(A).count() === 0 && await chip(B).count() === 0);
-} finally {
-  await browser.close();
-  server?.close();
-}
+});
 console.log(`M558: ${checks} bestanden, 0 fehlgeschlagen`);

@@ -5,10 +5,10 @@
    verschiebt, zoomt, klickt und schreibt weiter — nur ohne Leisten, Rahmen, Griffe und Knöpfe.
    Die Leisten bleiben eingehängt und ziehen sich nur unsichtbar zurück (visibility, keine Änderung am DOM und an ihren
    Maßen — die gemessene Kopfhöhe bleibt, nichts rechnet nach). Was zeigt, dass andere da sind und wohin jemand zeigt,
-   bleibt: Zeiger der Gäste, Laser, Reaktionen. Die Bedienung in den Karten (M421) steht in 99-bedienung-im-fokus.css. */
+   bleibt: Zeiger der Gäste, Laser, Reaktionen und der laufende Gruppen-Timer. Die Bedienung in den Karten (M421) steht in 99-bedienung-im-fokus.css. */
 html[data-nur-board] :is(
     .app > .topbar, .app > .tabs, .app > .dock, .app > .legal-corner, .dauerbaender > .lese-band,   /* M511: im Stapel */
-    .backlinks, .live-leiste, .zeig-band, .gruppen-timer, .punkte-leiste, .sprach-hinweis, .draw-palette,
+    .backlinks, .live-leiste, .zeig-band, .punkte-leiste, .sprach-hinweis, .draw-palette,
     .sel-toolbar, .sel-toolbar-dock, .sel-menu-fixed, .sel-toolbar-anker,
     .pn-minimap, .fokus-spur, .empty-board-hint, .app > .toast:not(.wichtig)
 ) { visibility: hidden !important; pointer-events: none !important; }
@@ -46,6 +46,8 @@ html[data-nur-board] .react-flow__node :is(
   min-width: 72px; height: 72px; padding: 0 12px 12px 12px;
   display: flex; align-items: flex-end; justify-content: flex-end; pointer-events: auto;
 }
+/* Eine frei platzierte Uhr (Ebene 96) bleibt auch in dieser Ecke greifbar. */
+.nur-board-ecke:has(~ .dauerbaender > .gruppen-timer.frei) { z-index: 95; }
 .nur-board-knopf {
   display: inline-flex; align-items: center; gap: 8px; flex: none;
   min-width: 44px; min-height: 44px; padding: 0 13px; justify-content: center;
