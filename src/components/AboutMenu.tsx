@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react';
 import { useBoard } from '../store';
 import { useDesign } from '../lib/designAttr';
 
@@ -10,8 +9,7 @@ import { useDesign } from '../lib/designAttr';
  * jetzt ihren eigenen Knopf (das Fragezeichen in der Aktionsleiste bzw. am Fuß der Spalte), und das Haus-Symbol in
  * der Reiter-Leiste entfällt: zwei Wege zum selben Ziel nebeneinander waren einer zu viel.
  *
- * M547: Im Design „Agency" (nach vave.log, eigenes Werk des Besitzers) eine eigene Marke statt der Wortmarke.
- * M550: In Agency atmet „pixi“ neben dem violetten Punkt und dem ruhig gesetzten „notes“.
+ * M561: Agency zeigt „pixi · notes“ als ruhenden Schriftzug mit violettem Trennpunkt.
  */
 export function AboutMenu() {
   const view = useBoard((s) => s.view);
@@ -37,18 +35,9 @@ export function AboutMenu() {
 }
 
 function AgencyMarke() {
-  const marke = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    let aus = false;
-    let stop: (() => void) | undefined;
-    void import('../lib/agencyLogo').then((m) => {
-      if (!aus && marke.current) stop = m.agencyBewegen(marke.current);
-    }).catch(() => { /* Das Standbild steht bereits. */ });
-    return () => { aus = true; stop?.(); };
-  }, []);
   return (
     <span className="agency-wortmarke" aria-hidden="true" data-sprache="aus" translate="no">
-      <span className="agency-pixi" ref={marke}><span className="agency-wortmarke-text">pixi</span></span>
+      <span className="agency-pixi">pixi</span>
       <span className="agency-trennpunkt" />
       <span className="agency-notes">notes</span>
     </span>

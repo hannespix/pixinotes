@@ -37,7 +37,7 @@ import type { AppNode } from '../types';
 import { NoteCard } from './nodes/NoteCard';
 import { EmailCard } from './nodes/EmailCard';
 import { ImageCard } from './nodes/ImageCard';
-import { boardZoomMelden } from '../lib/boardZoom';
+import { boardZoomMelden, modulAusschnitt } from '../lib/boardZoom';
 import { bedienMass, BOARD_ZOOM_MAX, BOARD_ZOOM_MIN, radAnteil, radSchritt } from '../lib/radZoom';
 import { FileCard } from './nodes/FileCard';
 import { PortalCard } from './nodes/PortalCard';
@@ -891,7 +891,7 @@ export function Board() {
     );
   }, [archivKey, edges, showArchived]);
 
-  // Suche: nach Board-Wechsel zur gefundenen Karte fliegen und sie markieren
+  // Nach Board-Wechsel zur gefundenen Karte fliegen und sie markieren.
   useEffect(() => {
     if (!pendingFocus || pendingFocus.boardId !== activeId) return;
     const node = nodes.find((n) => n.id === pendingFocus.nodeId);
@@ -902,17 +902,54 @@ export function Board() {
       useBoard.getState().setShowArchived(true);
       useBoard.getState().showToast('Der Treffer liegt im Archiv – archivierte Karten sind jetzt eingeblendet.');
     }
-    const t = setTimeout(() => {
-      const w = node.measured?.width ?? 280;
-      const h = node.measured?.height ?? 120;
-      setCenter(node.position.x + w / 2, node.position.y + h / 2, { zoom: 1, duration: 650 });
+    const ankommen = () => {
       if (pendingFocus.markieren !== false) onNodesChange(
         nodes.map((n) => ({ id: n.id, type: 'select' as const, selected: n.id === node.id })),
       );
       clearPendingFocus();
+    };
+    if (pendingFocus.einpassen) {
+      let bild = 0;
+      const ende = performance.now() + 700;
+      const fliegen = () => {
+        const stand = useBoard.getState();
+        if (stand.pendingFocus !== pendingFocus) return;
+        if (stand.activeId !== activeId || stand.view !== 'board' || stand.tasksOpen || stand.focusCard) {
+          clearPendingFocus();
+          return;
+        }
+        const flaeche = zoomWrapRef.current?.querySelector('.react-flow')?.getBoundingClientRect();
+        const intern = getInternalNode(node.id);
+        const { width, height } = intern?.measured ?? {};
+        // Bei einem Boardwechsel erst nach React Flows eigener Einpassung und Messung anfahren.
+        if ((!flaeche?.width || !width || !height) && performance.now() < ende) {
+          bild = requestAnimationFrame(fliegen);
+          return;
+        }
+        if (flaeche?.width) {
+          const lage = intern?.internals.positionAbsolute ?? node.position;
+          const mass = sizeOf(node);
+          const ziel = modulAusschnitt(flaeche, { ...lage, w: width || mass.w, h: height || mass.h }, anzRef.current);
+          const duration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 440;
+          if (ziel) void setViewport(ziel, { duration });
+        }
+        ankommen();
+      };
+      bild = requestAnimationFrame(() => { bild = requestAnimationFrame(fliegen); });
+      return () => {
+        cancelAnimationFrame(bild);
+        const stand = useBoard.getState();
+        if (stand.pendingFocus === pendingFocus && (stand.activeId !== activeId || stand.view !== 'board' || stand.tasksOpen)) clearPendingFocus();
+      };
+    }
+    const t = setTimeout(() => {
+      const w = node.measured?.width ?? 280;
+      const h = node.measured?.height ?? 120;
+      setCenter(node.position.x + w / 2, node.position.y + h / 2, { zoom: 1, duration: 650 });
+      ankommen();
     }, 80);
     return () => clearTimeout(t);
-  }, [pendingFocus, activeId, nodes, setCenter, clearPendingFocus, onNodesChange]);
+  }, [pendingFocus, activeId, nodes, setCenter, setViewport, getInternalNode, clearPendingFocus, onNodesChange]);
 
   // Tastatur: N = neue Notiz; Strg+Z/Strg+Y = Undo/Redo (außerhalb von Eingabefeldern —
   // in Editoren gilt deren eigenes Undo)
@@ -1585,6 +1622,7 @@ export function Board() {
     if (fokusRueckkehr.current) {
       const prev = fokusRueckkehr.current;
       fokusRueckkehr.current = null;
+      if (useBoard.getState().pendingFocus?.einpassen) return undefined;
       fokusRueckfahrt.current = prev;
       window.setTimeout(() => { if (fokusRueckfahrt.current === prev) fokusRueckfahrt.current = null; }, 400);
       flyingUntil.current = performance.now() + 500;

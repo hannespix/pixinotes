@@ -9,7 +9,7 @@
        Wolke, Fenster 17 px rund mit violettem Etikett über dem Titel, Abdunkler mit leichter Unschärfe.
      · Umschalter als Segment auf hellem Grund (gewählt = weiße Pille mit violetter Schrift), Knöpfe mit Hub beim Zeigen,
        Fokusring 3 px #8951ff, Markierung in Lime, Hinweise warm-schwarz mit „Rückgängig" in Lime.
-     · PixiNotes in Readex Pro mit fließenden Konturen und einem reagierenden Mauszeiger in den Leisten (M549).
+     · „pixi · notes“ in Readex Pro mit violettem Trennpunkt (M561).
    Alles hängt an `html[data-design='agency']`; ohne das Attribut greift keine Regel und die Schrift wird nie geladen.
    Leistung (M491): keine :has()-Selektoren, keine neuen Animationen auf dem Board; der Hub der Knöpfe ist ein
    transform beim Zeigen (wie in vave.log, nicht auf Karten). */
@@ -48,7 +48,7 @@ html[data-design='agency']:not([data-lesbar='an']) .modal-section h3:not(.modal-
 html[data-design='agency']:not([data-lesbar='an']) .fluessig-card canvas { font-family: var(--font-agency); }
 html[data-design='agency'] ::selection { background: var(--agency-lime); color: #1b1b1b; }
 
-/* ---------- Wortmarke und Mauszeiger (M555) ---------- */
+/* ---------- Wortmarke (M561) ---------- */
 html[data-design='agency'] .logo {
   color: var(--ink); background: var(--surface); box-shadow: none; border-color: transparent; border-radius: var(--r);
 }
@@ -57,17 +57,9 @@ html[data-design='agency']:not([data-kontrast='hoch']) .logo.active::before { co
 .logo .agency-wortmarke {
   display: inline-flex; align-items: center; flex: none; gap: 4.5px; font-size: 25px; line-height: 1;
 }
-html[data-design='agency']:not([data-theme='dark'], [data-kontrast='hoch']) .logo .agency-pixi { color: #000; }
 .agency-wortmarke .agency-pixi {
-  position: relative; display: block; flex: none; width: 1.916667em; line-height: 1.25; text-align: center;
-  font-weight: 520; font-kerning: none; letter-spacing: -0.018em;
+  line-height: 1.25; font-weight: 520; letter-spacing: -0.018em;
 }
-.agency-pixi .agency-wortmarke-text { font-weight: inherit; }
-.agency-pixi > .agency-animation { position: absolute; inset: 0; visibility: hidden; pointer-events: none; }
-.agency-pixi[data-animiert] > .agency-animation { visibility: visible; }
-.agency-animation > svg { display: block; width: 100%; height: 100%; }
-.agency-animation > svg path { fill: currentColor; }
-.agency-pixi[data-animiert] .agency-wortmarke-text { visibility: hidden; }
 .agency-trennpunkt {
   width: 0.185em; height: 0.185em; flex: none; border-radius: 50%; background: var(--accent); translate: 0 0.07em;
 }
@@ -75,31 +67,9 @@ html[data-design='agency']:not([data-theme='dark'], [data-kontrast='hoch']) .log
   .agency-trennpunkt { background: ButtonText; forced-color-adjust: none; }
 }
 .agency-wortmarke .agency-notes { font-size: 0.76em; font-weight: 400; letter-spacing: -0.055em; translate: 0 0.06em; }
-html[data-lesbar='an'] .agency-wortmarke .agency-pixi { width: auto; font-weight: 400; }
-html[data-lesbar='an'] .agency-pixi[data-animiert] .agency-wortmarke-text { visibility: visible; }
-html[data-lesbar='an'] .agency-pixi > .agency-animation { display: none; }
+html[data-lesbar='an'] .agency-wortmarke .agency-pixi { font-weight: 400; }
 @media (min-width: 641px) { html[data-design='agency'] .logo { padding-inline: 12px; } }
 @media (max-width: 640px) { .logo .agency-wortmarke { font-size: 22px; gap: 3.5px; } }
-@media (prefers-reduced-motion: reduce) {
-  .agency-pixi[data-animiert] .agency-wortmarke-text { visibility: visible; }
-  .agency-pixi > .agency-animation { display: none; }
-}
-.agency-zeiger {
-  position: fixed; top: -7px; left: -7px; z-index: 3000; scale: 1; zoom: var(--pn-gegen, 1);
-  width: 14px; height: 14px; box-sizing: border-box; border: 1.25px solid white; border-radius: 50%;
-  mix-blend-mode: difference; pointer-events: none;
-  transition: scale 220ms cubic-bezier(0.2, 0.75, 0.35, 1), background-color 180ms ease;
-}
-.agency-zeiger.aktiv { scale: 2.2; background-color: white; }
-.agency-zeiger[hidden] { display: none; }
-@starting-style { .agency-zeiger.aktiv { scale: 1; background-color: transparent; } }
-@media (any-hover: hover) and (any-pointer: fine) and (prefers-reduced-motion: no-preference) {
-  html[data-design='agency']:not([data-lesbar='an'], [data-kontrast='hoch']) :is(.topbar, .tabs, .dock) :is(button:enabled, a[href]):not([data-agency-zeiger]) {
-    cursor: var(--zeiger-agency);
-  }
-  html[data-design='agency']:not([data-lesbar='an'], [data-kontrast='hoch']) [data-agency-zeiger],
-  html[data-design='agency']:not([data-lesbar='an'], [data-kontrast='hoch']) [data-agency-zeiger] * { cursor: none; }
-}
 
 /* ---------- Fläche ---------- */
 html[data-design='agency'] .react-flow { --xy-background-pattern-color: #d9dbd3; }

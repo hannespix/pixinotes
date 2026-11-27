@@ -222,7 +222,7 @@ export interface BoardState {
   view: 'overview' | 'board';
   toast: Toast | null;
   /** M431: `markieren: false` — nur hinfahren, die Auswahl bleibt, wie sie ist */
-  pendingFocus: { boardId: string; nodeId: string; markieren?: boolean } | null;
+  pendingFocus: { boardId: string; nodeId: string; markieren?: boolean; einpassen?: boolean } | null;
   lastDeleted: DeletedSnapshot | null;
   tool: Tool;
   settingsOpen: boolean;
@@ -392,10 +392,12 @@ export interface BoardState {
   // Hierarchie (Bereiche / Projekte / Boards)
   addSpace: (name?: string) => void;
   renameSpace: (id: string, name: string) => void;
+  moveSpace: (id: string, beforeSpaceId?: string) => void;
   /** M398: mit `mit` auch, wenn noch Boards darin liegen – sie werden gelöscht oder ziehen um */
   removeSpace: (id: string, mit?: EbeneLoeschen) => void;
   addProject: (spaceId: string, name?: string) => void;
   renameProject: (id: string, name: string) => void;
+  moveProject: (id: string, targetSpaceId: string, beforeProjectId?: string) => void;
   removeProject: (id: string, mit?: EbeneLoeschen) => void;
   /** M398: das zuletzt gelöschte Projekt oder den Bereich samt Boards zurückholen */
   ebeneZurueck: () => boolean;
@@ -577,7 +579,7 @@ export interface BoardState {
   setNodePosition: (id: string, x: number, y: number) => void;
   /** Mehrere Positionen in EINEM Store-Update — für den Physik-Loop (60 fps) */
   setNodePositions: (entries: Array<[string, number, number]>) => void;
-  focusNode: (boardId: string, nodeId: string, opt?: { markieren?: boolean }) => void;
+  focusNode: (boardId: string, nodeId: string, opt?: { markieren?: boolean; einpassen?: boolean }) => void;
   clearPendingFocus: () => void;
 
   showToast: (message: string, undo?: boolean | 'schritt' | 'ebene', durationMs?: number, abbruch?: boolean) => void;

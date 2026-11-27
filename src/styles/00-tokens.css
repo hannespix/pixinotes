@@ -171,7 +171,6 @@
   --pixi-effekt: #306230;
   --pixi-schatten: rgba(15, 56, 15, 0.16);
   --zeiger-fadenkreuz: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 2v7M12 15v7M2 12h7M15 12h7' stroke='%23fff' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M12 2v7M12 15v7M2 12h7M15 12h7' stroke='%23111' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='12' r='1.7' fill='%23111' stroke='%23fff' stroke-width='1.2'/%3E%3C/svg%3E") 12 12, crosshair;
-  --zeiger-agency: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='6' fill='none' stroke='%23fff' stroke-width='3'/%3E%3Ccircle cx='12' cy='12' r='6' fill='none' stroke='%23111' stroke-width='1.5'/%3E%3C/svg%3E") 12 12, pointer;
 }
 
 /* ---------- Akzentfarben-Themes ---------- */

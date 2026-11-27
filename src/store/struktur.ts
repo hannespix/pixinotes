@@ -27,6 +27,17 @@ let ebenenUndo: {
 /** M530: Das letzte Gelöschte war ein Board — „Rückgängig" in der Meldung holt es zurück (store/boardZurueck.ts) */
 let boardWeg = false;
 
+/** Schiebt eine Ebene vor den Nachbarn oder ans Ende. Veraltete Ziele ändern die Liste nicht. */
+function einsortieren<T extends { id: string }>(liste: T[], eintrag: T, vor?: string): T[] {
+  const von = liste.indexOf(eintrag);
+  const ziel = vor === undefined ? liste.length : liste.findIndex((e) => e.id === vor);
+  if (ziel < 0 || (von >= 0 && (von === ziel || von + 1 === ziel))) return liste;
+  const neu = [...liste];
+  if (von >= 0) neu.splice(von, 1);
+  neu.splice(von >= 0 && von < ziel ? ziel - 1 : ziel, 0, eintrag);
+  return neu;
+}
+
 /** M480: Teil des Board-Speichers – Struktur */
 export function strukturScheibe(set: Setzen, get: Holen) {
   /**
@@ -186,6 +197,14 @@ export function strukturScheibe(set: Setzen, get: Holen) {
     renameSpace: (id, name) =>
       set({ spaces: get().spaces.map((sp) => (sp.id === id ? { ...sp, name } : sp)) }),
 
+    moveSpace: (id, vor) => {
+      const { spaces } = get();
+      const bereich = spaces.find((sp) => sp.id === id);
+      if (!bereich) return;
+      const neu = einsortieren(spaces, bereich, vor);
+      if (neu !== spaces) set({ spaces: neu });
+    },
+
     removeSpace: (id, mit) => ebeneLoeschen('bereich', id, mit),
 
     addProject: (spaceId, name) =>
@@ -210,6 +229,21 @@ export function strukturScheibe(set: Setzen, get: Holen) {
           projects: sp.projects.map((p) => (p.id === id ? { ...p, name } : p)),
         })),
       }),
+
+    moveProject: (id, zielId, vor) => {
+      const { spaces } = get();
+      const quelle = spaces.find((sp) => sp.projects.some((p) => p.id === id));
+      const projekt = quelle?.projects.find((p) => p.id === id);
+      const ziel = spaces.find((sp) => sp.id === zielId);
+      if (!quelle || !projekt || !ziel) return;
+      const projects = einsortieren(ziel.projects, projekt, vor);
+      if (projects === ziel.projects) return;
+      set({ spaces: spaces.map((sp) => {
+        if (sp === ziel) return { ...sp, projects };
+        if (sp === quelle) return { ...sp, projects: sp.projects.filter((p) => p !== projekt) };
+        return sp;
+      }) });
+    },
 
     removeProject: (id, mit) => ebeneLoeschen('projekt', id, mit),
 

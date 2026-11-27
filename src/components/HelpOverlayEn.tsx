@@ -18,6 +18,7 @@ export function NeuEn() {
             <section id="help-neu">
               <p>The latest releases in brief, newest first. Which version is currently running is shown at the bottom of the help.</p>
               <ul><NeuesteZuerst>
+                <li><b>Organize projects and open cards on the board (M561)</b> Drag spaces and projects in the sidebar or tile overview. Moving a project to another space takes its boards with it. Selecting a card in the navigation brings it into view on the board at a readable zoom. The Agency wordmark is static, and the interface uses the system pointer.</li>
                 <li><b>A flowing wave in the Agency wordmark (M560)</b> The left stem of the “p” stays fixed. The wave builds to the left of the opening, then flows to the right edge. Both “i” stems have gently rounded contours. Their dots, the violet separator, and “notes” stay still.</li>
                 <li><b>Shared timer with the interface hidden (M559)</b> The timer stays visible and keeps counting down when you hide the interface. You can drag it, minimize it, and tap the remaining time to expand it again.</li>
                 <li><b>Move and minimize the timer (M558)</b> Drag the shared timer out of the way by its handle or minimize it to a small button showing the time left. Press the button to restore the full display. Everyone can move or minimize their own timer display while sharing the same countdown.</li>
@@ -342,6 +343,8 @@ export function HilfeEn() {
                 <li><b>Alt+U</b> hides and shows the column (like the ‹ button at its bottom), <b>Alt+W</b> jumps to its search.</li>
                 <li><b>Alt+B</b> hides the interface for screen sharing (M510). A running shared timer stays visible. <b>Esc</b> brings it back, as does the button that appears at the bottom right when you move the mouse.</li>
                 <li>On a phone, the path <b>“Project › Board”</b> in the header opens the same tree.</li>
+                <li>In the sidebar, drag the header of a space or project into place. In the tile overview, use the handle beside its name. Drop a project on a space header to put it last in that space. You can also use <b>⋯ → Move …</b>.</li>
+                <li>Selecting a card in the tree or overview opens its board and brings the card into view. An open sidebar stays visible.</li>
                 <li><b>Overview:</b> spaces as zones, boards as tiles – drag them to move them to other projects. The <b>Hierarchy ⇄ Graph</b> switch shows the link graph there (portals, [[Wikilinks]]).</li>
               </ul>
               <h4>⋯ on boards and projects</h4>

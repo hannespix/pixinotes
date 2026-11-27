@@ -6,6 +6,8 @@ import {
   BackgroundVariant,
   ReactFlow,
   ReactFlowProvider,
+  ViewportPortal,
+  useReactFlow,
   type Edge,
   type Node,
   type NodeProps,
@@ -22,7 +24,7 @@ import type { AppNode } from '../types';
 import { InlineName } from './InlineName';
 import { wurzelZoom } from '../lib/anzeige';
 import { BereichMenu, BoardMenu, ProjektMenu, insBild } from './EbenenMenu';
-import { ITarget, IZoomIn, IZoomOut } from './Icons';
+import { IGriff, ITarget, IZoomIn, IZoomOut } from './Icons';
 import { kartenName, zahlWort } from '../lib/sprache';
 import { SVG_INHALT } from '../lib/uebersetzung';
 import { ohneEingang } from '../lib/eingangId';
@@ -37,7 +39,37 @@ const SPACE_ACCENTS = ['#4f7cff', '#e07a3f', '#3fa564', '#a05fd4', '#d44f6e'];
 // Kachel- und Layout-Maße (Canvas-Koordinaten)
 const BW = 200, BH = 150, GAP = 16, PROJ_HEAD = 44, SPACE_HEAD = 56, SPACE_GAP = 70;
 
-interface ProjectRect { id: string; x: number; y: number; w: number; h: number }
+interface ZonenRechteck { id: string; x: number; y: number; w: number; h: number }
+interface ProjectRect extends ZonenRechteck { spaceId: string }
+type EbenenZiel = { spaceId?: string; davor?: string; marke: CSSProperties; innen?: boolean };
+type EbenenZug = {
+  id: string;
+  art: 'ovSpace' | 'ovProject';
+  start: Pt;
+  versatz: Pt;
+  mit: ReadonlyMap<string, Node>;
+};
+
+function liegtIn(p: Pt, r: ZonenRechteck): boolean {
+  return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
+}
+
+function einfuegeMarke(r: ZonenRechteck, quer: boolean, danach: boolean): CSSProperties {
+  return quer
+    ? { left: r.x + (danach ? r.w + GAP / 2 : -GAP / 2) - 3, top: r.y, width: 6, height: r.h }
+    : { left: r.x, top: r.y + (danach ? r.h + GAP / 2 : -GAP / 2) - 3, width: r.w, height: 6 };
+}
+
+function ebeneMitziehen(node: Node, zug: EbenenZug | null): Node {
+  const grund = zug?.mit.get(node.id);
+  if (!zug || !grund) return node;
+  return {
+    ...node,
+    position: { x: grund.position.x + zug.versatz.x, y: grund.position.y + zug.versatz.y },
+    zIndex: (grund.zIndex ?? 0) + 10,
+    className: 'ovc-ebene-im-zug',
+  };
+}
 
 /**
  * M232: Archivierte Karten aus den Boards nehmen — es sei denn, das Archiv
@@ -132,8 +164,12 @@ function OverviewCanvas() {
   // sind, und die beiden Übersichten widersprächen sich gegenseitig.
   const boards = useMemo(() => ohneArchiv(alleBoards, showArchived), [alleBoards, showArchived]);
   const moveBoard = useBoard((s) => s.moveBoard);
+  const moveProject = useBoard((s) => s.moveProject);
+  const moveSpace = useBoard((s) => s.moveSpace);
   const setProjektSortierung = useBoard((s) => s.setProjektSortierung);
   const openBoard = useBoard((s) => s.openBoard);
+  const flaeche = useRef<HTMLDivElement>(null);
+  const { getViewport } = useReactFlow();
   // tick erzwingt Neu-Layout nach einem Drag (Kacheln rasten in die Zonen zurück)
   const [tick, setTick] = useState(0);
 
@@ -178,20 +214,22 @@ function OverviewCanvas() {
     const da = new Set(boards.map((b) => b.id));
     return new Map(spaces.flatMap((sp) => sp.projects.map((p) => [p.id, p.boardIds.filter((id) => da.has(id)).length] as const)));
   }, [vorschau, spaces, boards]);
-  const { nodes: layoutNodes, edges, projectRects, breite } = useMemo(
+  const { nodes: layoutNodes, edges, spaceRects, projectRects, breite } = useMemo(
     () => layoutHierarchy(anzeigeSpaces, boards, schmal, mindestens),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [anzeigeSpaces, boards, tick, schmal, mindestens],
   );
   // Gesteuerte Knoten: Die gezogene Kachel behält ihre Lage unter der Maus, alle anderen folgen dem (Vorschau-)Layout
   const ziehe = useRef<{ id: string; x: number; y: number } | null>(null);
+  const ebenenZug = useRef<EbenenZug | null>(null);
+  const [ebenenZiel, setEbenenZiel] = useState<EbenenZiel | null>(null);
   const [rfNodes, setRfNodes] = useState<Node[]>(layoutNodes);
   useEffect(() => {
     const z = ziehe.current;
     setRfNodes(layoutNodes.map((n) => {
       if (z && n.id === z.id) return { ...n, position: { x: z.x, y: z.y }, dragging: true };
       if (vorschau && n.id === `p-${vorschau.projectId}`) return { ...n, className: 'ovc-ziel' };
-      return n;
+      return ebeneMitziehen(n, ebenenZug.current);
     }));
   }, [layoutNodes, vorschau]);
   // Erst nach dem ersten Einpassen gleiten die Kacheln — sonst flögen sie beim Öffnen von links oben herein
@@ -206,7 +244,7 @@ function OverviewCanvas() {
   const platzFuer = (node: Node): { projectId: string; index: number } | null => {
     const cx = node.position.x + BW / 2;
     const cy = node.position.y + BH / 2;
-    const hit = projectRects.find((r) => cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h);
+    const hit = projectRects.find((r) => liegtIn({ x: cx, y: cy }, r));
     if (!hit) return null;
     const projekt = anzeigeSpaces.flatMap((sp) => sp.projects).find((p) => p.id === hit.id);
     if (!projekt) return null;
@@ -219,12 +257,66 @@ function OverviewCanvas() {
     return { projectId: hit.id, index: Math.min(andere.length, row * cols + col) };
   };
 
+  const ebenenZeiger = (e: MouseEvent | TouchEvent) => {
+    const zeiger = 'changedTouches' in e ? e.changedTouches[0] : e;
+    const kasten = flaeche.current?.getBoundingClientRect();
+    if (!zeiger || !kasten || e.type === 'touchcancel') return null;
+    const { clientX, clientY } = zeiger;
+    const { x, y, zoom } = getViewport();
+    return {
+      punkt: { x: (inLayout(clientX - kasten.left) - x) / zoom, y: (inLayout(clientY - kasten.top) - y) / zoom },
+      innen: clientX >= kasten.left && clientX <= kasten.right && clientY >= kasten.top && clientY <= kasten.bottom,
+    };
+  };
+
+  /** M561: Einfügeziele bleiben am Layout verankert, während der gezogene Block mit seinem Inhalt folgt. */
+  const zielFuerEbene = (p: Pt, zug: EbenenZug): EbenenZiel | null => {
+
+    if (zug.art === 'ovSpace') {
+      const rest = spaceRects.filter((r) => `s-${r.id}` !== zug.id);
+      const letztes = rest.at(-1);
+      if (!letztes || p.x < -GAP || p.x > breite + GAP) return null;
+      const naechstes = rest.find((r) => p.y < r.y + r.h / 2);
+      return { davor: naechstes?.id, marke: einfuegeMarke(naechstes ?? letztes, false, !naechstes) };
+    }
+
+    const bereich = spaceRects.find((r) => liegtIn(p, r));
+    if (!bereich) return null;
+    const projekte = projectRects.filter((r) => r.spaceId === bereich.id);
+    const getroffen = projekte.find((r) => liegtIn(p, r));
+    if (getroffen && `p-${getroffen.id}` === zug.id) return null;
+    const andereProjekte = projekte.filter((r) => `p-${r.id}` !== zug.id);
+    if (getroffen) {
+      const danach = schmal ? p.y > getroffen.y + getroffen.h / 2 : p.x > getroffen.x + getroffen.w / 2;
+      return {
+        spaceId: bereich.id,
+        davor: danach ? andereProjekte[andereProjekte.indexOf(getroffen) + 1]?.id : getroffen.id,
+        marke: einfuegeMarke(getroffen, !schmal, danach),
+      };
+    }
+    const spaeter = p.y >= bereich.y + SPACE_HEAD && andereProjekte.find((r) => schmal
+      ? p.y >= r.y - GAP && p.y < r.y
+      : p.x >= r.x - GAP && p.x < r.x && p.y >= r.y && p.y <= r.y + r.h);
+    if (spaeter) return { spaceId: bereich.id, davor: spaeter.id, marke: einfuegeMarke(spaeter, !schmal, false) };
+    return { spaceId: bereich.id, marke: { left: bereich.x, top: bereich.y, width: bereich.w, height: bereich.h }, innen: true };
+  };
+
   // Nur bei ECHTER Strukturänderung remounten (fitView); nach einem reinen
   // Drag reicht die neue nodes-Referenz zum Zurückschnappen — Zoom bleibt (N2)
   const structureKey = `${spaces.length}|${spaces.reduce((a, s) => a + s.projects.length, 0)}|${boards.length}|${schmal ? 's' : 'b'}`;
 
   return (
-    <div className={`board-wrap ov-canvas${weich ? ' ov-weich' : ''}${vorschau ? ' ov-zieht' : ''}`}>
+    <div
+      ref={flaeche}
+      className={`board-wrap ov-canvas${weich ? ' ov-weich' : ''}${vorschau ? ' ov-zieht' : ''}`}
+      onTouchStartCapture={(e) => {
+        // Zweiter Finger dreht den Zug in die Pinch-Geste. React Flow bricht dann ohne onNodeDragStop ab.
+        if (e.touches.length < 2 || !ebenenZug.current) return;
+        ebenenZug.current = null;
+        setEbenenZiel(null);
+        setTick((t) => t + 1);
+      }}
+    >
       <ReactFlow
         key={structureKey /* nach Drag/Strukturänderung sauber neu einrasten + fitView */}
         nodes={rfNodes}
@@ -254,6 +346,15 @@ function OverviewCanvas() {
           if (node.type === 'ovBoard') openBoard((node.data as { board: BoardDoc }).board.id);
         }}
         onNodeDragStart={(e, node) => {
+          if (node.type === 'ovSpace' || node.type === 'ovProject') {
+            const zeiger = ebenenZeiger(e);
+            if (!zeiger) return;
+            const projekte = node.type === 'ovSpace' ? (node.data as SpaceZoneData).space.projects : [(node.data as ProjectZoneData).project];
+            const ids = new Set([node.id, ...projekte.flatMap((p) => [`p-${p.id}`, ...p.boardIds.map((id) => `b-${id}`)])]);
+            const mit = new Map(layoutNodes.filter((n) => ids.has(n.id)).map((n) => [n.id, n]));
+            ebenenZug.current = { id: node.id, art: node.type, start: zeiger.punkt, versatz: { x: 0, y: 0 }, mit };
+            return;
+          }
           if (node.type !== 'ovBoard') return;
           ziehe.current = { id: node.id, x: node.position.x, y: node.position.y };
           neigung.current?.stop();
@@ -261,6 +362,16 @@ function OverviewCanvas() {
           tempo.current = tempoMesser(node.position.x, e.timeStamp);
         }}
         onNodeDrag={(e, node) => {
+          const ebene = ebenenZug.current;
+          if (ebene?.id === node.id) {
+            const zeiger = ebenenZeiger(e);
+            if (!zeiger) return;
+            const p = zeiger.punkt;
+            ebene.versatz = { x: p.x - ebene.start.x, y: p.y - ebene.start.y };
+            setRfNodes((nds) => nds.map((n) => ebeneMitziehen(n, ebene)));
+            setEbenenZiel(zeiger.innen ? zielFuerEbene(p, ebene) : null);
+            return;
+          }
           const z = ziehe.current;
           if (node.type !== 'ovBoard' || !z) return;
           z.x = node.position.x; z.y = node.position.y;
@@ -272,7 +383,20 @@ function OverviewCanvas() {
           if (!p) { if (alt) setVorschau(null); return; }
           if (!alt || alt.projectId !== p.projectId || alt.index !== p.index) setVorschau({ boardId, ...p });
         }}
-        onNodeDragStop={(_, node) => {
+        onNodeDragStop={(e, node) => {
+          const ebene = ebenenZug.current;
+          if (ebene?.id === node.id) {
+            const zeiger = ebenenZeiger(e);
+            const ziel = zeiger?.innen ? zielFuerEbene(zeiger.punkt, ebene) : null;
+            ebenenZug.current = null;
+            setEbenenZiel(null);
+            if (ziel) {
+              if (ebene.art === 'ovSpace') moveSpace((node.data as SpaceZoneData).space.id, ziel.davor);
+              else if (ziel.spaceId) moveProject((node.data as ProjectZoneData).project.id, ziel.spaceId, ziel.davor);
+            }
+            setTick((t) => t + 1);
+            return;
+          }
           ziehe.current = null;
           neigung.current?.loslassen();
           if (node.type !== 'ovBoard') return;
@@ -300,6 +424,9 @@ function OverviewCanvas() {
         }}
       >
         <Background variant={BackgroundVariant.Dots} gap={26} size={1.6} />
+        {ebenenZiel && <ViewportPortal>
+          <div className={`ovc-ebenen-ablage${ebenenZiel.innen ? ' innen' : ''}`} style={ebenenZiel.marke} aria-hidden="true" />
+        </ViewportPortal>}
       </ReactFlow>
       {/* M312: „+ Neuer Bereich" schwebte hier als eigener Knopf — Anlegen geht
           jetzt überall gleich über ＋ Neu am Fuß der Navigation. */}
@@ -478,7 +605,6 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   const openBoard = useBoard((s) => s.openBoard);
   const focusNode = useBoard((s) => s.focusNode);
   /* M285: Auch aus dem Netz heraus wird eine Karte im selben Blatt geöffnet */
-  const oeffneKarte = useBoard((s) => s.oeffneKarte);
   // M193: Ebenen liegen im Store und bleiben erhalten — vorher fiel „Karten"
   // bei jedem Öffnen wieder auf „aus" zurück
   const layers = useBoard((s) => s.graphLayers);
@@ -1680,7 +1806,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
                 <g
                   key={d.key}
                   className={`ov-graph-dot ${marking ? (hits.cards.has(d.key) ? 'hit' : 'dim') : ''}`}
-                  onClick={() => { openBoard(sb.boardId); focusNode(sb.boardId, d.nodeId); }}
+                  onClick={() => focusNode(sb.boardId, d.nodeId, { einpassen: true })}
                 >
                   <title {...SVG_INHALT}>{d.title}</title>
                   <circle cx={d.x} cy={d.y} r={ui(5)} strokeWidth={0} fill={tropfenPlan.boardFarbe.has(sb.boardId) ? `url(#${verlaufId(sb.boardId)})` : `url(#netz-tropfen-${farbIndex.get(sb.boardId) ?? 0})`} />
@@ -1796,9 +1922,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
         <div className="ov-graph-ctx nodrag" ref={insBild} style={{ left: ctxMenu.x, top: ctxMenu.y }}>
           <div className="ov-graph-ctx-title" translate="no">{boardName(ctxMenu.boardId)}</div>
           <button onClick={() => { openBoard(ctxMenu.boardId); setCtxMenu(null); }}>Board öffnen</button>
-          {/* M285: „aus der netzansicht … geht es noch gar nicht" — hier
-              stehen jetzt die Karten selbst. Ein Klick öffnet dieselbe
-              Bearbeitung wie überall und kehrt danach ins Netz zurück. */}
+          {/* M561: Die Karten-Ziele führen zu ihrem Modul auf dem Board. */}
           {(() => {
             const brd = useBoard.getState().boards.find((b) => b.id === ctxMenu.boardId);
             const karten = (brd?.nodes ?? []).filter((n) => !n.archived).slice(0, 8);
@@ -1811,8 +1935,8 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
                     key={n.id}
                     className="ov-graph-ctx-karte"
                     translate="no"
-                    title={`„${kartenTitel(n)}" öffnen und bearbeiten`}
-                    onClick={() => { oeffneKarte(ctxMenu.boardId, n.id, 'overview'); setCtxMenu(null); }}
+                    title="Zur Karte springen"
+                    onClick={() => { focusNode(ctxMenu.boardId, n.id, { einpassen: true }); setCtxMenu(null); }}
                   >{kartenTitel(n)}</button>
                 ))}
                 {(brd?.nodes.length ?? 0) > karten.length && (
@@ -1847,6 +1971,7 @@ function layoutHierarchy(spaces: Space[], boards: BoardDoc[], schmal = false, mi
   const boardById = new Map(boards.map((b) => [b.id, b]));
   const nodes: Node[] = [];
   const edges: Edge[] = [];
+  const spaceRects: ZonenRechteck[] = [];
   const projectRects: ProjectRect[] = [];
   const tilePos = new Map<string, { x: number; y: number }>();
 
@@ -1877,13 +2002,14 @@ function layoutHierarchy(spaces: Space[], boards: BoardDoc[], schmal = false, mi
       ? SPACE_HEAD + (sizes.length ? sizes.reduce((a, s) => a + s.h + GAP, 0) : 90 + GAP)
       : SPACE_HEAD + (sizes.length ? Math.max(...sizes.map((s) => s.h)) : 90) + GAP;
     breite = Math.max(breite, spaceW);
+    spaceRects.push({ id: space.id, x: 0, y, w: spaceW, h: spaceH });
 
     nodes.push({
       id: `s-${space.id}`,
       type: 'ovSpace',
       position: { x: 0, y },
       data: { space, accent },
-      draggable: false,
+      dragHandle: '.ovc-space-head',
       selectable: false,
       focusable: false,
       zIndex: 0,
@@ -1896,13 +2022,13 @@ function layoutHierarchy(spaces: Space[], boards: BoardDoc[], schmal = false, mi
       const { cols, w, h } = sizes[pi];
       const projX = px;
       const projY = py;
-      projectRects.push({ id: project.id, x: projX, y: projY, w, h });
+      projectRects.push({ id: project.id, spaceId: space.id, x: projX, y: projY, w, h });
       nodes.push({
         id: `p-${project.id}`,
         type: 'ovProject',
         position: { x: projX, y: projY },
         data: { project, spaceId: space.id, leer: sichtbareIds[pi].length === 0 },
-        draggable: false,
+        dragHandle: '.ovc-project-head',
         selectable: false,
         focusable: false,
         zIndex: 1,
@@ -1943,7 +2069,7 @@ function layoutHierarchy(spaces: Space[], boards: BoardDoc[], schmal = false, mi
     }
   }
 
-  return { nodes, edges, projectRects, breite };
+  return { nodes, edges, spaceRects, projectRects, breite };
 }
 
 /* ---------- Zonen & Kacheln ---------- */
@@ -1955,13 +2081,17 @@ function SpaceZone({ data }: NodeProps<Node<SpaceZoneData, 'ovSpace'>>) {
   return (
     <div className="ovc-space" style={{ borderColor: accent }}>
       <div className="ovc-space-head">
-        <InlineName value={space.name} className="ovc-space-name" style={{ '--bereich-farbe': accent } as CSSProperties} editing={editing} onEditingChange={setEditing} onRename={(n) => renameSpace(space.id, n)} />
+        <div className="ovc-ebenen-titel">
+          <span className="ovc-ebenen-griff" data-taste="uebersicht-bereich-griff" title="Bereich verschieben" aria-hidden="true"><IGriff size={16} /></span>
+          <InlineName value={space.name} className="ovc-space-name" style={{ '--bereich-farbe': accent } as CSSProperties} editing={editing} onEditingChange={setEditing} onRename={(n) => renameSpace(space.id, n)} />
+        </div>
         {/* M312: „+ Projekt" und „✕" standen hier offen in jeder Zeile — jetzt
             dasselbe ⋯ wie an Projekt und Board, sichtbar beim Zeigen. */}
         <div className="ov-head-actions nodrag">
           <BereichMenu spaceId={space.id} onRename={() => setEditing(true)} />
         </div>
       </div>
+      {space.projects.length === 0 && <div className="ov-empty small nodrag">Projekte hierher ziehen</div>}
     </div>
   );
 }
@@ -1973,7 +2103,10 @@ function ProjectZone({ data }: NodeProps<Node<ProjectZoneData, 'ovProject'>>) {
   return (
     <div className="ovc-project">
       <div className="ovc-project-head">
-        <InlineName value={project.name} className="ov-project-name" editing={editing} onEditingChange={setEditing} onRename={(n) => renameProject(project.id, n)} />
+        <div className="ovc-ebenen-titel">
+          <span className="ovc-ebenen-griff" data-taste="uebersicht-projekt-griff" title="Projekt verschieben" aria-hidden="true"><IGriff size={16} /></span>
+          <InlineName value={project.name} className="ov-project-name" editing={editing} onEditingChange={setEditing} onRename={(n) => renameProject(project.id, n)} />
+        </div>
         <div className="ov-head-actions nodrag">
           {/* M288/M312: Neues Board, Duplizieren, Reihenfolge, Archivieren und
               Löschen stehen hinter demselben ⋯ wie im Baum — ein Menü, überall. */}
@@ -2024,12 +2157,12 @@ function BoardTile({ data }: NodeProps<Node<BoardTileData, 'ovBoard'>>) {
  * M285: … und ANFASSBAR. Bis hierher war das ein Bild: Man sah, wo Karten
  * liegen, konnte aber keine davon öffnen — „aus der netzansicht und so weiter
  * geht es noch gar nicht". Jetzt ist jedes Rechteck ein Ziel: Der Zeiger nennt
- * die erste Zeile, ein Klick öffnet dieselbe Karten-Bearbeitung wie überall
- * sonst. Die Vorschau bleibt dabei, was sie war — es kommt kein neues
+ * die erste Zeile. M561: Ein Klick zeigt die Karte auf dem Board.
+ * Die Vorschau bleibt dabei, was sie war — es kommt kein neues
  * Bedienelement hinzu, das vorhandene fängt nur endlich Klicks.
  */
 function BoardMiniMap({ board, accent }: { board: BoardDoc; accent: string }) {
-  const oeffneKarte = useBoard((s) => s.oeffneKarte);
+  const focusNode = useBoard((s) => s.focusNode);
   if (board.nodes.length === 0) return <div className="ov-minimap empty">leer</div>;
   /* M285: Jede Karte mit ihrem EIGENEN Maß.
      Vorher bekam jedes Rechteck dieselbe Größe (250 × 150). Solange die
@@ -2067,10 +2200,10 @@ function BoardMiniMap({ board, accent }: { board: BoardDoc; accent: string }) {
               // M389: Mit dem Finger öffnet die Kachel das BOARD. Die Mini-Karten sind dort wenige Punkte groß und
               // zeigen ohne Maus nicht, was sie sind — wer die Kachel antippte, landete blind im Fokus irgendeiner Karte.
               if ((e.nativeEvent as PointerEvent).pointerType === 'touch') { useBoard.getState().openBoard(board.id); return; }
-              oeffneKarte(board.id, n.id, 'overview');
+              focusNode(board.id, n.id, { einpassen: true });
             }}
           >
-            <title>{kartenTitel(n)} – öffnen und bearbeiten</title>
+            <title>{kartenTitel(n)}</title>
           </rect>
         );
       })}
