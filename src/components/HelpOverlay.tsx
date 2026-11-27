@@ -175,6 +175,7 @@ export function HelpOverlay() {
             <section id="help-neu">
               <p>Die letzten Ausbaustufen in Kürze, neueste zuerst. Welche Fassung gerade läuft, steht am Fuß der Hilfe.</p>
               <ul><NeuesteZuerst>
+                <li><b>Timer bei ausgeblendeter Oberfläche (M559)</b> Der gemeinsame Timer bleibt beim Teilen sichtbar und zählt weiter. Du kannst ihn auch in dieser Ansicht verschieben, minimieren und durch Antippen der Restzeit wieder öffnen.</li>
                 <li><b>Timer verschieben und minimieren (M558)</b> Zieh den „Timer für alle“ am Griff aus dem Weg oder lass ihn als kleinen Knopf mit Restzeit anzeigen. Ein Klick auf die Restzeit öffnet die ganze Uhr wieder. Jede Person wählt ihre eigene Anzeige und sieht dieselbe Restzeit.</li>
                 <li><b>Weichere Innenkonturen und mehr Kontrast in Agency (M557)</b> Die Öffnung im „p“ wandert schräg nach oben, während sich am Stamm Tinte sammelt. Die Innenwinkel des „x“ runden sich. Hinweise und kleine Beschriftungen sind in Hell und Dunkel besser lesbar. Eine feine violette Linie zeigt die Auswahl in Umschaltern.</li>
                 <li><b>Deutlichere Welle in der Agency-Wortmarke (M556)</b> Der Bauch des „p“ wölbt sich stärker. Während die Bewegung durch „pixi“ läuft, werden das „x“ und das letzte „i“ schmaler. Die Formen fließen im selben ruhigen Takt wie bei vave.log zurück.</li>
@@ -539,7 +540,7 @@ export function HelpOverlay() {
               <ul>
                 <li>Ab Tablet-Breite steht links die <b>Navigation</b> mit dem ganzen Baum <b>Bereich › Projekt › Board › Karte</b>. Klick öffnet, ▸ klappt auf, das Suchfeld findet Boards und Karten.</li>
                 <li><b>Alt+U</b> blendet die Spalte aus und ein (wie der ‹-Knopf an ihrem Fuß), <b>Alt+W</b> springt in ihre Suche.</li>
-                <li><b>Alt+B</b> blendet die ganze Oberfläche aus – nur das Board bleibt, etwa zum Teilen des Bildschirms (M510). <b>Esc</b> holt sie zurück, ebenso der Knopf, der bei Mausbewegung unten rechts erscheint.</li>
+                <li><b>Alt+B</b> blendet die Oberfläche zum Teilen des Bildschirms aus (M510). Ein laufender Gruppen-Timer bleibt sichtbar. <b>Esc</b> holt sie zurück, ebenso der Knopf, der bei Mausbewegung unten rechts erscheint.</li>
                 <li>Am Telefon öffnet der Weg <b>„Projekt › Board"</b> in der Kopfzeile denselben Baum.</li>
                 <li><b>Übersicht:</b> Bereiche als Zonen, Boards als Kacheln – per Drag in andere Projekte verschiebbar. Der Umschalter <b>Hierarchie ⇄ Netz</b> zeigt dort den Verknüpfungs-Graphen (Portale, [[Wikilinks]]).</li>
               </ul>

@@ -18,6 +18,7 @@ export function NeuEn() {
             <section id="help-neu">
               <p>The latest releases in brief, newest first. Which version is currently running is shown at the bottom of the help.</p>
               <ul><NeuesteZuerst>
+                <li><b>Shared timer with the interface hidden (M559)</b> The timer stays visible and keeps counting down when you hide the interface. You can drag it, minimize it, and tap the remaining time to expand it again.</li>
                 <li><b>Move and minimize the timer (M558)</b> Drag the shared timer out of the way by its handle or minimize it to a small button showing the time left. Press the button to restore the full display. Everyone can move or minimize their own timer display while sharing the same countdown.</li>
                 <li><b>Softer letterforms and clearer contrast in Agency (M557)</b> The opening in the “p” moves diagonally upward as ink gathers along its stem. The inner corners of the “x” round out. Hints and small labels are easier to read in both themes. A thin violet line marks the selected option in segmented controls.</li>
                 <li><b>A more pronounced wave in the Agency wordmark (M556)</b> The bowl of the “p” swells more visibly. The “x” and the final “i” grow slimmer as the wave passes through “pixi”. The shapes flow back at the same unhurried pace as vave.log.</li>
@@ -338,7 +339,7 @@ export function HilfeEn() {
               <ul>
                 <li>From tablet width up, the <b>navigation</b> sits on the left with the whole tree <b>Space › Project › Board › Card</b>. A click opens, ▸ expands, and the search field finds boards and cards.</li>
                 <li><b>Alt+U</b> hides and shows the column (like the ‹ button at its bottom), <b>Alt+W</b> jumps to its search.</li>
-                <li><b>Alt+B</b> hides the whole interface – only the board remains, for example when sharing your screen (M510). <b>Esc</b> brings it back, as does the button that appears at the bottom right when you move the mouse.</li>
+                <li><b>Alt+B</b> hides the interface for screen sharing (M510). A running shared timer stays visible. <b>Esc</b> brings it back, as does the button that appears at the bottom right when you move the mouse.</li>
                 <li>On a phone, the path <b>“Project › Board”</b> in the header opens the same tree.</li>
                 <li><b>Overview:</b> spaces as zones, boards as tiles – drag them to move them to other projects. The <b>Hierarchy ⇄ Graph</b> switch shows the link graph there (portals, [[Wikilinks]]).</li>
               </ul>
