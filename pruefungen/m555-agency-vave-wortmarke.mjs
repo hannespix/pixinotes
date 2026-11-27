@@ -23,7 +23,9 @@ function pruefeSchluessel(schluessel, zeit, name) {
 for (const [i, { zeit, verschiebung }] of vorlage.entries()) {
   const name = `Buchstabe ${i + 1}`;
   const elemente = asset.layers[i].shapes.flatMap(({ it }) => it);
-  const pfade = elemente.filter((e) => e.ty === 'sh' && e.ks.a === 1);
+  // Auch die wandernde Öffnung im p behält für ihre Form den Takt der Vorlage.
+  const pfade = elemente.flatMap((e) => e.ty === 'gr' ? e.it : [e])
+    .filter((e) => e.ty === 'sh' && e.ks.a === 1);
   assert.ok(pfade.length > 0, `${name}: animierte Kontur`);
   for (const pfad of pfade) pruefeSchluessel(pfad.ks.k, zeit, name);
   const { p } = elemente.find((e) => e.ty === 'tr');
@@ -72,7 +74,12 @@ try {
   assert.equal(await bild(), 25, 'Der lange Zug hält in Bild 25');
   await seite.clock.runFor(6900);
   assert.equal(await bild(), 0, 'Der Rücklauf ist wieder bei Bild 0');
-  assert.deepEqual(await start(), original, 'Beim Rücklauf stimmen die SVG-Konturen exakt mit dem Ausgangspunkt überein');
+  // Lottie rundet die Koordinaten einer transformierten Untergruppe auf zwei
+  // Stellen. Beim ersten Zeichnen kann derselbe Pfad noch volle Präzision haben.
+  const aufHundertstel = (d) => d.replace(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/gi,
+    (zahl) => String(Math.round(Number(zahl) * 100) / 100));
+  assert.deepEqual((await start()).map(aufHundertstel), original.map(aufHundertstel),
+    'Der Rücklauf trifft alle Ausgangskonturen mit der Zeichenpräzision des Lottie-Renderers');
   await seite.evaluate(() => window.aufraeumen());
   assert.equal(await seite.locator('.agency-animation').count(), 0, 'Der Lottie-Player räumt seine Zeichenfläche auf');
   assert.equal(await seite.locator('.agency-wortmarke-text').textContent(), 'pixi', 'Der ruhende Text ist weiterhin vorhanden');

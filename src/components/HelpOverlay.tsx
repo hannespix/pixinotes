@@ -175,6 +175,7 @@ export function HelpOverlay() {
             <section id="help-neu">
               <p>Die letzten Ausbaustufen in Kürze, neueste zuerst. Welche Fassung gerade läuft, steht am Fuß der Hilfe.</p>
               <ul><NeuesteZuerst>
+                <li><b>Eine fließende Welle in der Agency-Wortmarke (M560)</b> Der linke Stamm des „p“ bleibt fest. Die Welle baut sich links der Öffnung auf und fließt zum rechten Rand. Die i-Stämme sind sanft gerundet. Ihre Punkte, der violette Trennpunkt und „notes“ stehen still.</li>
                 <li><b>Timer bei ausgeblendeter Oberfläche (M559)</b> Der gemeinsame Timer bleibt beim Teilen sichtbar und zählt weiter. Du kannst ihn auch in dieser Ansicht verschieben, minimieren und durch Antippen der Restzeit wieder öffnen.</li>
                 <li><b>Timer verschieben und minimieren (M558)</b> Zieh den „Timer für alle“ am Griff aus dem Weg oder lass ihn als kleinen Knopf mit Restzeit anzeigen. Ein Klick auf die Restzeit öffnet die ganze Uhr wieder. Jede Person wählt ihre eigene Anzeige und sieht dieselbe Restzeit.</li>
                 <li><b>Weichere Innenkonturen und mehr Kontrast in Agency (M557)</b> Die Öffnung im „p“ wandert schräg nach oben, während sich am Stamm Tinte sammelt. Die Innenwinkel des „x“ runden sich. Hinweise und kleine Beschriftungen sind in Hell und Dunkel besser lesbar. Eine feine violette Linie zeigt die Auswahl in Umschaltern.</li>

@@ -55,10 +55,12 @@ try {
     }, png.toString('base64'));
   }
 
+  // M560 bindet die Welle an den festen p-Stamm und die i-Punkte.
+  // Die Fläche des schlanken Ruhe-x dient als Bezugsgröße für den Rückzug.
   const erwartungen = [
-    { buchstabe: 'p', index: 0, min: 1.92, max: 2.17 },
-    { buchstabe: 'x', index: 2, min: 0.60, max: 0.71 },
-    { buchstabe: 'zweites i', index: 3, min: 0.48, max: 0.60 },
+    { buchstabe: 'p', index: 0, min: 1.48, max: 1.59 },
+    { buchstabe: 'x', index: 2, min: 0.69, max: 0.77 },
+    { buchstabe: 'zweites i', index: 3, min: 0.62, max: 0.69 },
   ];
   const ergebnisse = [];
   for (const { buchstabe, index, min, max } of erwartungen) {
