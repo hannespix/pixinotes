@@ -271,6 +271,7 @@ export function Board() {
   const showToast = useBoard((s) => s.showToast);
 
   const { screenToFlowPosition, setCenter, fitView, getViewport, setViewport, getInternalNode, zoomIn, zoomOut, zoomTo } = useReactFlow();
+  const rfStore = useStoreApi();
   const wheelZoom = useBoard((s) => s.wheelZoom);
   /**
    * M268: Der Anzeige-Faktor läuft im Board-Zoom mit.
@@ -832,6 +833,13 @@ export function Board() {
   }, [getViewport, setViewport, fokusScroll, fokusSchieben, fokusGrenzenX, fokusBalken]);
   const pendingFocus = useBoard((s) => s.pendingFocus);
   const clearPendingFocus = useBoard((s) => s.clearPendingFocus);
+  const leinwandKey = `${activeId}:${importEpoch}`;
+  const startEinpassen = useRef({ key: '', an: true });
+  // M561: Beim gezielten Sprung montiert die Leinwand ohne Gesamteinpassung.
+  // React Flow reiht fitView auch nachträglich ein, wenn die Prop wieder wahr wird.
+  if (startEinpassen.current.key !== leinwandKey) {
+    startEinpassen.current = { key: leinwandKey, an: !(pendingFocus?.boardId === activeId && pendingFocus.einpassen) };
+  }
 
   // Board-Optionen (M88): Hintergrund-Tönung + Gitter/Raster-Fang
   const boardBg = useBoard((s) => selectActiveBoard(s).bg);
@@ -890,66 +898,6 @@ export function Board() {
         : e,
     );
   }, [archivKey, edges, showArchived]);
-
-  // Nach Board-Wechsel zur gefundenen Karte fliegen und sie markieren.
-  useEffect(() => {
-    if (!pendingFocus || pendingFocus.boardId !== activeId) return;
-    const node = nodes.find((n) => n.id === pendingFocus.nodeId);
-    if (!node) { clearPendingFocus(); return; }
-    // Treffer liegt im (ausgeblendeten) Archiv → Archiv einblenden, sonst
-    // fliegt die Suche ins Leere
-    if (node.archived && !useBoard.getState().showArchived) {
-      useBoard.getState().setShowArchived(true);
-      useBoard.getState().showToast('Der Treffer liegt im Archiv – archivierte Karten sind jetzt eingeblendet.');
-    }
-    const ankommen = () => {
-      if (pendingFocus.markieren !== false) onNodesChange(
-        nodes.map((n) => ({ id: n.id, type: 'select' as const, selected: n.id === node.id })),
-      );
-      clearPendingFocus();
-    };
-    if (pendingFocus.einpassen) {
-      let bild = 0;
-      const ende = performance.now() + 700;
-      const fliegen = () => {
-        const stand = useBoard.getState();
-        if (stand.pendingFocus !== pendingFocus) return;
-        if (stand.activeId !== activeId || stand.view !== 'board' || stand.tasksOpen || stand.focusCard) {
-          clearPendingFocus();
-          return;
-        }
-        const flaeche = zoomWrapRef.current?.querySelector('.react-flow')?.getBoundingClientRect();
-        const intern = getInternalNode(node.id);
-        const { width, height } = intern?.measured ?? {};
-        // Bei einem Boardwechsel erst nach React Flows eigener Einpassung und Messung anfahren.
-        if ((!flaeche?.width || !width || !height) && performance.now() < ende) {
-          bild = requestAnimationFrame(fliegen);
-          return;
-        }
-        if (flaeche?.width) {
-          const lage = intern?.internals.positionAbsolute ?? node.position;
-          const mass = sizeOf(node);
-          const ziel = modulAusschnitt(flaeche, { ...lage, w: width || mass.w, h: height || mass.h }, anzRef.current);
-          const duration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 440;
-          if (ziel) void setViewport(ziel, { duration });
-        }
-        ankommen();
-      };
-      bild = requestAnimationFrame(() => { bild = requestAnimationFrame(fliegen); });
-      return () => {
-        cancelAnimationFrame(bild);
-        const stand = useBoard.getState();
-        if (stand.pendingFocus === pendingFocus && (stand.activeId !== activeId || stand.view !== 'board' || stand.tasksOpen)) clearPendingFocus();
-      };
-    }
-    const t = setTimeout(() => {
-      const w = node.measured?.width ?? 280;
-      const h = node.measured?.height ?? 120;
-      setCenter(node.position.x + w / 2, node.position.y + h / 2, { zoom: 1, duration: 650 });
-      ankommen();
-    }, 80);
-    return () => clearTimeout(t);
-  }, [pendingFocus, activeId, nodes, setCenter, setViewport, getInternalNode, clearPendingFocus, onNodesChange]);
 
   // Tastatur: N = neue Notiz; Strg+Z/Strg+Y = Undo/Redo (außerhalb von Eingabefeldern —
   // in Editoren gilt deren eigenes Undo)
@@ -1073,7 +1021,6 @@ export function Board() {
    */
   const strgRef = useRef(false);
   const ziehtRef = useRef(false);
-  const rfStore = useStoreApi();
   const rasterSelbst = useRef(false);
   useEffect(() => {
     const taste = (e: KeyboardEvent) => {
@@ -1333,6 +1280,90 @@ export function Board() {
     const id = requestAnimationFrame(() => { uiMelden(getViewport().zoom); zoomMelden(getViewport().zoom, true); });
     return () => { cancelAnimationFrame(id); window.clearTimeout(zoomZeit.current); };
   }, [activeId, anzeige, getViewport, zoomMelden, uiMelden]);
+  const letzterSprung = useRef<typeof pendingFocus>(null);
+  // Nach Board-Wechsel zur gefundenen Karte fliegen und sie markieren.
+  useEffect(() => {
+    if (!pendingFocus || pendingFocus.boardId !== activeId) return;
+    letzterSprung.current = pendingFocus;
+    const node = nodes.find((n) => n.id === pendingFocus.nodeId);
+    if (!node) { clearPendingFocus(); return; }
+    // Treffer liegt im (ausgeblendeten) Archiv → Archiv einblenden, sonst
+    // fliegt die Suche ins Leere
+    if (node.archived && !useBoard.getState().showArchived) {
+      useBoard.getState().setShowArchived(true);
+      useBoard.getState().showToast('Der Treffer liegt im Archiv – archivierte Karten sind jetzt eingeblendet.');
+    }
+    const ungueltig = () => {
+      const stand = useBoard.getState();
+      return stand.activeId !== activeId || stand.view !== 'board' || stand.tasksOpen || stand.presenting;
+    };
+    const markieren = () => {
+      if (pendingFocus.markieren === false) return;
+      const karten = selectActiveBoard(useBoard.getState()).nodes;
+      if (karten.some((n) => n.id === node.id)) onNodesChange(
+        karten.filter((n) => !!n.selected !== (n.id === node.id))
+          .map((n) => ({ id: n.id, type: 'select' as const, selected: n.id === node.id })),
+      );
+    };
+    if (pendingFocus.einpassen) {
+      let bild = 0;
+      const ende = performance.now() + 700;
+      const fliegen = () => {
+        const stand = useBoard.getState();
+        if (stand.pendingFocus !== pendingFocus) return;
+        if (ungueltig() || stand.focusCard) {
+          clearPendingFocus();
+          return;
+        }
+        const leinwand = zoomWrapRef.current?.querySelector('.react-flow');
+        const flaeche = leinwand?.getBoundingClientRect();
+        const { domNode, panZoom } = rfStore.getState();
+        // Der gemeinsame React-Flow-Store kann noch den Renderer des vorigen Boards tragen.
+        if (!panZoom || domNode !== leinwand || !flaeche?.width) {
+          bild = requestAnimationFrame(fliegen);
+          return;
+        }
+        const intern = getInternalNode(node.id);
+        const { width, height } = intern?.measured ?? {};
+        if ((!width || !height) && performance.now() < ende) {
+          bild = requestAnimationFrame(fliegen);
+          return;
+        }
+        const lage = intern?.internals.positionAbsolute ?? node.position;
+        const mass = sizeOf(node);
+        const ziel = modulAusschnitt(flaeche, { ...lage, w: width || mass.w, h: height || mass.h }, anzRef.current);
+        clearPendingFocus();
+        if (!ziel) return;
+        if (pendingFocus.markieren !== false) onNodesChange(
+          selectActiveBoard(stand).nodes.filter((n) => n.selected)
+            .map((n) => ({ id: n.id, type: 'select' as const, selected: false })),
+        );
+        const duration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 440;
+        void setViewport(ziel, { duration }).then((angekommen) => {
+          const aktuell = useBoard.getState();
+          if (!angekommen || letzterSprung.current !== pendingFocus || aktuell.pendingFocus || ungueltig()
+            || aktuell.focusCard || zoomWrapRef.current?.querySelector('.react-flow') !== leinwand) return;
+          // Die Griffe bekommen ihr richtiges Maß, bevor sie mit der Auswahl erscheinen.
+          zoomMelden(ziel.zoom, true);
+          markieren();
+        });
+      };
+      bild = requestAnimationFrame(() => { bild = requestAnimationFrame(fliegen); });
+      return () => {
+        cancelAnimationFrame(bild);
+        if (useBoard.getState().pendingFocus === pendingFocus && ungueltig()) clearPendingFocus();
+      };
+    }
+    const t = setTimeout(() => {
+      const w = node.measured?.width ?? 280;
+      const h = node.measured?.height ?? 120;
+      setCenter(node.position.x + w / 2, node.position.y + h / 2, { zoom: 1, duration: 650 });
+      markieren();
+      clearPendingFocus();
+    }, 80);
+    return () => clearTimeout(t);
+  }, [pendingFocus, activeId, nodes, setCenter, setViewport, rfStore, getInternalNode, clearPendingFocus, onNodesChange, zoomMelden]);
+
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.code !== 'Space' || e.repeat) return;
@@ -1974,7 +2005,7 @@ export function Board() {
         </div>
       )}
       <ReactFlow
-        key={`${activeId}:${importEpoch}`}
+        key={leinwandKey}
         nodes={rfNodes}
         edges={rfEdges}
         nodeTypes={nodeTypes}
@@ -2019,7 +2050,7 @@ export function Board() {
         multiSelectionKeyCode={['Meta', 'Shift']}
         minZoom={BOARD_ZOOM_MIN * anzeige}
         maxZoom={BOARD_ZOOM_MAX * anzeige}
-        fitView
+        fitView={startEinpassen.current.an}
         fitViewOptions={{ padding: 0.25, maxZoom: anzeige }}
         defaultEdgeOptions={KANTEN_VORGABE}
         // M373: der „React Flow"-Schriftzug unten rechts ist ausgeblendet (Nutzerwunsch); die Bibliothek ist in der Hilfe genannt

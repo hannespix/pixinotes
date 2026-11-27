@@ -105,14 +105,30 @@ try {
   const P = await seite();
   await P.locator('.react-flow__viewport').evaluate((element) => {
     const bilder = new Set();
-    const beobachter = new MutationObserver(() => bilder.add(element.style.transform));
+    const karte = element.querySelector('.react-flow__node[data-id="normal"]');
+    let ersteAuswahl;
+    const beobachter = new MutationObserver(() => {
+      bilder.add(element.style.transform);
+      if (!ersteAuswahl && karte.classList.contains('selected')) {
+        ersteAuswahl = {
+          zoom: new DOMMatrixReadOnly(getComputedStyle(element).transform).a,
+          griffmass: Number(getComputedStyle(karte).getPropertyValue('--pn-inv')),
+        };
+      }
+    });
     beobachter.observe(element, { attributes: true, attributeFilter: ['style'] });
-    window.flugZwischenschritte = () => { beobachter.disconnect(); return bilder.size; };
+    beobachter.observe(karte, { attributes: true, attributeFilter: ['class'] });
+    window.flugMessung = () => { beobachter.disconnect(); return { schritte: bilder.size, ersteAuswahl }; };
   });
   await knopf(P, 'Sitzungsplanung').click();
   pruefe('Ein Klick im Baum öffnet die Karte auf dem Board', await P.locator('.app.focus-mode').count() === 0);
-  pruefe('Die ausgewählte Karte steht lesbar in der Mitte rechts neben der Spalte', !!await landung(P, 'normal', { min: 1.15 }));
-  pruefe('Die Kamera fährt in sichtbaren Zwischenschritten zur Karte', await P.evaluate(() => window.flugZwischenschritte()) >= 3);
+  const normal = await landung(P, 'normal', { min: 1.15 });
+  pruefe('Die ausgewählte Karte steht lesbar in der Mitte rechts neben der Spalte', !!normal);
+  const flug = await P.evaluate(() => window.flugMessung());
+  pruefe('Die Kamera fährt in sichtbaren Zwischenschritten zur Karte', flug.schritte >= 3);
+  pruefe('Die Karte wird erst mit richtig bemessenen Griffen an der Landung ausgewählt',
+    Math.abs(flug.ersteAuswahl.zoom - normal.zoom) < 0.001
+      && Math.abs(flug.ersteAuswahl.griffmass - 1 / normal.zoom) <= 0.04, flug.ersteAuswahl);
 
   await knopf(P, 'Kleine Markierung').click();
   const klein = await landung(P, 'klein', { min: 1.2, max: 2.2 });

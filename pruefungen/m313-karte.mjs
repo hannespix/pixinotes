@@ -135,9 +135,15 @@ console.log('\n════ D: Rechen-Tabelle ════');
   // M407: dazu „Filtern und sortieren"
   pruefe('D2 ⋯: Spalte anhängen, Auto-Summe, Filtern und sortieren, Als CSV speichern', JSON.stringify(m) === JSON.stringify(['Spalte anhängen', 'Auto-Summe', 'Filtern und sortieren', 'Als CSV speichern']), JSON.stringify(m));
   await P.locator('.ebenen-menu button', { hasText: 'Spalte anhängen' }).click();
-  await P.waitForTimeout(400);
-  const cols = await P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state.boards[0].nodes.find((n) => n.id === 's1').data.cols);
-  pruefe('D3 „Spalte anhängen" wirkt', cols === 4, `cols: ${cols}`);
+  // Weitere Zustandsänderungen können das gedrosselte Speichern verschieben.
+  const gespeichert = await P.waitForFunction(() => {
+    const stand = JSON.parse(localStorage.getItem('pixinotes-board'));
+    return stand.state.boards[0].nodes.find((n) => n.id === 's1').data.cols === 4;
+  }, null, { timeout: 4000 }).then(() => true, (fehler) => {
+    if (fehler.name !== 'TimeoutError') throw fehler;
+    return false;
+  });
+  pruefe('D3 „Spalte anhängen" wirkt', gespeichert, 'Spalte 4 fehlt im lokalen Stand');
 }
 
 // ══ E: Diagramm ═══════════════════════════════════════════════════════
