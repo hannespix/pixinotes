@@ -8,7 +8,7 @@ import { FreigabeDialogSpaet } from './FreigabeHost';
 // M459: „Per Link teilen" (mit Konto-Anfragen) kommt erst beim Öffnen
 const LinkDialog = nachLazy(() => import('./LinkDialog').then((m) => ({ default: m.LinkDialog })));
 import {
-  IArchive, IArchiveRestore, ICopy, IDownload, IDuplicate, IMore, IMoveTo,
+  IArchive, IArchiveRestore, IArrowUp, IArrowDown, ICopy, IDownload, IDuplicate, IMore, IMoveTo,
   IPen, IPerson, IPlay, IPlus, IShare, ITrash, IReihenfolge, ICheck, IUsers, IX, IUhr,
 } from './Icons';
 import { MENUE_HIER } from '../lib/kontextmenue';
@@ -266,6 +266,37 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
   );
 }
 
+/** Gleiche Ziele wie beim Ziehen, auch per Tastatur und auf Touch-Geräten. */
+function Platzwahl({ liste, id, setzen, andereBereiche, zu, children }: {
+  liste: ReadonlyArray<{ id: string }>;
+  id: string;
+  setzen: (vor?: string) => void;
+  andereBereiche?: ReadonlyArray<{ id: string; name: string }>;
+  zu: () => void;
+  children: (knopf: React.ReactNode) => React.ReactNode;
+}) {
+  const [offen, setOffen] = useState(false);
+  if (!offen) return children(
+    <button role="menuitem" onClick={() => setOffen(true)}><IMoveTo size={14} /> Verschieben …</button>
+  );
+  const index = liste.findIndex((eintrag) => eintrag.id === id);
+  return <>
+    <button role="menuitem" disabled={index <= 0} onClick={() => { setzen(liste[index - 1].id); zu(); }}>
+      <IArrowUp size={14} /> Eine Position nach vorn
+    </button>
+    <button role="menuitem" disabled={index < 0 || index >= liste.length - 1} onClick={() => { setzen(liste[index + 2]?.id); zu(); }}>
+      <IArrowDown size={14} /> Eine Position nach hinten
+    </button>
+    {!!andereBereiche?.length && <>
+      <div className="ebenen-menu-titel">In anderen Bereich verschieben</div>
+      {andereBereiche.map((sp) => <button key={sp.id} role="menuitem" onClick={() => { useBoard.getState().moveProject(id, sp.id); zu(); }}>
+        <IMoveTo size={14} /> <span translate="no">{sp.name}</span>
+      </button>)}
+    </>}
+    <button role="menuitem" className="ebenen-menu-zurueck" onClick={() => setOffen(false)}>← Zurück</button>
+  </>;
+}
+
 /**
  * M312: Und noch eine Ebene höher: am Bereich. Vorher gab es dafür nur
  * „+ Projekt" und „✕" als offene Knöpfe in der Übersicht — und im Baum gar
@@ -276,15 +307,16 @@ export function BereichMenu({ spaceId, onRename, klasse = '' }: {
   onRename?: () => void;
   klasse?: string;
 }) {
-  const space = useBoard((s) => s.spaces.find((sp) => sp.id === spaceId));
+  const spaces = useBoard((s) => s.spaces);
+  const space = spaces.find((sp) => sp.id === spaceId);
   const renameSpace = useBoard((s) => s.renameSpace);
   const addProject = useBoard((s) => s.addProject);
-  const einziger = useBoard((s) => s.spaces.length <= 1);
+  const einziger = spaces.length <= 1;
   if (!space) return null;
   const boardZahl = space.projects.reduce((n, p) => n + p.boardIds.length, 0);
   return (
     <MenuHuelle titel={`Bereich „${space.name}": umbenennen, Projekt anlegen, löschen`} klasse={klasse} kinder={(zu) => (
-      <>
+      <Platzwahl liste={spaces} id={spaceId} setzen={(vor) => useBoard.getState().moveSpace(spaceId, vor)} zu={zu}>{(verschieben) => <>
         <button role="menuitem" onClick={() => { zu(); if (onRename) onRename(); else {
           const n = window.prompt('Bereich umbenennen:', space.name);
           if (n?.trim()) renameSpace(spaceId, n.trim());
@@ -292,6 +324,7 @@ export function BereichMenu({ spaceId, onRename, klasse = '' }: {
         <button role="menuitem" onClick={() => { addProject(spaceId); zu(); }}>
           <IPlus size={14} /> Neues Projekt
         </button>
+        {!einziger && verschieben}
         <div className="ebenen-menu-titel">Aufräumen</div>
         {/* M398: auch mit Inhalt – der Dialog fragt, was mit den Boards geschieht; nur der letzte Bereich bleibt */}
         <button
@@ -302,7 +335,7 @@ export function BereichMenu({ spaceId, onRename, klasse = '' }: {
           data-taste="bereich-loeschen"
           onClick={() => { zu(); ebeneLoeschenFragen('bereich', spaceId); }}
         ><ITrash size={14} /> Löschen{boardZahl > 0 ? ' …' : ''}</button>
-      </>
+      </>}</Platzwahl>
     )} />
   );
 }
@@ -323,8 +356,9 @@ export function ProjektMenu({ projectId, onRename, klasse = '' }: {
   const setProjektSortierung = useBoard((s) => s.setProjektSortierung);
   // M310: Unteransicht „Reihenfolge" — wie „In Projekt verschieben" beim Board
   const [ordnen, setOrdnen] = useState(false);
-  const projekt = spaces.flatMap((sp) => sp.projects).find((p) => p.id === projectId);
-  if (!projekt) return null;
+  const bereich = spaces.find((sp) => sp.projects.some((p) => p.id === projectId));
+  const projekt = bereich?.projects.find((p) => p.id === projectId);
+  if (!bereich || !projekt) return null;
   const offen = projekt.boardIds.filter((id) => boards.some((b) => b.id === id && !b.archived));
   const sortierung = projekt.sortierung ?? 'manuell';
   const SORTIERUNGEN: ReadonlyArray<readonly [BoardSortierung, string, string]> = [
@@ -352,7 +386,9 @@ export function ProjektMenu({ projectId, onRename, klasse = '' }: {
           <button role="menuitem" className="ebenen-menu-zurueck" onClick={() => setOrdnen(false)}>← Zurück</button>
         </>
       ) : (
-      <>
+      <Platzwahl liste={bereich.projects} id={projectId} zu={zu}
+        setzen={(vor) => useBoard.getState().moveProject(projectId, bereich.id, vor)}
+        andereBereiche={spaces.filter((sp) => sp !== bereich)}>{(verschieben) => <>
         <button role="menuitem" onClick={() => { zu(); if (onRename) onRename(); else {
           const n = window.prompt('Projekt umbenennen:', projekt.name);
           if (n?.trim()) renameProject(projectId, n.trim());
@@ -366,6 +402,7 @@ export function ProjektMenu({ projectId, onRename, klasse = '' }: {
         <button role="menuitem" className="ebenen-menu-reihenfolge" onClick={() => setOrdnen(true)}>
           <IReihenfolge size={14} /> Reihenfolge: {sortName} …
         </button>
+        {(bereich.projects.length > 1 || spaces.length > 1) && verschieben}
         <div className="ebenen-menu-titel">Aufräumen</div>
         <button
           role="menuitem"
@@ -389,7 +426,7 @@ export function ProjektMenu({ projectId, onRename, klasse = '' }: {
           data-taste="projekt-loeschen"
           onClick={() => { zu(); ebeneLoeschenFragen('projekt', projectId); }}
         ><ITrash size={14} /> Löschen{projekt.boardIds.length > 0 ? ' …' : ''}</button>
-      </>
+      </>}</Platzwahl>
       )
     )} />
   );

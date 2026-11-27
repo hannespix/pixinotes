@@ -1,5 +1,5 @@
 /**
- * M547 — Design „Agency" (nach vave.log) in den Einstellungen (Violett, Grün-Grau, Readex Pro, weiche Rundungen, atmende Wortmarke).
+ * M547 — Design „Agency" (nach vave.log) in den Einstellungen (Violett, Grün-Grau, Readex Pro, weiche Rundungen).
  *
  *   A  Einstellungen → Darstellung → Design: drei Wahlen; „Agency" wirkt sofort (html[data-design], Grund #f8f9f6),
  *      steht in den Vorlieben, übersteht das Neuladen; Akzent-Tupfer weichen dem Satz „Violett (Agency)", die gewählte
@@ -10,8 +10,7 @@
  *      der Maus violett umrissen; Kanban-Spalte 13 px auf #f0f2eb, Ticket 9 px; Umschalter als Segment (8/5 px, gewählt
  *      weiß mit violetter Schrift); Fenster 17 px mit Etikett „PIXINOTES" über dem Titel (500, −0,045 em); Felder 7 px;
  *      Kontextmenü mit weicher Wolke; Hinweis (Toast) warm-schwarz, 8 px; Fokusring 3 px #8951ff.
- *   D  Wortmarke (M550, Einzelheiten in m548-agency-logo.mjs): „pixi · notes“ fließt von selbst
- *      und steht bei „Besser lesbar“ still.
+ *   D  Wortmarke (M561): „pixi · notes“ als ruhender Schriftzug.
  *   E  Kontrast-Scan (werkzeug/kontrast-pruefen.mjs) hell und dunkel: Karten (Notiz mit allen Editor-Farben, Kanban,
  *      Protokoll, Tabelle) ruhend/ausgewählt/Fokus, Board, Einstellungen (dazu Ränder und Fokusringe ≥ 3:1), Hilfe,
  *      Suche, Kontextmenü — keine Schrift unter 4,5:1. Dunkel: eigener Grund.
@@ -71,8 +70,8 @@ const brett = (nodes) => ({ boards: [{ id: 'b0', name: 'Studio', edges: [], draw
 const ALLE = () => KARTEN.map((k, i) => ({ ...k, position: { x: 40 + (i % 3) * 500, y: 40 + Math.floor(i / 3) * 480 } }));
 
 /** Neue Seite; `design` = 'agency' | 'pixel' | 'klassisch' | 'ohne' (Vorlieben ohne Design) */
-async function seite(nodes, { dunkel = false, design = 'agency', lesbar = false, anfragen = null, ruhig = false } = {}) {
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 980 }, deviceScaleFactor: 1, locale: 'de-DE', colorScheme: dunkel ? 'dark' : 'light', reducedMotion: ruhig ? 'reduce' : 'no-preference' });
+async function seite(nodes, { dunkel = false, design = 'agency', lesbar = false, anfragen = null } = {}) {
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 980 }, deviceScaleFactor: 1, locale: 'de-DE', colorScheme: dunkel ? 'dark' : 'light' });
   await ctx.addInitScript(([s, d, des, les]) => {
     if (localStorage.getItem('pixinotes-onboarded')) return;
     localStorage.setItem('pixinotes-onboarded', '1');
@@ -96,16 +95,6 @@ const grund = (P) => P.evaluate(() => getComputedStyle(document.querySelector('.
 const vorlieben = (P) => P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-einstellungen') || '{}').ui ?? {});
 const stil = (P, sel, prop, pseudo = null) => P.evaluate(([sel, prop, pseudo]) => { const e = document.querySelector(sel); return e ? getComputedStyle(e, pseudo)[prop] : null; }, [sel, prop, pseudo]);
 const readex = (u) => /readex/i.test(u);
-/** Die Buchstabenkonturen ändern sich in den gerenderten Lottie-Frames. */
-const konturenSammeln = (P, ms) => P.evaluate((ms) => new Promise((fertig) => {
-  const liste = []; const ab = performance.now();
-  const iv = setInterval(() => {
-    const form = document.querySelector('.agency-pixi svg');
-    liste.push(!form?.getClientRects().length || getComputedStyle(form).visibility !== 'visible' ? ''
-      : [...form.querySelectorAll('path[d]')].map((pfad) => pfad.getAttribute('d')).join('/'));
-    if (performance.now() - ab > ms) { clearInterval(iv); fertig(liste); }
-  }, 60);
-}), ms);
 
 console.log('════ A: Umschalten in den Einstellungen ════');
 {
@@ -214,21 +203,17 @@ console.log('════ B/C: Schrift und Formen ════');
 {
   const { ctx, P } = await seite(ALLE(), { lesbar: true });
   pruefe('B „Besser lesbar" gewinnt auch in Agency (Atkinson)', /Atkinson/.test(await stil(P, 'body', 'fontFamily')) && /Atkinson/.test(await stil(P, '.logo', 'fontFamily')));
-  const text = P.locator('.agency-wortmarke-text');
-  const g = await konturenSammeln(P, 550);
-  pruefe('D „Besser lesbar": sichtbarer Schriftzug ohne Bewegung (M548)', await text.isVisible() && g.every((d) => d === ''));
+  pruefe('D „Besser lesbar“ zeigt den Schriftzug sichtbar', await P.locator('.agency-pixi').isVisible());
   await ctx.close();
 }
 
 console.log('════ D: Marke ════');
 {
-  // M554 prüft die Bewegungsformen in Bildpunkten. M548 prüft die Pausen in der App.
   const { ctx, P } = await seite([{ ...KARTEN[2], position: { x: 300, y: 300 } }]);
-  await P.waitForSelector('.agency-pixi[data-agency-frame] svg');
   const marke = await P.evaluate(() => {
     const l = document.querySelector('.logo');
     return {
-      pixi: l.querySelector('.agency-wortmarke-text')?.textContent,
+      pixi: l.querySelector('.agency-pixi')?.textContent,
       notes: l.querySelector('.agency-notes')?.textContent,
       label: l.getAttribute('aria-label'),
       versteckt: l.querySelector('.agency-wortmarke')?.getAttribute('aria-hidden'),
@@ -236,13 +221,8 @@ console.log('════ D: Marke ════');
   });
   pruefe('D Wortmarke pixi · notes, Name für Vorleser bleibt',
     marke.pixi === 'pixi' && marke.notes === 'notes' && marke.label === 'PixiNotes – zur Übersicht' && marke.versteckt === 'true', marke);
-  await P.waitForFunction(() => {
-    const frame = Number(document.querySelector('.agency-pixi')?.dataset.agencyFrame);
-    return frame > 3 && frame < 18;
-  });
-  const g = new Set(await konturenSammeln(P, 700));
-  g.delete('');
-  pruefe('D die Kontur von pixi verändert sich von selbst', g.size > 3, g.size);
+  pruefe('D die ruhende Wortmarke besteht aus sichtbarem Text', await P.locator('.agency-pixi').isVisible()
+    && await P.locator('.agency-wortmarke svg').count() === 0);
   await ctx.close();
 }
 

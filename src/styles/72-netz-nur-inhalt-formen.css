@@ -230,7 +230,7 @@ html[data-kontrast='hoch'] .ov-graph-node .ov-tropfen { stroke: var(--ink); stro
    gedämpfte Feder. Die gezogene Kachel selbst gleitet nicht (sie haftet an der Maus) — sie hebt sich, neigt sich mit
    dem Tempo und senkt sich beim Ablegen wieder. M481: Kurven, Dauern und Schatten aus den --zieh-*-Tokens —
    dieselben wie beim Ziehen auf dem Board (34-praesentation.css). */
-.ov-canvas.ov-weich .react-flow__node:not(.dragging) {
+.ov-canvas.ov-weich .react-flow__node:not(.dragging, .ovc-ebene-im-zug) {
   transition: transform var(--zieh-feder-dauer) var(--zieh-feder), width 0.34s cubic-bezier(0.3, 1, 0.4, 1), height 0.34s cubic-bezier(0.3, 1, 0.4, 1);
 }
 .ov-canvas .react-flow__node-ovBoard .ovc-tile {
@@ -250,7 +250,7 @@ html[data-kontrast='hoch'] .ov-graph-node .ov-tropfen { stroke: var(--ink); stro
 [data-theme='dark'] .ov-canvas .react-flow__node.ovc-ziel .ovc-project { background: color-mix(in srgb, var(--accent) 10%, rgba(255, 255, 255, 0.07)); }
 .ov-canvas .react-flow__node-ovProject .ovc-project { transition: border-color 0.2s ease, background-color 0.2s ease; }
 @media (prefers-reduced-motion: reduce) {
-  .ov-canvas.ov-weich .react-flow__node:not(.dragging) { transition: transform 0.12s ease, width 0.12s ease, height 0.12s ease; }
+  .ov-canvas.ov-weich .react-flow__node:not(.dragging, .ovc-ebene-im-zug) { transition: transform 0.12s ease, width 0.12s ease, height 0.12s ease; }
   .ov-canvas .react-flow__node-ovBoard .ovc-tile { transform: none !important; }
 }
 /* M443: Einrichtung des MCP-Servers — knapp, Code zum Kopieren */

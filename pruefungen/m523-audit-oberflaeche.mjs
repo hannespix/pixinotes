@@ -412,8 +412,8 @@ await teil(async () => {
   // H3: Was die Hilfe im Dock-Menü nennt, steht dort auch
   await P.keyboard.press('Alt+h'); await P.waitForSelector('.help-modal');
   const hilfe = await P.locator('.help-modal').evaluate((m) => [...m.querySelectorAll('#help-start li, #help-aufgaben li')].map((l) => l.textContent));
-  const dockSatz = hilfe.find((t) => /^Dock ⋯ → „/.test(t)) ?? '';
-  const genannt = /^Dock ⋯ → „([^"“”]+)["“”]/.exec(dockSatz)?.[1] ?? '';
+  const dockSatz = hilfe.find((t) => /Dock.*⋯ → „/.test(t)) ?? '';
+  const genannt = /⋯ → „([^"“”]+)["“”]/.exec(dockSatz)?.[1] ?? '';
   await P.keyboard.press('Escape'); await warteBis(P, () => !document.querySelector('.help-modal'), 4000);
   await P.locator('.dock button[aria-label="Mehr"]').click(); await P.waitForSelector('.dock-menu-more');
   const eintraege = (await P.locator('.dock-menu-more button').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').replace(/ …$/, '').trim());

@@ -9,10 +9,8 @@
  * blauen Klötzchen, der Navigator (Baum bis zur Karte) stand nur neben dem
  * Board.
  *
- * Das Prinzip dahinter: Es gibt genau EINE Stelle, an der eine Karte
- * bearbeitet wird — das Karten-Blatt. Jede Ansicht führt dorthin, und jede
- * Ansicht bekommt einen zurück. Geprüft wird deshalb der ganze Rundweg aus
- * jeder Ansicht, nicht nur das Öffnen.
+ * Seit M561 führen Karten-Ziele aus Baum und Übersicht direkt zur Auswahl
+ * auf dem Board. Das Karten-Blatt bleibt über die Karte selbst erreichbar.
  */
 // Läuft aus dem Repository: `node pruefungen/m285-durchgang.mjs`
 // Voraussetzung: `npm run build` (die Reihe prüft den dist/-Stand) und ein
@@ -30,7 +28,7 @@ import http from 'node:http';
 import { readFileSync, existsSync } from 'node:fs';
 import { extname, join } from 'node:path';
 
-const DIST = path.join(__repo, 'dist');
+const DIST = process.env.PN_DIST ?? path.join(__repo, 'dist');
 const PORT = 4503;
 const app = http.createServer((q, r) => {
   let f = join(DIST, q.url.split('?')[0] === '/' ? 'index.html' : q.url.split('?')[0].slice(1));
@@ -92,7 +90,7 @@ console.log('════ T1: Übersicht, Mini-Vorschau ════');
   pruefe('T1c die Karten der Vorschau sind Ziele (vorher: keins)', anzahl >= 5, String(anzahl));
   const zeiger = await P.locator('.ov-mini-karte title').first().textContent();
   pruefe('T1d der Zeiger nennt die Karte beim Namen',
-    /öffnen und bearbeiten/.test(zeiger ?? ''), String(zeiger));
+    (zeiger ?? '').trim() === 'Bereich Planung', String(zeiger));
 
   // Eine echte Notiz öffnen (nicht den Rahmen)
   const idx = await P.evaluate(() => {
@@ -104,24 +102,16 @@ console.log('════ T1: Übersicht, Mini-Vorschau ════');
   await P.waitForTimeout(1600);
   const s1 = await stand(P);
   console.log('   ', JSON.stringify(s1));
-  pruefe('T1f ein Klick öffnet das Karten-Blatt', s1.blattOffen, JSON.stringify(s1));
-  pruefe('T1g und zwar mit DIESER Karte', await P.evaluate(() => {
-    const s = JSON.parse(localStorage.getItem('pixinotes-board'));
-    void s;
-    const el = document.querySelector('.react-flow__node.pn-focused');
-    return !!el && (el.textContent ?? '').includes('Antrag prüfen');
-  }));
-  pruefe('T1h der Schließen-Knopf sagt, wohin er führt',
-    (await P.locator('.focus-x').getAttribute('aria-label')) === 'Zurück zur Übersicht',
-    String(await P.locator('.focus-x').getAttribute('aria-label')));
-  await P.screenshot({ path: `${SD}/m285-blatt.png` });
+  pruefe('T1f ein Klick öffnet das Board', s1.ansicht === 'board' && !s1.blattOffen, JSON.stringify(s1));
+  pruefe('T1g und wählt die angeklickte Karte aus', (await P.locator('.react-flow__node.selected[data-id="n1"]').count()) === 1);
+  await P.screenshot({ path: `${SD}/m285-board.png` });
 
   // … und zurück
-  await P.locator('.focus-x').click();
+  await P.locator('.logo').click();
   await P.waitForTimeout(1500);
   const s2 = await stand(P);
   console.log('   ', JSON.stringify(s2));
-  pruefe('T1i nach dem Schließen steht man wieder in der Übersicht',
+  pruefe('T1h das Logo führt wieder zur Übersicht',
     s2.ansicht === 'uebersicht' && !s2.blattOffen, JSON.stringify(s2));
   await P.screenshot({ path: `${SD}/m285-zurueck.png` });
   await ctx.close();
@@ -155,22 +145,17 @@ console.log('\n════ T2: Netzansicht ════');
   if (menue) {
     pruefe('T2c es führt direkt zu den Karten des Boards',
       menue.some((t) => /Antrag prüfen|Rückmeldung|Konzept B/.test(t)), JSON.stringify(menue));
-    // Eine NOTIZ wählen — ein Bereich hat bewusst kein Blatt (siehe T4)
+    // Eine Notiz aus der Liste des Boards wählen.
     const kartenKnopf = P.locator('.ov-graph-ctx-karte', { hasText: 'Antrag prüfen' }).first();
     if (await kartenKnopf.count()) {
       await kartenKnopf.click();
       await P.waitForTimeout(1700);
       const s = await stand(P);
       console.log('   ', JSON.stringify(s));
-      pruefe('T2d ein Klick öffnet dasselbe Karten-Blatt', s.blattOffen, JSON.stringify(s));
-      if (s.blattOffen) {
-        await P.locator('.focus-x').click();
-        await P.waitForTimeout(1500);
-        const z = await stand(P);
-        pruefe('T2e und führt zurück in die Übersicht', z.ansicht === 'uebersicht', JSON.stringify(z));
-      }
+      pruefe('T2d ein Klick zeigt das Board', s.ansicht === 'board' && !s.blattOffen, JSON.stringify(s));
+      pruefe('T2e und wählt die Notiz aus', (await P.locator('.react-flow__node.selected[data-id="n1"]').count()) === 1);
     } else {
-      pruefe('T2d ein Klick öffnet dasselbe Karten-Blatt', false, 'Karten-Eintrag nicht gefunden');
+      pruefe('T2d ein Klick zeigt das Board', false, 'Karten-Eintrag nicht gefunden');
     }
   }
   await P.screenshot({ path: `${SD}/m285-netz.png` });
@@ -199,18 +184,14 @@ for (const ansicht of ['overview', 'board']) {
     const hatKarten = await karte.count();
     pruefe(`T3b (${ansicht}) der Baum reicht bis zur Karte`, hatKarten > 0, String(hatKarten));
     if (hatKarten) {
-      pruefe(`T3c (${ansicht}) und verspricht das Bearbeiten`,
-        /bearbeiten/.test((await karte.getAttribute('title')) ?? ''),
+      pruefe(`T3c (${ansicht}) und bezeichnet den Sprung zur Karte`,
+        (await karte.getAttribute('title')) === 'Zur Karte springen',
         String(await karte.getAttribute('title')));
       await karte.click();
       await P.waitForTimeout(1600);
       const s = await stand(P);
-      pruefe(`T3d (${ansicht}) der Klick öffnet das Karten-Blatt`, s.blattOffen, JSON.stringify(s));
-      if (s.blattOffen) {
-        const ziel = await P.locator('.focus-x').getAttribute('aria-label');
-        pruefe(`T3e (${ansicht}) der Rückweg führt an den Ausgangsort`,
-          ziel === (ansicht === 'overview' ? 'Zurück zur Übersicht' : 'Zurück zum Board'), String(ziel));
-      }
+      pruefe(`T3d (${ansicht}) der Klick öffnet das Board`, s.ansicht === 'board' && !s.blattOffen, JSON.stringify(s));
+      pruefe(`T3e (${ansicht}) und wählt die Notiz aus`, (await P.locator('.react-flow__node.selected[data-id="n1"]').count()) === 1);
     }
   }
   await ctx.close();

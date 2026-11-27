@@ -175,6 +175,7 @@ export function HelpOverlay() {
             <section id="help-neu">
               <p>Die letzten Ausbaustufen in Kürze, neueste zuerst. Welche Fassung gerade läuft, steht am Fuß der Hilfe.</p>
               <ul><NeuesteZuerst>
+                <li><b>Ordnen und auf dem Board weiterlesen (M561)</b> Bereiche und Projekte lassen sich in der Navigationsspalte und in der Kachelübersicht ziehen. Ein Projekt nimmt seine Boards in den neuen Bereich mit. Ein Klick auf eine Karte in der Navigation zeigt sie lesbar auf dem Board. Die Agency-Wortmarke steht still und der Mauszeiger folgt dem System.</li>
                 <li><b>Eine fließende Welle in der Agency-Wortmarke (M560)</b> Der linke Stamm des „p“ bleibt fest. Die Welle baut sich links der Öffnung auf und fließt zum rechten Rand. Die i-Stämme sind sanft gerundet. Ihre Punkte, der violette Trennpunkt und „notes“ stehen still.</li>
                 <li><b>Timer bei ausgeblendeter Oberfläche (M559)</b> Der gemeinsame Timer bleibt beim Teilen sichtbar und zählt weiter. Du kannst ihn auch in dieser Ansicht verschieben, minimieren und durch Antippen der Restzeit wieder öffnen.</li>
                 <li><b>Timer verschieben und minimieren (M558)</b> Zieh den „Timer für alle“ am Griff aus dem Weg oder lass ihn als kleinen Knopf mit Restzeit anzeigen. Ein Klick auf die Restzeit öffnet die ganze Uhr wieder. Jede Person wählt ihre eigene Anzeige und sieht dieselbe Restzeit.</li>
@@ -543,6 +544,8 @@ export function HelpOverlay() {
                 <li><b>Alt+U</b> blendet die Spalte aus und ein (wie der ‹-Knopf an ihrem Fuß), <b>Alt+W</b> springt in ihre Suche.</li>
                 <li><b>Alt+B</b> blendet die Oberfläche zum Teilen des Bildschirms aus (M510). Ein laufender Gruppen-Timer bleibt sichtbar. <b>Esc</b> holt sie zurück, ebenso der Knopf, der bei Mausbewegung unten rechts erscheint.</li>
                 <li>Am Telefon öffnet der Weg <b>„Projekt › Board"</b> in der Kopfzeile denselben Baum.</li>
+                <li>Ziehe in der Navigationsspalte die Kopfzeile eines Bereichs oder Projekts an die gewünschte Stelle. In der Kachelübersicht nimmst du den Griff am Namen. Lege ein Projekt auf dem Kopf des Zielbereichs ab, um es dort am Ende einzufügen. Ohne Ziehen geht es über <b>⋯ → Verschieben …</b>.</li>
+                <li>Wenn du im Baum oder in der Übersicht eine Karte auswählst, öffnet sich ihr Board mit der Karte im sichtbaren Ausschnitt. Eine geöffnete Seitenspalte bleibt dabei sichtbar.</li>
                 <li><b>Übersicht:</b> Bereiche als Zonen, Boards als Kacheln – per Drag in andere Projekte verschiebbar. Der Umschalter <b>Hierarchie ⇄ Netz</b> zeigt dort den Verknüpfungs-Graphen (Portale, [[Wikilinks]]).</li>
               </ul>
               <h4>⋯ an Board und Projekt</h4>
